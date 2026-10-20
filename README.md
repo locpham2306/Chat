@@ -6,14 +6,15 @@ Repository chung cho ứng dụng chat: backend và frontend được phát tri�
 
 ```text
 Chat/
-├── backend/       # Spring Boot, đang review bước 3: MySQL/JPA/Flyway
+├── backend/       # Spring Boot, đang review bước 4: dữ liệu user/session
 │   └── docs/      # Quy tắc BE và hợp đồng API
 └── frontend/      # Frontend (chưa dựng base)
 ```
 
 Backend có khung Java 21 / Spring Boot 3.5.16 / Maven và health check.
 Đã thêm xử lý lỗi HTTP và Bean Validation dùng message bundle.
-Cấu hình persistence dùng MySQL 8.4, JPA và Flyway; chưa có bảng hoặc API nghiệp vụ.
+Cấu hình persistence dùng MySQL 8.4, JPA và Flyway; có schema/entity/repository user/session,
+chưa có API nghiệp vụ.
 Framework frontend chưa chốt.
 
 BE phát triển trên nhánh `backend`, code nằm trong `backend/`.

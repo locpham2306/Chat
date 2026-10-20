@@ -1,7 +1,7 @@
 # Database migrations
 
-Chưa có bảng nghiệp vụ ở bước 3. Flyway quản lý lịch sử migration;
-schema user/session sẽ được thêm ở bước auth sau khi review.
+V1 tạo bảng users; V2 tạo bảng sessions.
+Entity/repository nằm ở modules.user và modules.auth.
 
 - Đặt SQL tại đây: `V1__create_users.sql`, `V2__create_sessions.sql`, ...
 - Chỉ tạo migration khi có thay đổi schema thực sự, không thêm migration rỗng.

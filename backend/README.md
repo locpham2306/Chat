@@ -1,7 +1,7 @@
 # Backend
 
 Thư mục dành cho toàn bộ source, build, cấu hình và test của backend Spring Boot.
-Bước 3: cấu hình MySQL/JPA/Flyway; đã có lỗi HTTP/validation chung, chưa có bảng hoặc API nghiệp vụ.
+Bước 4: schema/entity/repository user và session; chưa có API auth hoặc API chat.
 Java 21, Spring Boot 3.5.16, Maven Wrapper 3.9.5; root package `com.chat`.
 
 Phát triển trên nhánh `backend`, giữ toàn bộ code trong thư mục `backend/`.
@@ -25,9 +25,9 @@ Linux/macOS: `sh mvnw spring-boot:run`.
 File `.env.example` chỉ là mẫu; Spring Boot không tự đọc `.env`.
 App yêu cầu database hoạt động; không tự tạo database hay âm thầm chuyển sang database in-memory.
 
-Kiểm tra: `GET http://localhost:8080/actuator/health` trả `{"status":"UP"}`.
+Kiểm tra: `GET http://localhost:8086/actuator/health` trả `{"status":"UP"}`.
 Chỉ expose health, không expose env hoặc chi tiết health.
-Đổi port bằng biến môi trường `SERVER_PORT` (mặc định 8080).
+Đổi port bằng biến môi trường `SERVER_PORT` (mặc định 8086).
 Ứng dụng chưa có session/authentication hay API chat; chưa dùng để triển khai production.
 
 ## Build và kiểm tra
@@ -45,6 +45,9 @@ Lệnh chạy jar vẫn cần các biến DB và MySQL như phần chạy local.
 Test khởi động HTTP server ở port ngẫu nhiên, kiểm tra health và endpoint env không được expose.
 Test persistence chạy migration fixture trên MySQL, kiểm tra không chạy lặp migration,
 lưu/đọc tiếng Việt và emoji, rollback transaction.
+Các migration production V1/V2 cũng chạy trong test; Hibernate validate entity khớp schema.
+Test bổ sung kiểm tra unique username, UUID/audit, foreign key, unique token hash,
+phiên hết hạn đúng tại expiresAt và thu hồi idempotent.
 Test MVC kiểm tra validation Việt/Anh, JSON sai, lỗi nghiệp vụ, lỗi giao thức HTTP,
 ẩn thông tin lỗi nội bộ và giữ nguyên response thành công.
 
@@ -77,7 +80,7 @@ Các endpoint `/test/...` chỉ nằm trong test, không được thêm vào ứ
 
 ## Các bước review tiếp theo
 
-1. Schema user/session, entity/repository và session cookie, đăng nhập/đăng xuất.
+1. Service/API đăng ký, đăng nhập/đăng xuất, mã hóa mật khẩu và session cookie.
 2. Module nghiệp vụ, phân quyền hội thoại và WebSocket.
 
 Mỗi bước dừng để review; chỉ commit/push khi được yêu cầu.

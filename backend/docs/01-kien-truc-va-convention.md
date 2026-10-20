@@ -2,8 +2,9 @@
 
 ## Phạm vi
 
-Hiện có `com.chat.ChatApplication` và phần common cho lỗi HTTP/validation;
-các module nghiệp vụ sẽ được thêm theo từng bước review.
+Hiện có `com.chat.ChatApplication`, phần common cho lỗi HTTP/validation,
+entity/repository trong `modules.user` và `modules.auth`.
+Service và API nghiệp vụ sẽ được thêm theo từng bước review.
 Tham khảo cách tổ chức của QLCC; không mang nghiệp vụ chung cư, Core/CMS,
 sync offline hoặc cấu hình nội bộ sang Chat.
 
@@ -13,6 +14,7 @@ Dưới root package `com.chat`:
 
 ```text
 common/
+  base/
   config/
   exception/
   dto/
@@ -57,6 +59,12 @@ WebSocket handler đặt trong module sở hữu nghiệp vụ và gọi service
 - Entity khớp migration; kiểu ID khớp schema DB. ID trên API vẫn là string theo hợp đồng.
 - Ưu tiên FK ID; dùng quan hệ JPA khi có lý do rõ ràng, tránh serialize entity trực tiếp.
 - Không ép entity kế thừa base có audit/sync không phù hợp schema.
+- `common.base.BaseEntity` chứa createdAt/updatedAt, dùng `@CreatedDate`,
+  `@LastModifiedDate` và `AuditingEntityListener`; bật tại `common.config.JpaAuditingConfig`.
+- Entity có audit tương ứng kế thừa BaseEntity (hiện là UserEntity).
+  SessionEntity giữ createdAt/expiresAt/revokedAt riêng cho vòng đời phiên.
+- Dùng Lombok `@Getter` thay getter viết tay. Không dùng `@Data` hoặc setter toàn bộ
+  để tránh lộ thông tin trong toString và cho phép sửa ID/audit/token ngoài ý muốn.
 - Enum dùng riêng đặt tại module; enum dùng chung đặt tại `common.enums`.
 - Tên enum kết thúc bằng `Enum`; constant dùng UPPER_SNAKE_CASE.
 - Giá trị serialize ra API phải khớp chính xác chuỗi đã công bố, phân biệt hoa/thường.
