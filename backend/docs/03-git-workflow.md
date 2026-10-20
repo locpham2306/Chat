@@ -1,4 +1,4 @@
-# Quy trình Git
+# Quy trình Git backend
 
 ## Nhánh và commit
 
@@ -21,7 +21,7 @@ Khi có ứng dụng, PR phải qua build/test phù hợp và được reviewer 
 
 ## Checklist
 
-- [ ] Source đúng `backend/` hoặc `frontend/`.
+- [ ] Source BE nằm trong `backend/`.
 - [ ] Module/layer đúng trách nhiệm.
 - [ ] DTO, enum và lỗi khớp hợp đồng.
 - [ ] Phân quyền và transaction được kiểm tra.
