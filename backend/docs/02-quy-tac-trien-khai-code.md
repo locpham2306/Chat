@@ -59,6 +59,8 @@
 ## Database, cấu hình và kiểm thử
 
 - Mỗi thay đổi schema phải có migration; không dùng JPA tự sửa schema production.
+- MySQL 8.4; JPA `ddl-auto=validate`, `open-in-view=false`; Flyway quản lý schema.
+  Xem [database và migration](05-database-va-migration.md).
 - Secret lấy từ env hoặc secret store; cấu hình mẫu chỉ có placeholder.
 - Không thêm dependency/base abstraction khi chưa có nhu cầu.
 - Test nghiệp vụ quan trọng: phân quyền, session hết hạn/thu hồi, logout,

@@ -1,7 +1,7 @@
 # Backend
 
 Thư mục dành cho toàn bộ source, build, cấu hình và test của backend Spring Boot.
-Bước 2: khung Spring Boot và xử lý lỗi HTTP/validation chung; chưa có database hoặc API nghiệp vụ.
+Bước 3: cấu hình MySQL/JPA/Flyway; đã có lỗi HTTP/validation chung, chưa có bảng hoặc API nghiệp vụ.
 Java 21, Spring Boot 3.5.16, Maven Wrapper 3.9.5; root package `com.chat`.
 
 Phát triển trên nhánh `backend`, giữ toàn bộ code trong thư mục `backend/`.
@@ -9,13 +9,21 @@ Khi hoàn thiện và kiểm tra xong mới gộp vào `main`.
 
 ## Chạy local
 
-Cần JDK 21 và kết nối mạng để tải dependency lần đầu. Từ `backend/`:
+Cần JDK 21, MySQL 8.4 và kết nối mạng để tải dependency lần đầu.
+Tạo database `chat` rỗng với charset `utf8mb4`; chuẩn bị tài khoản riêng có quyền trên database này.
+Xem [hướng dẫn database](docs/05-database-va-migration.md).
+Từ `backend/`, đặt biến môi trường bằng giá trị local của bạn:
 
 ```powershell
+$env:DB_URL='jdbc:mysql://localhost:3306/chat?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=UTF-8'
+$env:DB_USERNAME='chat_app'
+$env:DB_PASSWORD='<mat-khau-local>'
 .\mvnw.cmd spring-boot:run
 ```
 
 Linux/macOS: `sh mvnw spring-boot:run`.
+File `.env.example` chỉ là mẫu; Spring Boot không tự đọc `.env`.
+App yêu cầu database hoạt động; không tự tạo database hay âm thầm chuyển sang database in-memory.
 
 Kiểm tra: `GET http://localhost:8080/actuator/health` trả `{"status":"UP"}`.
 Chỉ expose health, không expose env hoặc chi tiết health.
@@ -24,12 +32,19 @@ Chỉ expose health, không expose env hoặc chi tiết health.
 
 ## Build và kiểm tra
 
+Cần Docker Engine/Docker Desktop đang chạy. Testcontainers tạo MySQL riêng trên port ngẫu nhiên,
+không dùng `DB_URL`/tài khoản database local; container được dọn sau test.
+Lần đầu cần tải image `mysql:8.4`.
+
 ```powershell
 .\mvnw.cmd clean verify
 java -jar target/chat-backend-0.0.1-SNAPSHOT.jar
 ```
 
+Lệnh chạy jar vẫn cần các biến DB và MySQL như phần chạy local.
 Test khởi động HTTP server ở port ngẫu nhiên, kiểm tra health và endpoint env không được expose.
+Test persistence chạy migration fixture trên MySQL, kiểm tra không chạy lặp migration,
+lưu/đọc tiếng Việt và emoji, rollback transaction.
 Test MVC kiểm tra validation Việt/Anh, JSON sai, lỗi nghiệp vụ, lỗi giao thức HTTP,
 ẩn thông tin lỗi nội bộ và giữ nguyên response thành công.
 
@@ -62,9 +77,8 @@ Các endpoint `/test/...` chỉ nằm trong test, không được thêm vào ứ
 
 ## Các bước review tiếp theo
 
-1. Chốt database, thêm migration và cấu hình persistence.
-2. Session cookie, đăng nhập/đăng xuất và phân quyền.
-3. Module nghiệp vụ và WebSocket.
+1. Schema user/session, entity/repository và session cookie, đăng nhập/đăng xuất.
+2. Module nghiệp vụ, phân quyền hội thoại và WebSocket.
 
 Mỗi bước dừng để review; chỉ commit/push khi được yêu cầu.
 
