@@ -33,6 +33,15 @@
 - Không trả stack trace, SQL, credential hoặc nội dung nội bộ ra client.
 - Message có thể quản lý bằng resource bundle; code lỗi là key ổn định để FE xử lý.
 - Không tạo enum lỗi chỉ để chứa message; có thể dùng `*ErrorConstants` cho key.
+- Base hiện dùng `BusinessException(HttpStatus, messageKey, args)` cho lỗi 4xx.
+  Code FE được ánh xạ theo HTTP status qua `ErrorConstants`, message tra trong bundle.
+- `@Valid` trên request DTO và message như `{validation.notBlank}` dùng chung
+  `messages.properties` / `messages_en.properties`; mặc định tiếng Việt.
+- DTO lỗi có `timestamp`, `status`, `code`, `message`, `path`, `fieldErrors`.
+  Không đưa giá trị bị reject hoặc query string vào response lỗi.
+- Lỗi giao thức Spring MVC giữ status/header gốc (ví dụ 405 + Allow);
+  lỗi 4xx không có code riêng dùng `VALIDATION_ERROR`.
+- Lỗi security filter và WS chưa được xử lý bởi MVC advice; bổ sung tại bước triển khai tương ứng.
 
 ## Session và phân quyền
 

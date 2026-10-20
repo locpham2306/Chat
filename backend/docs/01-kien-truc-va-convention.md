@@ -2,7 +2,8 @@
 
 ## Phạm vi
 
-Hiện có khung `com.chat.ChatApplication`; các layer bên dưới sẽ được thêm theo từng bước review.
+Hiện có `com.chat.ChatApplication` và phần common cho lỗi HTTP/validation;
+các module nghiệp vụ sẽ được thêm theo từng bước review.
 Tham khảo cách tổ chức của QLCC; không mang nghiệp vụ chung cư, Core/CMS,
 sync offline hoặc cấu hình nội bộ sang Chat.
 
@@ -14,6 +15,8 @@ Dưới root package `com.chat`:
 common/
   config/
   exception/
+  dto/
+    response/
   constant/
   enums/
 modules/

@@ -1,7 +1,7 @@
 # Backend
 
 Thư mục dành cho toàn bộ source, build, cấu hình và test của backend Spring Boot.
-Bước 1: khung Spring Boot chạy độc lập, chưa có database hoặc API nghiệp vụ.
+Bước 2: khung Spring Boot và xử lý lỗi HTTP/validation chung; chưa có database hoặc API nghiệp vụ.
 Java 21, Spring Boot 3.5.16, Maven Wrapper 3.9.5; root package `com.chat`.
 
 Phát triển trên nhánh `backend`, giữ toàn bộ code trong thư mục `backend/`.
@@ -30,13 +30,41 @@ java -jar target/chat-backend-0.0.1-SNAPSHOT.jar
 ```
 
 Test khởi động HTTP server ở port ngẫu nhiên, kiểm tra health và endpoint env không được expose.
+Test MVC kiểm tra validation Việt/Anh, JSON sai, lỗi nghiệp vụ, lỗi giao thức HTTP,
+ẩn thông tin lỗi nội bộ và giữ nguyên response thành công.
+
+## Xử lý lỗi và validation
+
+- `common.exception.BusinessException`: lỗi nghiệp vụ với HTTP status 4xx và message key.
+- `common.exception.GlobalExceptionHandler`: chuẩn hóa lỗi trong Spring MVC.
+- `common.dto.response.ErrorResponse`: timestamp UTC, status, code, message, path, fieldErrors.
+- `common.constant.ErrorConstants`: các code ổn định theo hợp đồng.
+- `common.config.ValidationConfig`: Bean Validation dùng chung message bundle.
+- `messages.properties` / `messages_en.properties`: tiếng Việt mặc định; dùng
+  `Accept-Language: en` để nhận tiếng Anh.
+
+Ví dụ trong service khi đã có nghiệp vụ:
+
+```java
+throw new BusinessException(HttpStatus.NOT_FOUND, ErrorConstants.NOT_FOUND);
+```
+
+Message riêng module khai báo trong bundle, code trả FE vẫn theo loại lỗi HTTP.
+Key không tồn tại sẽ dùng thông báo chung, không trả nguyên key.
+Request DTO dùng `@NotBlank(message = "{validation.notBlank}")` cùng `@Valid`.
+Không đưa password, token hoặc chi tiết SQL vào message/arguments.
+`fieldErrors` luôn là array; lỗi DTO có tên field và message, không chứa rejectedValue.
+
+Các lỗi giao thức vẫn giữ HTTP status/header gốc, ví dụ 405 với header Allow;
+405/406 dùng code `VALIDATION_ERROR`, không chuyển thành 500.
+Phần này xử lý lỗi Spring MVC; lỗi filter/security và WS sẽ được tích hợp riêng ở bước tương ứng.
+Các endpoint `/test/...` chỉ nằm trong test, không được thêm vào ứng dụng.
 
 ## Các bước review tiếp theo
 
-1. Xử lý lỗi và validation thống nhất theo contract.
-2. Chốt database, thêm migration và cấu hình persistence.
-3. Session cookie, đăng nhập/đăng xuất và phân quyền.
-4. Module nghiệp vụ và WebSocket.
+1. Chốt database, thêm migration và cấu hình persistence.
+2. Session cookie, đăng nhập/đăng xuất và phân quyền.
+3. Module nghiệp vụ và WebSocket.
 
 Mỗi bước dừng để review; chỉ commit/push khi được yêu cầu.
 

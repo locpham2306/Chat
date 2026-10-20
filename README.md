@@ -6,12 +6,13 @@ Repository chung cho ứng dụng chat: backend và frontend được phát tri�
 
 ```text
 Chat/
-├── backend/       # Khung Spring Boot, đang review bước 1
+├── backend/       # Spring Boot, đang review bước 2: lỗi và validation
 │   └── docs/      # Quy tắc BE và hợp đồng API
 └── frontend/      # Frontend (chưa dựng base)
 ```
 
 Backend có khung Java 21 / Spring Boot 3.5.16 / Maven và health check.
+Đã thêm xử lý lỗi HTTP và Bean Validation dùng message bundle.
 Chưa có database hoặc API nghiệp vụ. Framework frontend và database chưa chốt.
 
 BE phát triển trên nhánh `backend`, code nằm trong `backend/`.
