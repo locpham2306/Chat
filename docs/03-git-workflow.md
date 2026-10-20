@@ -2,7 +2,11 @@
 
 ## Nhánh và commit
 
-- `main` là nhánh chung; phát triển trên `feature/<slug>`, `fix/<slug>`, `chore/<slug>`.
+- `main` dành cho bản tích hợp hoàn thiện.
+- BE phát triển trên nhánh `backend`; source vẫn nằm trong thư mục `backend/`.
+  Không code tính năng BE trực tiếp trên `main`; khi hoàn thiện mới gộp vào `main`.
+- Nếu cần nhánh công việc nhỏ cho BE, tách `feature/<slug>`, `fix/<slug>`,
+  `chore/<slug>` từ `backend` rồi gộp lại `backend` trước.
 - Không force-push lên nhánh dùng chung.
 - Commit theo Conventional Commits: `feat:`, `fix:`, `refactor:`, `test:`,
   `docs:`, `build:`, `chore:`; có thể thêm scope `backend`, `frontend`, `docs`.

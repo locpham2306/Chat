@@ -8,11 +8,14 @@ Repository chung cho ứng dụng chat: backend và frontend được phát tri�
 Chat/
 ├── backend/       # Backend Spring Boot (chưa dựng base)
 ├── docs/          # Quy tắc code, Git và hợp đồng API
-└── frontend/      # Sẽ được thêm khi bắt đầu làm FE
+└── frontend/      # Frontend (chưa dựng base)
 ```
 
 Hiện repo chỉ có cấu trúc và tài liệu; chưa có ứng dụng chạy được, build, database hoặc dependency.
 Framework frontend, phiên bản Java/Spring Boot, build tool và database sẽ được chốt khi dựng base.
+
+BE phát triển trên nhánh `backend`, code nằm trong `backend/`.
+`main` dành cho bản tích hợp hoàn thiện; khi BE sẵn sàng mới gộp từ `backend` vào `main`.
 
 ## Tài liệu
 
@@ -21,6 +24,7 @@ Framework frontend, phiên bản Java/Spring Boot, build tool và database sẽ 
 - [Quy trình Git](docs/03-git-workflow.md)
 - [Hợp đồng API chat](docs/04-hop-dong-api.md)
 - [Hướng dẫn backend](backend/README.md)
+- [Hướng dẫn frontend](frontend/README.md)
 
 Convention tổ chức code tham khảo QLCC, được điều chỉnh cho ứng dụng chat.
 Hợp đồng API của Chat là nguồn quyết định về endpoint, method, response và enum.
