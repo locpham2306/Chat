@@ -55,4 +55,4 @@
 - Test nghiệp vụ quan trọng: phân quyền, session hết hạn/thu hồi, logout,
   lookup không tạo hội thoại, tin đầu rollback, gửi đồng thời và retry không tạo trùng.
 - Khi đã có build tool, chạy compile/test phù hợp và ghi kết quả thực tế trong PR.
-  Hiện chưa dựng base nên chưa có lệnh kiểm thử ứng dụng.
+  Chạy `.\mvnw.cmd clean verify` từ `backend/` trên Windows; Linux/macOS dùng `sh mvnw clean verify`.

@@ -7,4 +7,4 @@
 - Tuân thủ `docs/01-kien-truc-va-convention.md` và `docs/02-quy-tac-trien-khai-code.md`.
 - Theo `docs/03-git-workflow.md`; khi hoàn thiện mới gộp vào `main`.
 - Khi đổi API, cập nhật `docs/04-hop-dong-api.md` và tài liệu liên quan để FE đối chiếu.
-- Chưa dựng base; không tự thêm framework, database hoặc hạ tầng khi chưa có yêu cầu.
+- Đang review bước 1: khung Spring Boot. Làm từng bước; chỉ commit/push khi người dùng yêu cầu.

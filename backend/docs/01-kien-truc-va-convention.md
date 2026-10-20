@@ -2,13 +2,13 @@
 
 ## Phạm vi
 
-Đây là quy ước cho code sẽ được triển khai, không phải mô tả các class đã tồn tại.
+Hiện có khung `com.chat.ChatApplication`; các layer bên dưới sẽ được thêm theo từng bước review.
 Tham khảo cách tổ chức của QLCC; không mang nghiệp vụ chung cư, Core/CMS,
 sync offline hoặc cấu hình nội bộ sang Chat.
 
 ## Cấu trúc backend
 
-Dưới root package được chốt khi dựng base:
+Dưới root package `com.chat`:
 
 ```text
 common/
