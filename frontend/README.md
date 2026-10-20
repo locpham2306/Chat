@@ -10,6 +10,6 @@ Khi bắt đầu triển khai:
 3. Tạo cấu hình mẫu không chứa secret và hướng dẫn chạy local.
 4. Thêm test và CI tương ứng với tính năng thực sự triển khai.
 
-Đọc [hợp đồng API](../docs/04-hop-dong-api.md) và
-[quy trình Git](../docs/03-git-workflow.md) trước khi code.
+Đọc [hợp đồng API](../backend/docs/04-hop-dong-api.md) trước khi tích hợp với BE.
+Quy tắc code frontend sẽ được nhóm FE bổ sung riêng.
 HTTP và WebSocket phải khớp endpoint, enum và luồng session đã thống nhất.

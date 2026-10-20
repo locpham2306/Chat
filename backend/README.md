@@ -13,6 +13,9 @@ Khi bắt đầu triển khai:
 3. Tạo cấu hình mẫu không chứa secret và hướng dẫn chạy local.
 4. Thêm migration, test và CI tương ứng với tính năng thực sự triển khai.
 
-Đọc [convention](../docs/01-kien-truc-va-convention.md),
-[quy tắc code](../docs/02-quy-tac-trien-khai-code.md) và
-[hợp đồng API](../docs/04-hop-dong-api.md) trước khi code.
+Quy tắc BE được lưu trong `docs/` của thư mục backend.
+
+Đọc [convention](docs/01-kien-truc-va-convention.md),
+[quy tắc code](docs/02-quy-tac-trien-khai-code.md),
+[quy trình Git](docs/03-git-workflow.md) và
+[hợp đồng API](docs/04-hop-dong-api.md) trước khi code.
