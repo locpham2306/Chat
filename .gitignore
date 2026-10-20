@@ -1,0 +1,38 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+!.env.sample
+application-local.yml
+application-local.yaml
+application-local.properties
+*.key
+*.pem
+*.p12
+*.jks
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Java builds (keep Maven/Gradle wrapper files trackable)
+target/
+build/
+.gradle/
+*.class
+
+# Frontend builds
+node_modules/
+dist/
+coverage/
+.next/
+.nuxt/
+
+# Runtime data
+logs/
+*.log
+uploads/
+tmp/
