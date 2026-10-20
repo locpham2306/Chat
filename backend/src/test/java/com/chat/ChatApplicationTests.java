@@ -4,6 +4,13 @@ import com.chat.modules.auth.entity.SessionEntity;
 import com.chat.modules.auth.repository.SessionRepository;
 import com.chat.modules.user.entity.UserEntity;
 import com.chat.modules.user.repository.UserRepository;
+import com.chat.modules.conversation.entity.ConversationEntity;
+import com.chat.modules.conversation.entity.ConversationReadStateEntity;
+import com.chat.modules.conversation.entity.ConversationMemberEntity;
+import com.chat.modules.conversation.enums.MemberRoleEnum;
+import com.chat.modules.file.entity.FileEntity;
+import com.chat.modules.message.entity.MessageEntity;
+import com.chat.modules.message.entity.MessageAttachmentEntity;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +44,8 @@ class ChatApplicationTests {
     @ServiceConnection
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4")
             .withDatabaseName("chat_test")
-            .withCommand("--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci");
+            .withCommand("--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci",
+                    "--log-bin-trust-function-creators=1");
 
     @Autowired
     private TestRestTemplate restTemplate;
@@ -77,7 +85,7 @@ class ChatApplicationTests {
 
     @Test
     void migrationsAreAppliedAndNotRepeated() {
-        assertThat(flyway.info().applied()).hasSize(3);
+        assertThat(flyway.info().applied()).hasSize(5);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
@@ -193,5 +201,82 @@ class ChatApplicationTests {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new SessionEntity(UUID.randomUUID(), "d".repeat(64), now, now))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void chatEntitiesRoundTripWithAttachmentsAndReadMarker() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            var user = users.saveAndFlush(new UserEntity("DomainUser", "hash", "An"));
+            var conversation = persist(ConversationEntity.group(user.getId(), "Nhóm 👋", null));
+            var member = persist(new ConversationMemberEntity(conversation.getId(), user.getId(),
+                    MemberRoleEnum.OWNER, Instant.now()));
+            var message = persist(new MessageEntity(conversation.getId(), user.getId(), "client-1", "Xin chào"));
+            var file = new FileEntity(user.getId(), "ảnh.png", "test/image.png", "image/png", 12L);
+            file.bindToConversation(conversation.getId());
+            persist(file);
+            var attachment = persist(new MessageAttachmentEntity(message.getId(), file.getId(), 0));
+            persist(new ConversationReadStateEntity(member.getId(), message.getId()));
+            entityManager.clear();
+            assertThat(entityManager.find(ConversationEntity.class, conversation.getId()).getName()).isEqualTo("Nhóm 👋");
+            assertThat(entityManager.find(ConversationReadStateEntity.class, member.getId()).getLastReadMessageId())
+                    .isEqualTo(message.getId());
+            assertThat(entityManager.find(MessageEntity.class, message.getId()).getContent()).isEqualTo("Xin chào");
+            assertThat(entityManager.find(FileEntity.class, file.getId()).getSize()).isEqualTo(12L);
+            assertThat(entityManager.find(MessageAttachmentEntity.class, attachment.getId()).getFileId()).isEqualTo(file.getId());
+            status.setRollbackOnly();
+        });
+    }
+
+    @Test
+    void directPairCannotBeDuplicatedInReverseOrder() {
+        assertThatThrownBy(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            var a = users.saveAndFlush(new UserEntity("PairA", "hash", "A"));
+            var b = users.saveAndFlush(new UserEntity("PairB", "hash", "B"));
+            persist(ConversationEntity.direct(a.getId(), b.getId()));
+            persist(ConversationEntity.direct(b.getId(), a.getId()));
+        })).hasRootCauseInstanceOf(java.sql.SQLException.class);
+    }
+
+    @Test
+    void senderClientMessageIdCannotBeDuplicatedAcrossConversations() {
+        assertThatThrownBy(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            var user = users.saveAndFlush(new UserEntity("RetryUser", "hash", "A"));
+            var first = persist(ConversationEntity.group(user.getId(), "First", null));
+            var second = persist(ConversationEntity.group(user.getId(), "Second", null));
+            persist(new MessageEntity(first.getId(), user.getId(), "same-client-id", "Hello"));
+            persist(new MessageEntity(second.getId(), user.getId(), "same-client-id", "Hello"));
+        })).hasRootCauseInstanceOf(java.sql.SQLException.class);
+    }
+
+    @Test
+    void readMarkerCannotReferenceAnotherConversation() {
+        assertThatThrownBy(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            var user = users.saveAndFlush(new UserEntity("ReadUser", "hash", "A"));
+            var first = persist(ConversationEntity.group(user.getId(), "First", null));
+            var second = persist(ConversationEntity.group(user.getId(), "Second", null));
+            var member = persist(new ConversationMemberEntity(first.getId(), user.getId(), MemberRoleEnum.OWNER, Instant.now()));
+            var message = persist(new MessageEntity(second.getId(), user.getId(), "read-1", "Hello"));
+            persist(new ConversationReadStateEntity(member.getId(), message.getId()));
+        })).hasRootCauseInstanceOf(java.sql.SQLException.class);
+    }
+
+    @Test
+    void attachmentCannotUseFileBoundToAnotherConversation() {
+        assertThatThrownBy(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            var user = users.saveAndFlush(new UserEntity("FileUser", "hash", "A"));
+            var first = persist(ConversationEntity.group(user.getId(), "First", null));
+            var second = persist(ConversationEntity.group(user.getId(), "Second", null));
+            var file = new FileEntity(user.getId(), "file.txt", "test/file.txt", "text/plain", 5);
+            file.bindToConversation(first.getId());
+            persist(file);
+            var message = persist(new MessageEntity(second.getId(), user.getId(), "file-1", null));
+            persist(new MessageAttachmentEntity(message.getId(), file.getId(), 0));
+        })).hasRootCauseInstanceOf(java.sql.SQLException.class);
+    }
+
+    private <T> T persist(T entity) {
+        entityManager.persist(entity);
+        entityManager.flush();
+        return entity;
     }
 }

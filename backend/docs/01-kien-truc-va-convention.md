@@ -3,7 +3,7 @@
 ## Phạm vi
 
 Hiện có `com.chat.ChatApplication`, phần common cho lỗi HTTP/validation,
-entity/repository trong `modules.user` và `modules.auth`.
+entity trong modules user/auth/conversation/message/file, repository user/auth.
 Service và API nghiệp vụ sẽ được thêm theo từng bước review.
 Tham khảo cách tổ chức của QLCC; không mang nghiệp vụ chung cư, Core/CMS,
 sync offline hoặc cấu hình nội bộ sang Chat.
@@ -61,7 +61,7 @@ WebSocket handler đặt trong module sở hữu nghiệp vụ và gọi service
 - Không ép entity kế thừa base có audit/sync không phù hợp schema.
 - `common.base.BaseEntity` chứa createdAt/updatedAt, dùng `@CreatedDate`,
   `@LastModifiedDate` và `AuditingEntityListener`; bật tại `common.config.JpaAuditingConfig`.
-- Entity có audit tương ứng kế thừa BaseEntity (hiện là UserEntity).
+- Entity có audit tương ứng kế thừa BaseEntity.
   SessionEntity giữ createdAt/expiresAt/revokedAt riêng cho vòng đời phiên.
 - Dùng Lombok `@Getter` thay getter viết tay. Không dùng `@Data` hoặc setter toàn bộ
   để tránh lộ thông tin trong toString và cho phép sửa ID/audit/token ngoài ý muốn.

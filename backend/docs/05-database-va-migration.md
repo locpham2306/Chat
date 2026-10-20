@@ -5,8 +5,13 @@
 - MySQL 8.4, Spring Data JPA, HikariCP, Flyway.
 - Dependency version do Spring Boot BOM quản lý.
 - Bước 4 thêm V1 users, V2 sessions và entity/repository; chưa có service/API auth.
+- V3 thêm conversations, conversation_members, messages, files, message_attachments
+  và FK avatar. Xem [schema đầy đủ](06-database-schema.md).
+- V4 chuẩn hóa 3NF: tách read state, bỏ conversation_id lặp ở attachment;
+  chuyển dữ liệu cũ và giữ kiểm tra cùng hội thoại bằng trigger.
 - `common.base.BaseEntity` gom createdAt/updatedAt, tự ghi qua JPA Auditing.
-  UserEntity kế thừa base; SessionEntity giữ các mốc thời gian vòng đời phiên riêng.
+  Các entity user/conversation/member/message/file/attachment kế thừa base;
+  SessionEntity giữ các mốc thời gian vòng đời phiên riêng.
 - Chưa thêm Redis, auditing user hoặc soft delete khi chưa có nghiệp vụ dùng đến.
 
 ## Kết nối local
@@ -21,6 +26,10 @@ CREATE DATABASE chat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 Tạo tài khoản riêng và cấp quyền DDL/DML cần thiết trong database `chat`
 để Flyway quản lý schema và app truy xuất dữ liệu. Không dùng root để chạy app.
 Credential không đưa vào Git; tham khảo `backend/.env.example`.
+V4 tạo trigger. Khi server bật binary logging, chạy migration bằng tài khoản quản trị
+có quyền phù hợp hoặc để DBA cấu hình `log_bin_trust_function_creators` theo chính sách
+môi trường. Không cấp SUPER cho tài khoản runtime. Container test bật tùy chọn này
+riêng trong container; migration không thay đổi cấu hình global của MySQL local.
 
 | Biến | Ý nghĩa |
 | --- | --- |
@@ -32,7 +41,9 @@ Credential không đưa vào Git; tham khảo `backend/.env.example`.
 
 URL mẫu dùng `connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=UTF-8`.
 Không tắt TLS mặc định trong cấu hình chung; TLS/certificate cấu hình theo môi trường.
-Spring Boot không tự load file `.env`; đặt biến qua shell, IDE hoặc hệ thống triển khai.
+App đã khai báo import `.env` tại thư mục làm việc hoặc `backend/.env`.
+Chạy từ `Chat/` hoặc `Chat/backend/`; file dùng cú pháp properties `KEY=value`,
+không thêm quote/export. Biến môi trường vẫn ghi đè giá trị trong file.
 
 ## Quản lý schema
 
@@ -47,7 +58,8 @@ Spring Boot không tự load file `.env`; đặt biến qua shell, IDE hoặc h�
 - `spring.sql.init.mode=never`: không trộn thêm `schema.sql`/`data.sql` với Flyway.
 
 Khi chạy app trên database Chat, Flyway tạo users/sessions và bảng lịch sử migration.
-Trong lượt triển khai bước 4 chỉ chạy migration trên container test; chưa chạy trên MySQL local.
+Kiểm thử dùng MySQL 8.4 trong Docker; máy local hiện là MySQL 8.0.37.
+Chỉ chạy migration local vào schema `chat` khi được yêu cầu.
 
 ## Schema user/session
 
@@ -60,7 +72,7 @@ Trong lượt triển khai bước 4 chỉ chạy migration trên container test
 - `password_hash`: tối đa 255 ký tự; chỉ nhận mật khẩu đã được encode bởi auth service.
   Chưa triển khai encoder hoặc lưu mật khẩu thật trong bước này.
 - `full_name`: tối đa 100 ký tự, hỗ trợ tiếng Việt/emoji.
-- `avatar_file_id`, `last_seen`: nullable. Chưa có FK avatar vì bảng files chưa triển khai.
+- `avatar_file_id`, `last_seen`: nullable. V3 bổ sung FK avatar tới files.
 - `created_at`, `updated_at`: JPA Auditing ghi thời gian UTC qua BaseEntity.
   Không nhận từ API; không có public setter cho các trường audit.
 - Không lưu ONLINE/OFFLINE cố định; presence sẽ tính theo kết nối WS.
@@ -91,6 +103,8 @@ Kiểm tra migration chạy thành công và không chạy lại, UTF-8/emoji, r
 health và endpoint env không expose. Có test mapping UUID/audit, unique username/hash,
 FK session, expiry boundary, revocation idempotent và Hibernate validate schema.
 Chưa kiểm thử luồng login/cookie vì API đó chưa được triển khai.
+`ChatSchemaMigrationTests` nâng cấp V3 có dữ liệu lên V4, kiểm tra giữ mốc đọc/audit,
+liên kết tin/file và chặn cập nhật sai hội thoại cả ở dòng con lẫn dòng cha.
 
 ## Tham khảo
 

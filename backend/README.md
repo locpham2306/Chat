@@ -1,7 +1,8 @@
 # Backend
 
 Thư mục dành cho toàn bộ source, build, cấu hình và test của backend Spring Boot.
-Bước 4: schema/entity/repository user và session; chưa có API auth hoặc API chat.
+Đã dựng entity/schema cho toàn bộ phạm vi chat; chưa có API auth hoặc API chat.
+Xem [schema và quan hệ DB](docs/06-database-schema.md).
 Java 21, Spring Boot 3.5.16, Maven Wrapper 3.9.5; root package `com.chat`.
 
 Phát triển trên nhánh `backend`, giữ toàn bộ code trong thư mục `backend/`.
@@ -22,7 +23,10 @@ $env:DB_PASSWORD='<mat-khau-local>'
 ```
 
 Linux/macOS: `sh mvnw spring-boot:run`.
-File `.env.example` chỉ là mẫu; Spring Boot không tự đọc `.env`.
+Có thể copy `.env.example` thành `backend/.env` và điền thông tin local.
+App import `.env` khi chạy từ `Chat/` hoặc `Chat/backend/`; dùng `KEY=value`,
+không bọc giá trị trong dấu nháy hoặc thêm `export`. Biến môi trường có độ ưu tiên cao hơn file.
+Trong VS Code chọn cấu hình `Chat Backend (8086)` rồi F5/Ctrl+F5.
 App yêu cầu database hoạt động; không tự tạo database hay âm thầm chuyển sang database in-memory.
 
 Kiểm tra: `GET http://localhost:8086/actuator/health` trả `{"status":"UP"}`.
@@ -45,7 +49,8 @@ Lệnh chạy jar vẫn cần các biến DB và MySQL như phần chạy local.
 Test khởi động HTTP server ở port ngẫu nhiên, kiểm tra health và endpoint env không được expose.
 Test persistence chạy migration fixture trên MySQL, kiểm tra không chạy lặp migration,
 lưu/đọc tiếng Việt và emoji, rollback transaction.
-Các migration production V1/V2 cũng chạy trong test; Hibernate validate entity khớp schema.
+Các migration production V1–V4 cũng chạy trong test; Hibernate validate entity khớp schema.
+Schema 3NF có 8 bảng nghiệp vụ; test nâng cấp V3 có dữ liệu xác nhận giữ liên kết và mốc đọc.
 Test bổ sung kiểm tra unique username, UUID/audit, foreign key, unique token hash,
 phiên hết hạn đúng tại expiresAt và thu hồi idempotent.
 Test MVC kiểm tra validation Việt/Anh, JSON sai, lỗi nghiệp vụ, lỗi giao thức HTTP,
