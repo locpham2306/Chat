@@ -2,6 +2,8 @@ package com.chat;
 
 import com.chat.modules.auth.entity.SessionEntity;
 import com.chat.modules.auth.repository.SessionRepository;
+import com.chat.modules.auth.service.SessionService;
+import com.chat.modules.auth.security.SessionTokenGenerator;
 import com.chat.modules.user.entity.UserEntity;
 import com.chat.modules.user.repository.UserRepository;
 import com.chat.modules.conversation.entity.ConversationEntity;
@@ -64,6 +66,12 @@ class ChatApplicationTests {
 
     @Autowired
     private SessionRepository sessions;
+
+    @Autowired
+    private SessionService sessionService;
+
+    @Autowired
+    private SessionTokenGenerator sessionTokens;
 
     @Autowired
     private EntityManager entityManager;
@@ -201,6 +209,27 @@ class ChatApplicationTests {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new SessionEntity(UUID.randomUUID(), "d".repeat(64), now, now))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void sessionServicePersistsResolvesAndRevokesWithoutAffectingOtherSessions() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            var user = users.saveAndFlush(new UserEntity("ServiceUser", "hash-fixture", "An"));
+            var first = sessionService.create(user.getId());
+            var second = sessionService.create(user.getId());
+            entityManager.clear();
+            var stored = sessions.findById(first.getSessionId()).orElseThrow();
+            assertThat(stored.getTokenHash()).isEqualTo(sessionTokens.hash(first.getRawToken()));
+            assertThat(stored.getExpiresAt()).isEqualTo(stored.getCreatedAt().plus(365, ChronoUnit.DAYS));
+            assertThat(sessionService.findActive(first.getRawToken()).orElseThrow().userId()).isEqualTo(user.getId());
+            sessionService.revoke(first.getRawToken());
+            var revokedAt = sessions.findById(first.getSessionId()).orElseThrow().getRevokedAt();
+            sessionService.revoke(first.getRawToken());
+            assertThat(sessions.findById(first.getSessionId()).orElseThrow().getRevokedAt()).isEqualTo(revokedAt);
+            assertThat(sessionService.findActive(first.getRawToken())).isEmpty();
+            assertThat(sessionService.findActive(second.getRawToken())).isPresent();
+            status.setRollbackOnly();
+        });
     }
 
     @Test

@@ -37,6 +37,12 @@ spring:
     serialization:
       write-dates-as-timestamps: false
 
+app:
+  session:
+    cookie:
+      secure: ${SESSION_COOKIE_SECURE:true}
+      same-site: ${SESSION_COOKIE_SAME_SITE:Lax}
+
 server:
   port: ${SERVER_PORT:8086}
   shutdown: graceful

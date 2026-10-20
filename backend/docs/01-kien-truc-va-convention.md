@@ -4,7 +4,8 @@
 
 Hiện có `com.chat.ChatApplication`, phần common cho lỗi HTTP/validation,
 entity trong modules user/auth/conversation/message/file, repository user/auth.
-Service và API nghiệp vụ sẽ được thêm theo từng bước review.
+Đã có SessionService/SessionCookieService và implementation ở module auth;
+API và filter xác thực sẽ được thêm theo từng bước review.
 Tham khảo cách tổ chức của QLCC; không mang nghiệp vụ chung cư, Core/CMS,
 sync offline hoặc cấu hình nội bộ sang Chat.
 

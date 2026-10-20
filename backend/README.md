@@ -2,6 +2,7 @@
 
 Thư mục dành cho toàn bộ source, build, cấu hình và test của backend Spring Boot.
 Đã dựng entity/schema cho toàn bộ phạm vi chat; chưa có API auth hoặc API chat.
+Đã thêm [base session và cookie](docs/07-session-base.md), tham khảo cách tách lớp của QLCC.
 Xem [schema và quan hệ DB](docs/06-database-schema.md).
 Java 21, Spring Boot 3.5.16, Maven Wrapper 3.9.5; root package `com.chat`.
 
@@ -32,7 +33,9 @@ App yêu cầu database hoạt động; không tự tạo database hay âm thầ
 Kiểm tra: `GET http://localhost:8086/actuator/health` trả `{"status":"UP"}`.
 Chỉ expose health, không expose env hoặc chi tiết health.
 Đổi port bằng biến môi trường `SERVER_PORT` (mặc định 8086).
-Ứng dụng chưa có session/authentication hay API chat; chưa dùng để triển khai production.
+Ứng dụng có service session nội bộ, chưa có filter xác thực, API auth hoặc API chat.
+Cookie mặc định Secure=true; khi tích hợp login qua HTTP local dùng `SESSION_COOKIE_SECURE=false`.
+Chưa dùng để triển khai production.
 
 ## Build và kiểm tra
 
@@ -55,6 +58,8 @@ Test bổ sung kiểm tra unique username, UUID/audit, foreign key, unique token
 phiên hết hạn đúng tại expiresAt và thu hồi idempotent.
 Test MVC kiểm tra validation Việt/Anh, JSON sai, lỗi nghiệp vụ, lỗi giao thức HTTP,
 ẩn thông tin lỗi nội bộ và giữ nguyên response thành công.
+Test session base kiểm tra sinh/hash token, hạn 365 ngày, thu hồi độc lập từng phiên,
+cookie và không serialize token thô.
 
 ## Xử lý lỗi và validation
 
