@@ -1,7 +1,8 @@
 # Hợp đồng API chat
 
 Tóm tắt các quyết định đã thống nhất ngày 20/10/2026.
-Đây là thiết kế, chưa phải API đã triển khai.
+HTTP-01 đăng ký, HTTP-02 đăng nhập và HTTP-04 đăng xuất đã được triển khai.
+Các API còn lại vẫn là thiết kế.
 
 [Bảng API HTTP, WebSocket, model và mã lỗi](https://docs.google.com/spreadsheets/d/1DTv-iWD6VOK5e8GZwOaJ7J8uR1vmnhGx3EfQp_qGDjk/edit)
 
@@ -10,17 +11,19 @@ Nếu docs và sheet khác nhau, làm rõ trước khi triển khai phần có m
 
 ## Xác thực
 
-- `POST /api/auth/login`: nhận username/password, tạo một session hạn 365 ngày
-  (31.536.000 giây), đặt cookie `token` bằng `Set-Cookie`.
-- Cookie HttpOnly; Secure trên HTTPS; Path=/; SameSite=Lax cho cùng site.
+- `POST /api/auth/register`: nhận username/password/fullName, trả User với status
+  `'OFFLINE'` và không trả password/hash. Username trùng trả 409.
+- `POST /api/auth/login`: nhận username/password, tạo session ngẫu nhiên hạn 365 ngày
+  (31.536.000 giây), chỉ lưu hash + userId + expiresAt và đặt cookie `token`.
+- Response JSON đăng nhập chỉ là `{ "message": "Đăng nhập thành công" }`.
+- Cookie session HttpOnly; Secure trên HTTPS; Path=/; SameSite=Lax cho cùng site.
   Cross-site cần SameSite=None; Secure và bảo vệ CSRF phù hợp.
-- JSON login chỉ trả thông báo thành công, không trả token.
-- Không có access token, refresh token hoặc endpoint refresh.
-- Phiên hết hạn trả 401; FE chuyển tới login để người dùng đăng nhập lại,
-  không tự xác thực lại bằng token hết hạn.
-- `POST /api/auth/logout`: lấy token trong cookie hoặc body `{ "token": "..." }`.
+- Không có access token hoặc refresh token. Trình duyệt tự gửi cookie session;
+  session hết hạn thì FE chuyển người dùng tới đăng nhập.
+- `POST /api/auth/logout`: lấy session token trong cookie hoặc body `{ "token": "..." }`.
   Thiếu cả hai hoặc hai giá trị khác nhau trả 400.
-  Thu hồi phiên, xóa cookie, đóng WS; token đã hết hạn/thu hồi vẫn trả 204.
+  Thu hồi phiên, xóa cookie; token đã hết hạn/thu hồi vẫn trả 204.
+  Phần đóng WS sẽ nối vào logout khi module WebSocket được triển khai.
 
 ## Hội thoại DIRECT và tin đầu
 

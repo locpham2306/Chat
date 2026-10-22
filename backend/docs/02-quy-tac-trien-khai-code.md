@@ -45,10 +45,10 @@
 
 ## Session và phân quyền
 
-- Một session token ngẫu nhiên; server lưu hash, userId, expiresAt và trạng thái thu hồi.
-- Hạn cố định 365 ngày; cookie `token` do backend đặt, HttpOnly,
+- Dùng một session token ngẫu nhiên; server lưu hash, userId, expiresAt và trạng thái thu hồi.
+- Session hạn cố định 365 ngày; cookie `token` do backend đặt, HttpOnly,
   Secure trên HTTPS, Path=/; SameSite theo deployment đã thống nhất.
-- Không access/refresh token; không trả token trong JSON hoặc URL.
+- Không trả session token trong JSON hoặc URL.
 - Request kiểm tra phiên còn hạn/chưa thu hồi và quyền trên tài nguyên.
 - Logout hỗ trợ cookie hoặc body; nếu cả hai khác nhau trả 400.
   Thu hồi server-side, xóa cookie và đóng WS của phiên.

@@ -1,0 +1,77 @@
+package com.chat.modules.auth.service.impl;
+
+import com.chat.common.exception.BusinessException;
+import com.chat.modules.auth.constant.AuthMessageConstants;
+import com.chat.modules.auth.dto.request.LoginRequest;
+import com.chat.modules.auth.dto.request.RegisterRequest;
+import com.chat.modules.auth.service.AuthenticationService;
+import com.chat.modules.auth.service.IssuedSession;
+import com.chat.modules.auth.service.SessionService;
+import com.chat.modules.user.dto.response.UserResponse;
+import com.chat.modules.user.entity.UserEntity;
+import com.chat.modules.user.enums.UserStatusEnum;
+import com.chat.modules.user.mapper.UserMapper;
+import com.chat.modules.user.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.nio.charset.StandardCharsets;
+
+@Service
+@RequiredArgsConstructor
+public class AuthenticationServiceImpl implements AuthenticationService {
+    private static final int BCRYPT_MAX_PASSWORD_BYTES = 72;
+    private final UserRepository users;
+    private final UserMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
+    private final SessionService sessions;
+
+    @Override
+    @Transactional
+    public UserResponse register(RegisterRequest request) {
+        validatePasswordLength(request.password());
+        var username = request.username().trim();
+        var fullName = request.fullName().trim();
+        if (users.existsByUsername(username)) {
+            throw usernameExists();
+        }
+        try {
+            var user = users.saveAndFlush(
+                    new UserEntity(username, passwordEncoder.encode(request.password()), fullName));
+            return userMapper.toResponse(user, UserStatusEnum.OFFLINE);
+        } catch (DataIntegrityViolationException exception) {
+            // The database unique key is authoritative under concurrent registration.
+            throw usernameExists();
+        }
+    }
+
+    @Override
+    @Transactional
+    public IssuedSession login(LoginRequest request) {
+        validatePasswordLength(request.password());
+        var user = users.findByUsername(request.username().trim())
+                .orElseThrow(this::invalidCredentials);
+        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            throw invalidCredentials();
+        }
+        return sessions.create(user.getId());
+    }
+
+    private void validatePasswordLength(String password) {
+        if (password.getBytes(StandardCharsets.UTF_8).length > BCRYPT_MAX_PASSWORD_BYTES) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, AuthMessageConstants.PASSWORD_TOO_LONG);
+        }
+    }
+
+    private BusinessException invalidCredentials() {
+        return new BusinessException(HttpStatus.UNAUTHORIZED, AuthMessageConstants.INVALID_CREDENTIALS);
+    }
+
+    private BusinessException usernameExists() {
+        return new BusinessException(HttpStatus.CONFLICT, AuthMessageConstants.USERNAME_EXISTS);
+    }
+}

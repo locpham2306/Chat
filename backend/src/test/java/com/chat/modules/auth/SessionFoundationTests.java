@@ -58,8 +58,8 @@ class SessionFoundationTests {
             assertThat(service.findActive(token)).isEmpty();
             service.revoke(token);
         }
-        assertThat(service.findActive(null)).isEmpty();
-        service.revoke(null);
+        assertThat(service.findActive((String) null)).isEmpty();
+        service.revoke((String) null);
         verifyNoInteractions(sessions);
     }
 

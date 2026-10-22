@@ -30,10 +30,11 @@ public class SessionCookieServiceImpl implements SessionCookieService {
         if (!tokens.isValidFormat(session.getRawToken())) {
             throw new IllegalArgumentException("Invalid session token format");
         }
-        long seconds = Duration.between(clock.instant(), session.getExpiresAt()).getSeconds();
-        if (seconds <= 0) {
+        var remaining = Duration.between(clock.instant(), session.getExpiresAt());
+        if (remaining.isNegative() || remaining.isZero()) {
             throw new IllegalArgumentException("Cannot set an expired session cookie");
         }
+        long seconds = remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);
         response.addHeader(HttpHeaders.SET_COOKIE,
                 cookie(session.getRawToken()).maxAge(seconds).build().toString());
     }

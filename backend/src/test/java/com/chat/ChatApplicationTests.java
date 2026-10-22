@@ -19,6 +19,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.flywaydb.core.Flyway;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -29,17 +32,21 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "spring.flyway.locations=classpath:db/migration,classpath:db/test-migration")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "spring.flyway.locations=classpath:db/migration,classpath:db/test-migration",
+        "app.session.cookie.secure=true"
+})
 class ChatApplicationTests {
 
     @Container
@@ -74,6 +81,9 @@ class ChatApplicationTests {
     private SessionTokenGenerator sessionTokens;
 
     @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
     private EntityManager entityManager;
 
     @Test
@@ -89,6 +99,42 @@ class ChatApplicationTests {
         var response = restTemplate.getForEntity("/actuator/env", String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void registerLoginAndLogoutFollowCookieSessionContract() {
+        var username = "ApiUser";
+        var password = "MatKhauDemo123";
+        var register = restTemplate.postForEntity("/api/auth/register",
+                Map.of("username", username, "password", password, "fullName", "Nguyễn Văn An"),
+                String.class);
+        assertThat(register.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(register.getBody())
+                .contains("\"username\":\"ApiUser\"", "\"fullName\":\"Nguyễn Văn An\"", "\"status\":\"OFFLINE\"")
+                .doesNotContain(password, "passwordHash", "token");
+        var user = users.findByUsername(username).orElseThrow();
+        assertThat(passwordEncoder.matches(password, user.getPasswordHash())).isTrue();
+
+        var login = restTemplate.postForEntity("/api/auth/login",
+                Map.of("username", username, "password", password), String.class);
+        assertThat(login.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(login.getBody()).isEqualTo("{\"message\":\"Đăng nhập thành công\"}");
+        var setCookie = login.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
+        assertThat(setCookie).contains("token=", "Max-Age=31536000", "Path=/", "HttpOnly", "Secure", "SameSite=Lax");
+        var rawToken = setCookie.substring("token=".length(), setCookie.indexOf(';'));
+        assertThat(login.getBody()).doesNotContain(rawToken);
+        var stored = sessions.findByTokenHashAndRevokedAtIsNullAndExpiresAtAfter(
+                sessionTokens.hash(rawToken), Instant.now()).orElseThrow();
+        assertThat(stored.getUserId()).isEqualTo(user.getId());
+
+        var logoutHeaders = new HttpHeaders();
+        logoutHeaders.set(HttpHeaders.COOKIE, "token=" + rawToken);
+        var logout = restTemplate.exchange("/api/auth/logout", HttpMethod.POST,
+                new HttpEntity<>(logoutHeaders), Void.class);
+        assertThat(logout.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(logout.getHeaders().getFirst(HttpHeaders.SET_COOKIE))
+                .contains("token=;", "Max-Age=0", "Path=/", "HttpOnly", "Secure", "SameSite=Lax");
+        assertThat(sessionService.findActive(rawToken)).isEmpty();
     }
 
     @Test
