@@ -35,7 +35,7 @@ export const RegisterPage = () => {
           state: { successMessage: 'Đăng ký thành công. Bạn có thể đăng nhập ngay.' }
         })
       },
-      onError: (error) => {
+      onError: (error: unknown) => {
         const apiError = getApiError(error)
 
         if (apiError?.status === 409) {

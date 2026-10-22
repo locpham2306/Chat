@@ -40,10 +40,10 @@ export const MainLayout = () => {
           {user && (
             <div className='flex items-center gap-2'>
               <Avatar className='h-8 w-8'>
-                <AvatarFallback>{user.fullName.slice(0, 1).toUpperCase()}</AvatarFallback>
+                <AvatarFallback>{(user.fullName || user.username || 'U').slice(0, 1).toUpperCase()}</AvatarFallback>
               </Avatar>
               <div className='hidden sm:block text-left'>
-                <p className='text-xs font-medium leading-none'>{user.fullName}</p>
+                <p className='text-xs font-medium leading-none'>{user.fullName || user.username || 'User'}</p>
                 <div className='mt-0.5'>
                   <Badge variant={user.status === 'ONLINE' ? 'online' : 'offline'}>
                     {user.status === 'ONLINE' ? 'Online' : 'Offline'}

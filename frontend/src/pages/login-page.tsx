@@ -33,7 +33,7 @@ export const LoginPage = () => {
       onSuccess: () => {
         navigate('/chat', { replace: true })
       },
-      onError: (error) => {
+      onError: (error: unknown) => {
         const apiError = getApiError(error)
 
         apiError?.fieldErrors.forEach((fieldError) => {
