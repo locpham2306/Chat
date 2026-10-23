@@ -14,3 +14,7 @@ export const getApiErrorMessage = (error: unknown): string | undefined => {
 
   return getApiError(error)?.message ?? DEFAULT_ERROR_MESSAGE
 }
+
+export const isUnauthorizedError = (error: unknown): boolean => {
+  return axios.isAxiosError(error) && error.response?.status === 401
+}

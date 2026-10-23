@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
-import { MessageSquare, Moon, Sun, LogOut } from 'lucide-react'
+import { LoaderCircle, LogOut, MessageSquare, Moon, Sun } from 'lucide-react'
 import { Avatar, AvatarFallback } from '~/components/ui/avatar'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
+import { useLogoutMutation } from '~/hooks/use-auth'
 import { useAuthStore } from '~/stores/use-auth-store'
 
 export const MainLayout = () => {
   const [isDark, setIsDark] = useState(false)
+  const [logoutError, setLogoutError] = useState<string | null>(null)
   const user = useAuthStore((state) => state.user)
-  const logout = useAuthStore((state) => state.logout)
+  const logoutMutation = useLogoutMutation()
   const navigate = useNavigate()
 
   const toggleTheme = () => {
@@ -18,8 +20,11 @@ export const MainLayout = () => {
   }
 
   const handleLogout = () => {
-    logout()
-    navigate('/login')
+    setLogoutError(null)
+    logoutMutation.mutate(undefined, {
+      onSuccess: () => navigate('/login', { replace: true }),
+      onError: () => setLogoutError('Không thể đăng xuất. Vui lòng thử lại.')
+    })
   }
 
   return (
@@ -37,6 +42,15 @@ export const MainLayout = () => {
         </div>
 
         <div className='flex items-center gap-3'>
+          {logoutError && (
+            <p
+              role='alert'
+              className='fixed right-4 top-16 z-50 max-w-[calc(100vw-2rem)] rounded-md border border-destructive/30 bg-background px-3 py-2 text-xs text-destructive shadow-sm'
+            >
+              {logoutError}
+            </p>
+          )}
+
           {user && (
             <div className='flex items-center gap-2'>
               <Avatar className='h-8 w-8'>
@@ -61,10 +75,15 @@ export const MainLayout = () => {
             variant='ghost'
             size='icon'
             onClick={handleLogout}
-            title='Đăng xuất (Test mock)'
+            disabled={logoutMutation.isPending}
+            title='Đăng xuất'
             aria-label='Đăng xuất'
           >
-            <LogOut className='h-4 w-4' />
+            {logoutMutation.isPending ? (
+              <LoaderCircle className='h-4 w-4 animate-spin' aria-hidden='true' />
+            ) : (
+              <LogOut className='h-4 w-4' />
+            )}
           </Button>
         </div>
       </header>
