@@ -5,6 +5,7 @@ import type { User } from '~/types/user.type'
 const authApi = {
   login: (body: LoginBody) => http.post<LoginResponse>('/api/auth/login', body),
   register: (body: RegisterBody) => http.post<User>('/api/auth/register', body),
+  logout: () => http.post<void>('/api/auth/logout'),
   getProfile: () => http.get<User>('/api/users/me')
 }
 
