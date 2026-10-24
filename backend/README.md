@@ -1,7 +1,7 @@
 # Backend
 
 Thư mục dành cho toàn bộ source, build, cấu hình và test của backend Spring Boot.
-Đã dựng entity/schema, API register/login/logout, filter session và `/api/users/me`;
+Đã dựng entity/schema, API register/login/logout, filter session, xem/cập nhật `/api/users/me`;
 chưa có API chat. Xem [session và cookie](docs/07-session-base.md).
 Xem [schema và quan hệ DB](docs/06-database-schema.md).
 Java 21, Spring Boot 3.5.16, Maven Wrapper 3.9.5; root package `com.chat`.
@@ -57,15 +57,19 @@ Schema 3NF có 8 bảng nghiệp vụ; test nâng cấp V3 có dữ liệu xác 
 Test bổ sung kiểm tra unique username, UUID/audit, foreign key, unique token hash,
 phiên hết hạn đúng tại expiresAt và thu hồi idempotent.
 Test MVC kiểm tra validation Việt/Anh, JSON sai, lỗi nghiệp vụ, lỗi giao thức HTTP,
-ẩn thông tin lỗi nội bộ và giữ nguyên response thành công.
+ẩn thông tin lỗi nội bộ và response wrapper chung.
 Test auth kiểm tra BCrypt, session hạn 365 ngày, cookie, xác thực `/api/users/me`
-và không serialize token thô.
+và không serialize token thô. Test hồ sơ kiểm tra request đầy đủ, trim tên,
+xóa avatar và quyền sử dụng file ảnh.
 
 ## Xử lý lỗi và validation
 
-- `common.exception.BusinessException`: lỗi nghiệp vụ với HTTP status 4xx và message key.
-- `common.exception.GlobalExceptionHandler`: chuẩn hóa lỗi trong Spring MVC.
-- `common.dto.response.ErrorResponse`: timestamp UTC, status, code, message, path, fieldErrors.
+- `common.wrapper.BaseResponse`: envelope chung `code/strCode/message/content` theo QLCC.
+- `common.dto.response.PageResponse`: dữ liệu và metadata phân trang.
+- `exception.BusinessException` cùng các exception theo HTTP status: lỗi nghiệp vụ với message key.
+- `exception.GlobalExceptionHandler`: chuẩn hóa lỗi Spring MVC vào `BaseResponse`.
+- `common.dto.response.ErrorDetailResponse`: timestamp UTC, status, path, fieldErrors.
+- `utils.MessageUtils`, `StringUtils`, `PageableUtils`: helper dùng chung đã có nhu cầu.
 - `common.constant.ErrorConstants`: các code ổn định theo hợp đồng.
 - `common.config.ValidationConfig`: Bean Validation dùng chung message bundle.
 - `messages.properties` / `messages_en.properties`: tiếng Việt mặc định; dùng
@@ -74,14 +78,15 @@ và không serialize token thô.
 Ví dụ trong service khi đã có nghiệp vụ:
 
 ```java
-throw new BusinessException(HttpStatus.NOT_FOUND, ErrorConstants.NOT_FOUND);
+throw new NotFoundException(ErrorConstants.NOT_FOUND);
 ```
 
-Message riêng module khai báo trong bundle, code trả FE vẫn theo loại lỗi HTTP.
+Message riêng module khai báo trong bundle, `strCode` trả FE vẫn theo loại lỗi HTTP.
 Key không tồn tại sẽ dùng thông báo chung, không trả nguyên key.
 Request DTO dùng `@NotBlank(message = "{validation.notBlank}")` cùng `@Valid`.
 Không đưa password, token hoặc chi tiết SQL vào message/arguments.
-`fieldErrors` luôn là array; lỗi DTO có tên field và message, không chứa rejectedValue.
+`fieldErrors` trong `content` luôn là array; lỗi DTO có tên field và message,
+không chứa rejectedValue.
 
 Các lỗi giao thức vẫn giữ HTTP status/header gốc, ví dụ 405 với header Allow;
 405/406 dùng code `VALIDATION_ERROR`, không chuyển thành 500.
@@ -90,8 +95,9 @@ Các endpoint `/test/...` chỉ nằm trong test, không được thêm vào ứ
 
 ## Các bước review tiếp theo
 
-1. Cập nhật profile bản thân và avatar/file.
-2. Module nghiệp vụ, phân quyền hội thoại và WebSocket.
+1. Tìm kiếm user theo HTTP-07.
+2. Upload/download file và phân quyền file.
+3. Module hội thoại, tin nhắn và WebSocket.
 
 Mỗi bước dừng để review; chỉ commit/push khi được yêu cầu.
 

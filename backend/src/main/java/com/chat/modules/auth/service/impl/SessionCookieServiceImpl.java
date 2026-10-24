@@ -1,7 +1,8 @@
 package com.chat.modules.auth.service.impl;
 
 import com.chat.common.constant.ErrorConstants;
-import com.chat.common.exception.BusinessException;
+import com.chat.exception.BadRequestException;
+import com.chat.exception.BusinessException;
 import com.chat.modules.auth.config.SessionCookieProperties;
 import com.chat.modules.auth.security.SessionTokenGenerator;
 import com.chat.modules.auth.service.IssuedSession;
@@ -10,7 +11,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 
@@ -80,6 +80,6 @@ public class SessionCookieServiceImpl implements SessionCookieService {
     }
 
     private BusinessException invalidRequest() {
-        return new BusinessException(HttpStatus.BAD_REQUEST, ErrorConstants.VALIDATION_ERROR);
+        return new BadRequestException(ErrorConstants.VALIDATION_ERROR);
     }
 }

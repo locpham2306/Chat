@@ -1,12 +1,13 @@
-package com.chat.common.exception;
+package com.chat.exception;
 
 import com.chat.common.constant.ErrorConstants;
-import com.chat.common.dto.response.ErrorResponse;
+import com.chat.common.constant.StatusCode;
+import com.chat.common.dto.response.ErrorDetailResponse;
 import com.chat.common.dto.response.FieldErrorResponse;
+import com.chat.common.wrapper.BaseResponse;
+import com.chat.utils.MessageUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -24,27 +25,28 @@ import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
-
     private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
-    private final MessageSource messageSource;
+    private final MessageUtils messages;
 
-    public GlobalExceptionHandler(MessageSource messageSource) {
-        this.messageSource = messageSource;
+    public GlobalExceptionHandler(MessageUtils messages) {
+        this.messages = messages;
     }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Object> handleBusinessException(BusinessException exception, WebRequest request) {
-        String code = ErrorConstants.forStatus(exception.getStatus().value());
-        String fallback = message(code, request);
-        String detail = messageSource.getMessage(
-                exception.getMessageKey(), exception.getArguments(), fallback, LocaleContextHolder.getLocale());
-        return response(exception.getStatus(), HttpHeaders.EMPTY, code, detail, List.of(), request);
+        var status = exception.getStatus();
+        String strCode = ErrorConstants.forStatus(status.value());
+        String detail = messages.getMessage(exception.getMessageKey(), exception.getArguments());
+        if (detail.equals(exception.getMessageKey())) {
+            detail = messages.getMessage(strCode);
+        }
+        return response(status, HttpHeaders.EMPTY, strCode, detail, List.of(), request);
     }
 
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(
             Exception exception, Object body, HttpHeaders headers,
-            HttpStatusCode status, WebRequest request) {
+            HttpStatusCode statusCode, WebRequest request) {
         if (request instanceof ServletWebRequest servletRequest
                 && servletRequest.getResponse() != null
                 && servletRequest.getResponse().isCommitted()) {
@@ -57,32 +59,29 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     .map(error -> new FieldErrorResponse(
                             error instanceof FieldError fieldError ? fieldError.getField() : error.getObjectName(),
                             error.getDefaultMessage() == null
-                                    ? message(ErrorConstants.VALIDATION_ERROR, request) : error.getDefaultMessage()))
+                                    ? messages.getMessage(ErrorConstants.VALIDATION_ERROR) : error.getDefaultMessage()))
                     .toList();
         }
-        String code = ErrorConstants.forStatus(status.value());
-        return response(status, headers, code, message(code, request), fields, request);
+        var status = HttpStatus.valueOf(statusCode.value());
+        String strCode = ErrorConstants.forStatus(status.value());
+        return response(status, headers, strCode, messages.getMessage(strCode), fields, request);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleUnexpectedException(Exception exception, WebRequest request) {
-        // Exception messages and causes may contain credentials or SQL.
         LOG.error("Unhandled exception type: {}", exception.getClass().getName());
         return response(HttpStatus.INTERNAL_SERVER_ERROR, HttpHeaders.EMPTY,
-                ErrorConstants.INTERNAL_ERROR, message(ErrorConstants.INTERNAL_ERROR, request),
+                ErrorConstants.INTERNAL_ERROR, messages.getMessage(ErrorConstants.INTERNAL_ERROR),
                 List.of(), request);
     }
 
-    private String message(String code, WebRequest request) {
-        return messageSource.getMessage(code, null, LocaleContextHolder.getLocale());
-    }
-
     private ResponseEntity<Object> response(
-            HttpStatusCode status, HttpHeaders headers, String code, String message,
+            HttpStatus status, HttpHeaders headers, String strCode, String message,
             List<FieldErrorResponse> fields, WebRequest request) {
         String path = request instanceof ServletWebRequest servletRequest
                 ? servletRequest.getRequest().getRequestURI() : "";
-        var error = new ErrorResponse(Instant.now(), status.value(), code, message, path, fields);
-        return new ResponseEntity<>(error, headers, status);
+        var detail = new ErrorDetailResponse(Instant.now(), status.value(), path, fields);
+        var response = BaseResponse.error(StatusCode.from(status), strCode, message, detail);
+        return new ResponseEntity<>(response, headers, status);
     }
 }

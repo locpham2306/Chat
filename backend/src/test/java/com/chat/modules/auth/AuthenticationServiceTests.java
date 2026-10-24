@@ -1,6 +1,6 @@
 package com.chat.modules.auth;
 
-import com.chat.common.exception.BusinessException;
+import com.chat.exception.BusinessException;
 import com.chat.modules.auth.constant.AuthMessageConstants;
 import com.chat.modules.auth.dto.request.LoginRequest;
 import com.chat.modules.auth.dto.request.RegisterRequest;

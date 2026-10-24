@@ -1,6 +1,8 @@
-package com.chat.common.exception;
+package com.chat.exception;
 
 import com.chat.common.config.ValidationConfig;
+import com.chat.common.wrapper.BaseResponse;
+import com.chat.utils.MessageUtils;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
@@ -25,7 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = GlobalExceptionHandlerTests.TestController.class)
-@Import({ValidationConfig.class, GlobalExceptionHandlerTests.TestController.class})
+@Import({ValidationConfig.class, MessageUtils.class, GlobalExceptionHandlerTests.TestController.class})
 class GlobalExceptionHandlerTests {
 
     @Autowired
@@ -36,12 +38,13 @@ class GlobalExceptionHandlerTests {
         mvc.perform(post("/test/input").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"\", \"password\":\"secret-password\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.timestamp").isString())
-                .andExpect(jsonPath("$.path").value("/test/input"))
-                .andExpect(jsonPath("$.fieldErrors[0].field").value("name"))
-                .andExpect(jsonPath("$.fieldErrors[0].message").value("Không được để trống"))
+                .andExpect(jsonPath("$.code").value("3"))
+                .andExpect(jsonPath("$.strCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.content.status").value(400))
+                .andExpect(jsonPath("$.content.timestamp").isString())
+                .andExpect(jsonPath("$.content.path").value("/test/input"))
+                .andExpect(jsonPath("$.content.fieldErrors[0].field").value("name"))
+                .andExpect(jsonPath("$.content.fieldErrors[0].message").value("Không được để trống"))
                 .andExpect(content().string(not(containsString("secret-password"))));
     }
 
@@ -51,7 +54,7 @@ class GlobalExceptionHandlerTests {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Invalid request data"))
-                .andExpect(jsonPath("$.fieldErrors[0].message").value("Must not be blank"));
+                .andExpect(jsonPath("$.content.fieldErrors[0].message").value("Must not be blank"));
     }
 
     @Test
@@ -59,8 +62,8 @@ class GlobalExceptionHandlerTests {
         mvc.perform(post("/test/input").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\": secret-token"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.fieldErrors").isEmpty())
+                .andExpect(jsonPath("$.strCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.content.fieldErrors").isEmpty())
                 .andExpect(content().string(not(containsString("secret-token"))));
     }
 
@@ -70,11 +73,11 @@ class GlobalExceptionHandlerTests {
     void businessErrorsUseStableStatusAndCode(int httpStatus, String code) throws Exception {
         mvc.perform(get("/test/business").param("status", Integer.toString(httpStatus)))
                 .andExpect(status().is(httpStatus))
-                .andExpect(jsonPath("$.status").value(httpStatus))
-                .andExpect(jsonPath("$.code").value(code))
-                .andExpect(jsonPath("$.fieldErrors").isEmpty())
+                .andExpect(jsonPath("$.content.status").value(httpStatus))
+                .andExpect(jsonPath("$.strCode").value(code))
+                .andExpect(jsonPath("$.content.fieldErrors").isEmpty())
                 .andExpect(content().string(not(containsString("missing.message.key"))))
-                .andExpect(jsonPath("$.path").value("/test/business"));
+                .andExpect(jsonPath("$.content.path").value("/test/business"));
     }
 
     @Test
@@ -82,7 +85,7 @@ class GlobalExceptionHandlerTests {
         for (String url : new String[]{"/test/business", "/test/business?status=abc"}) {
             mvc.perform(get(url))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+                    .andExpect(jsonPath("$.strCode").value("VALIDATION_ERROR"));
         }
     }
 
@@ -90,8 +93,8 @@ class GlobalExceptionHandlerTests {
     void unknownRouteUsesErrorContract() throws Exception {
         mvc.perform(get("/api/does-not-exist"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("NOT_FOUND"))
-                .andExpect(jsonPath("$.path").value("/api/does-not-exist"));
+                .andExpect(jsonPath("$.strCode").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.content.path").value("/api/does-not-exist"));
     }
 
     @Test
@@ -99,44 +102,44 @@ class GlobalExceptionHandlerTests {
         mvc.perform(get("/test/input"))
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(header().string("Allow", containsString("POST")))
-                .andExpect(jsonPath("$.status").value(405))
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+                .andExpect(jsonPath("$.content.status").value(405))
+                .andExpect(jsonPath("$.strCode").value("VALIDATION_ERROR"));
     }
 
     @Test
     void wrongContentTypeUsesUnsupportedMediaType() throws Exception {
         mvc.perform(post("/test/input").contentType(MediaType.TEXT_PLAIN).content("hello"))
                 .andExpect(status().isUnsupportedMediaType())
-                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
+                .andExpect(jsonPath("$.strCode").value("UNSUPPORTED_MEDIA_TYPE"));
     }
 
     @Test
     void unexpectedFailureDoesNotLeakImplementationDetails() throws Exception {
         mvc.perform(get("/test/failure").queryParam("token", "private-token"))
                 .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(jsonPath("$.strCode").value("INTERNAL_ERROR"))
                 .andExpect(jsonPath("$.message").value("Lỗi nội bộ hệ thống"))
-                .andExpect(jsonPath("$.path").value("/test/failure"))
+                .andExpect(jsonPath("$.content.path").value("/test/failure"))
                 .andExpect(jsonPath("$.trace").doesNotExist())
                 .andExpect(content().string(not(containsString("private-token"))))
                 .andExpect(content().string(not(containsString("database-password"))));
     }
 
     @Test
-    void successfulResponseIsNotWrapped() throws Exception {
+    void successfulResponseUsesBaseResponse() throws Exception {
         mvc.perform(post("/test/input").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"An\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("An"))
-                .andExpect(jsonPath("$.code").doesNotExist());
+                .andExpect(jsonPath("$.content.name").value("An"))
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.strCode").value("success"));
     }
 
-    // Test-only controller: no example endpoints are added to the application.
     @RestController
     static class TestController {
         @PostMapping("/test/input")
-        Input input(@Valid @RequestBody Input input) {
-            return input;
+        BaseResponse<Input> input(@Valid @RequestBody Input input) {
+            return BaseResponse.success(input);
         }
 
         @GetMapping("/test/business")

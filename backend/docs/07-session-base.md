@@ -24,7 +24,7 @@ database chỉ lưu SHA-256 hash.
   và trả Error model 401 khi session không hợp lệ.
 - `AuthenticationService`: đăng ký user, kiểm tra BCrypt password và tạo session.
 - `AuthenticationController`: cung cấp register, login và logout.
-- `UserController`/`UserService`: trả hồ sơ hiện tại tại `GET /api/users/me`.
+- `UserController`/`UserService`: xem và cập nhật hồ sơ tại `GET/PUT /api/users/me`.
 
 Bảng `sessions` lưu `token_hash`, `user_id`, `created_at`, `expires_at`
 và `revoked_at`. Không lưu token thô trong database hoặc log.
@@ -39,9 +39,9 @@ và `revoked_at`. Không lưu token thô trong database hoặc log.
 
 ## Phạm vi hiện tại
 
-Đã có register, login, logout, filter xác thực session và API hồ sơ hiện tại.
-CORS/CSRF, cập nhật hồ sơ/avatar và WebSocket được làm ở các bước review tiếp theo.
+Đã có register, login, logout, filter xác thực session và API xem/cập nhật hồ sơ.
+CORS/CSRF, tìm kiếm user, upload/download file và WebSocket được làm ở các bước tiếp theo.
 
 Test kiểm tra BCrypt, session hạn 365 ngày, hash token trong DB, cookie HttpOnly,
-401 cho session thiếu/sai/đã thu hồi, `/api/users/me`, logout idempotent
-và không lộ token trong JSON.
+401 cho session thiếu/sai/đã thu hồi, `GET/PUT /api/users/me`, logout idempotent,
+phân quyền file avatar và không lộ token trong JSON.

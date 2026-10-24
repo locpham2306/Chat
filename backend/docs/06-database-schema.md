@@ -102,7 +102,8 @@ file và thành viên vẫn cần FK để tránh dữ liệu mồ côi.
   Các trigger giữ ràng buộc liên bảng sau khi bỏ cột lặp; không thay thế phân quyền ở service.
   Tài khoản chạy Flyway cần quyền CREATE TRIGGER trên schema Chat.
 - Unique message/file và message/position; position không âm.
-- Avatar user/nhóm có FK đến files. Quyền sử dụng/loại ảnh sẽ được service kiểm tra.
+- Avatar user/nhóm có FK đến files. Khi cập nhật avatar user, service chỉ nhận file
+  `image/*` do chính user upload và chưa gắn vào hội thoại.
 - Không cascade delete; chưa có API xóa user/hội thoại/tin trong phạm vi hiện tại.
 
 ## Những quy tắc cần service/transaction

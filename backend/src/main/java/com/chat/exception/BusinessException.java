@@ -1,15 +1,10 @@
-package com.chat.common.exception;
+package com.chat.exception;
 
 import org.springframework.http.HttpStatus;
 
 import java.util.Objects;
 
-/**
- * messageKey refers to a public, safe message in the resource bundle.
- * Never pass passwords, tokens or database exception messages as arguments.
- */
 public class BusinessException extends RuntimeException {
-
     private final HttpStatus status;
     private final String messageKey;
     private final Object[] arguments;

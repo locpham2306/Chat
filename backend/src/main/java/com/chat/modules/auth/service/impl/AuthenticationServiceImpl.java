@@ -1,6 +1,9 @@
 package com.chat.modules.auth.service.impl;
 
-import com.chat.common.exception.BusinessException;
+import com.chat.exception.BadRequestException;
+import com.chat.exception.BusinessException;
+import com.chat.exception.DataExistedException;
+import com.chat.exception.UnauthenticatedException;
 import com.chat.modules.auth.constant.AuthMessageConstants;
 import com.chat.modules.auth.dto.request.LoginRequest;
 import com.chat.modules.auth.dto.request.RegisterRequest;
@@ -12,9 +15,9 @@ import com.chat.modules.user.entity.UserEntity;
 import com.chat.modules.user.enums.UserStatusEnum;
 import com.chat.modules.user.mapper.UserMapper;
 import com.chat.modules.user.repository.UserRepository;
+import com.chat.utils.StringUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,8 +37,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Transactional
     public UserResponse register(RegisterRequest request) {
         validatePasswordLength(request.password());
-        var username = request.username().trim();
-        var fullName = request.fullName().trim();
+        var username = StringUtils.trim(request.username());
+        var fullName = StringUtils.trim(request.fullName());
         if (users.existsByUsername(username)) {
             throw usernameExists();
         }
@@ -53,7 +56,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Transactional
     public IssuedSession login(LoginRequest request) {
         validatePasswordLength(request.password());
-        var user = users.findByUsername(request.username().trim())
+        var user = users.findByUsername(StringUtils.trim(request.username()))
                 .orElseThrow(this::invalidCredentials);
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw invalidCredentials();
@@ -63,15 +66,15 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     private void validatePasswordLength(String password) {
         if (password.getBytes(StandardCharsets.UTF_8).length > BCRYPT_MAX_PASSWORD_BYTES) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, AuthMessageConstants.PASSWORD_TOO_LONG);
+            throw new BadRequestException(AuthMessageConstants.PASSWORD_TOO_LONG);
         }
     }
 
     private BusinessException invalidCredentials() {
-        return new BusinessException(HttpStatus.UNAUTHORIZED, AuthMessageConstants.INVALID_CREDENTIALS);
+        return new UnauthenticatedException(AuthMessageConstants.INVALID_CREDENTIALS);
     }
 
     private BusinessException usernameExists() {
-        return new BusinessException(HttpStatus.CONFLICT, AuthMessageConstants.USERNAME_EXISTS);
+        return new DataExistedException(AuthMessageConstants.USERNAME_EXISTS);
     }
 }

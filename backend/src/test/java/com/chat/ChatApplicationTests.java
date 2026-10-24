@@ -6,6 +6,7 @@ import com.chat.modules.auth.service.SessionService;
 import com.chat.modules.auth.security.SessionTokenGenerator;
 import com.chat.modules.user.entity.UserEntity;
 import com.chat.modules.user.repository.UserRepository;
+import com.chat.modules.user.dto.request.UpdateProfileRequest;
 import com.chat.modules.conversation.entity.ConversationEntity;
 import com.chat.modules.conversation.entity.ConversationReadStateEntity;
 import com.chat.modules.conversation.entity.ConversationMemberEntity;
@@ -22,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.flywaydb.core.Flyway;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -118,7 +120,9 @@ class ChatApplicationTests {
         var login = restTemplate.postForEntity("/api/auth/login",
                 Map.of("username", username, "password", password), String.class);
         assertThat(login.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(login.getBody()).isEqualTo("{\"message\":\"Đăng nhập thành công\"}");
+        assertThat(login.getBody())
+                .contains("\"code\":\"0\"", "\"strCode\":\"success\"",
+                        "\"content\":{\"message\":\"Đăng nhập thành công\"}");
         var setCookie = login.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
         assertThat(setCookie).contains("token=", "Max-Age=31536000", "Path=/", "HttpOnly", "Secure", "SameSite=Lax");
         var rawToken = setCookie.substring("token=".length(), setCookie.indexOf(';'));
@@ -129,7 +133,7 @@ class ChatApplicationTests {
 
         var unauthenticated = restTemplate.getForEntity("/api/users/me", String.class);
         assertThat(unauthenticated.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-        assertThat(unauthenticated.getBody()).contains("\"code\":\"UNAUTHENTICATED\"");
+        assertThat(unauthenticated.getBody()).contains("\"strCode\":\"UNAUTHENTICATED\"");
 
         var invalidHeaders = new HttpHeaders();
         invalidHeaders.set(HttpHeaders.COOKIE, "token=invalid");
@@ -146,6 +150,22 @@ class ChatApplicationTests {
                 .contains("\"id\":\"" + user.getId() + "\"", "\"username\":\"ApiUser\"",
                         "\"fullName\":\"Nguyễn Văn An\"", "\"status\":\"OFFLINE\"")
                 .doesNotContain(password, "passwordHash", "token");
+
+        var missingAvatarKeyHeaders = new HttpHeaders();
+        missingAvatarKeyHeaders.putAll(sessionHeaders);
+        missingAvatarKeyHeaders.setContentType(MediaType.APPLICATION_JSON);
+        var missingAvatarKey = restTemplate.exchange("/api/users/me", HttpMethod.PUT,
+                new HttpEntity<>(Map.of("fullName", "Tên mới"), missingAvatarKeyHeaders), String.class);
+        assertThat(missingAvatarKey.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        var updatedProfile = restTemplate.exchange("/api/users/me", HttpMethod.PUT,
+                new HttpEntity<>(new UpdateProfileRequest("  Nguyễn Văn Bình  ", null), sessionHeaders),
+                String.class);
+        assertThat(updatedProfile.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(updatedProfile.getBody())
+                .contains("\"fullName\":\"Nguyễn Văn Bình\"", "\"avatarFileId\":null")
+                .doesNotContain(password, "passwordHash", "token");
+        assertThat(users.findById(user.getId()).orElseThrow().getFullName()).isEqualTo("Nguyễn Văn Bình");
 
         var logout = restTemplate.exchange("/api/auth/logout", HttpMethod.POST,
                 new HttpEntity<>(sessionHeaders), Void.class);

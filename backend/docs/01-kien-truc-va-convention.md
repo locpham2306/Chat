@@ -3,9 +3,9 @@
 ## Phạm vi
 
 Hiện có `com.chat.ChatApplication`, phần common cho lỗi HTTP/validation,
-entity trong modules user/auth/conversation/message/file, repository user/auth.
+entity trong modules user/auth/conversation/message/file, repository user/auth/file.
 Đã có AuthenticationController/Service, SessionService, cookie service,
-filter xác thực session và UserController cho hồ sơ hiện tại.
+filter xác thực session và UserController cho xem/cập nhật hồ sơ hiện tại.
 Tham khảo cách tổ chức của QLCC; không mang nghiệp vụ chung cư, Core/CMS,
 sync offline hoặc cấu hình nội bộ sang Chat.
 
@@ -17,11 +17,13 @@ Dưới root package `com.chat`:
 common/
   base/
   config/
-  exception/
+  wrapper/
   dto/
     response/
   constant/
   enums/
+exception/
+utils/
 modules/
   <feature>/
     controller/
@@ -47,11 +49,15 @@ WebSocket handler đặt trong module sở hữu nghiệp vụ và gọi service
   `Mapper`, `Entity`, `Request`, `Response` theo vai trò.
 - Service có interface; implementation nằm trong `service/impl`.
 - Controller/WS handler nhận input, validate và gọi service; không chứa nghiệp vụ hoặc query DB.
+- Controller bọc response HTTP bằng `common.wrapper.BaseResponse`; dữ liệu phân trang dùng
+  `common.dto.response.PageResponse` trong `content`.
 - Service xử lý nghiệp vụ, phân quyền và transaction.
 - Repository chỉ truy xuất DB. Mapper chuyển Entity/DTO; không query DB hoặc quyết định quyền.
 - Dùng constructor injection; tránh field injection.
 - Ưu tiên MapStruct khi cần mapping; chỉ tạo `BaseMapper` khi có nhu cầu dùng chung thực tế.
 - `common` chỉ chứa thành phần dùng chung; không biến thành nơi chứa mọi nghiệp vụ.
+- Exception dùng chung nằm ở package gốc `com.chat.exception`; helper thuần dùng chung nằm ở
+  `com.chat.utils`, theo cấu trúc base QLCC.
 - SDK storage/cache và client ngoài nằm sau adapter trong `integration`.
   Chưa cần Redis/MinIO hoặc công nghệ khác thì không thêm dependency.
 

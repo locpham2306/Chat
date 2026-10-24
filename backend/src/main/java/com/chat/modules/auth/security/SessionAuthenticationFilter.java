@@ -1,7 +1,8 @@
 package com.chat.modules.auth.security;
 
 import com.chat.common.constant.ErrorConstants;
-import com.chat.common.exception.BusinessException;
+import com.chat.exception.BusinessException;
+import com.chat.exception.UnauthenticatedException;
 import com.chat.modules.auth.service.SessionCookieService;
 import com.chat.modules.auth.service.SessionService;
 import jakarta.servlet.FilterChain;
@@ -9,7 +10,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
@@ -49,13 +49,13 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
             request.setAttribute(SESSION_ATTRIBUTE, identity);
         } catch (BusinessException exception) {
             exceptionResolver.resolveException(request, response, null,
-                    exception.getStatus() == HttpStatus.UNAUTHORIZED ? exception : unauthenticated());
+                    exception.getStatus().value() == 401 ? exception : unauthenticated());
             return;
         }
         filterChain.doFilter(request, response);
     }
 
     private BusinessException unauthenticated() {
-        return new BusinessException(HttpStatus.UNAUTHORIZED, ErrorConstants.UNAUTHENTICATED);
+        return new UnauthenticatedException(ErrorConstants.UNAUTHENTICATED);
     }
 }

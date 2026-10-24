@@ -5,8 +5,9 @@
 - Endpoint dùng `/api/...` và đúng GET/POST/PUT/DELETE trong tài liệu Chat.
 - Chọn một nơi quản lý prefix `/api`, tránh khai báo lặp trong context-path và controller.
 - Input/output dùng DTO; không trả entity, password/hash hoặc session token trong JSON.
-- Response thành công trả object/array trực tiếp; 204 không có body.
-  Không tự thêm `BaseResponse<T>`, `/api/v1`, Core/CMS hay chuyển mọi API sang POST.
+- Response thành công dùng `BaseResponse<T>` với `code`, `strCode`, `message`, `content`;
+  204 không có body. Danh sách phân trang đặt `PageResponse<T>` trong `content`.
+- Không tự thêm `/api/v1`, Core/CMS hay chuyển mọi API sang POST.
 - Validate request bằng Bean Validation; validation nghiệp vụ nằm trong service.
 - Dùng PUT theo schema đã công bố, phân biệt field thiếu và null.
 - Enum ghi rõ dạng `type: 'DIRECT' | 'GROUP'` trong docs; JSON ví dụ chỉ chứa một giá trị hợp lệ.
@@ -37,7 +38,8 @@
   Code FE được ánh xạ theo HTTP status qua `ErrorConstants`, message tra trong bundle.
 - `@Valid` trên request DTO và message như `{validation.notBlank}` dùng chung
   `messages.properties` / `messages_en.properties`; mặc định tiếng Việt.
-- DTO lỗi có `timestamp`, `status`, `code`, `message`, `path`, `fieldErrors`.
+- Lỗi cũng dùng `BaseResponse`; `strCode` là mã ổn định cho FE. `content` chứa
+  `timestamp`, `status`, `path`, `fieldErrors`.
   Không đưa giá trị bị reject hoặc query string vào response lỗi.
 - Lỗi giao thức Spring MVC giữ status/header gốc (ví dụ 405 + Allow);
   lỗi 4xx không có code riêng dùng `VALIDATION_ERROR`.

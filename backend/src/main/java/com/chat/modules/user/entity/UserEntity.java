@@ -49,4 +49,11 @@ public class UserEntity extends BaseEntity {
         this.fullName = fullName;
     }
 
+    public void updateProfile(String fullName, UUID avatarFileId) {
+        if (fullName == null || fullName.isBlank() || fullName.length() > 100) {
+            throw new IllegalArgumentException("Invalid full name");
+        }
+        this.fullName = fullName;
+        this.avatarFileId = avatarFileId;
+    }
 }

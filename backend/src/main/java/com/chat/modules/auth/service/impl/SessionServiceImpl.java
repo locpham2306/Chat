@@ -1,7 +1,7 @@
 package com.chat.modules.auth.service.impl;
 
 import com.chat.common.constant.ErrorConstants;
-import com.chat.common.exception.BusinessException;
+import com.chat.exception.NotFoundException;
 import com.chat.modules.auth.entity.SessionEntity;
 import com.chat.modules.auth.repository.SessionRepository;
 import com.chat.modules.auth.security.SessionTokenGenerator;
@@ -10,7 +10,6 @@ import com.chat.modules.auth.service.SessionIdentity;
 import com.chat.modules.auth.service.SessionService;
 import com.chat.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +32,7 @@ public class SessionServiceImpl implements SessionService {
     @Transactional
     public IssuedSession create(UUID userId) {
         if (userId == null || !users.existsById(userId)) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, ErrorConstants.NOT_FOUND);
+            throw new NotFoundException(ErrorConstants.NOT_FOUND);
         }
         var now = clock.instant().truncatedTo(ChronoUnit.MICROS);
         var rawToken = tokens.generate();

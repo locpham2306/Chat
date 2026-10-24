@@ -1,8 +1,8 @@
 # Hợp đồng API chat
 
 Tóm tắt các quyết định đã thống nhất ngày 20/10/2026.
-HTTP-01 đăng ký, HTTP-02 đăng nhập, HTTP-04 đăng xuất
-và HTTP-05 hồ sơ bản thân đã được triển khai.
+HTTP-01 đăng ký, HTTP-02 đăng nhập, HTTP-04 đăng xuất,
+HTTP-05 xem hồ sơ và HTTP-06 cập nhật hồ sơ đã được triển khai.
 Các API còn lại vẫn là thiết kế.
 
 [Bảng API HTTP, WebSocket, model và mã lỗi](https://docs.google.com/spreadsheets/d/1DTv-iWD6VOK5e8GZwOaJ7J8uR1vmnhGx3EfQp_qGDjk/edit)
@@ -10,13 +10,32 @@ Các API còn lại vẫn là thiết kế.
 Khi thay đổi hợp đồng, cập nhật tài liệu liên quan và thông báo FE.
 Nếu docs và sheet khác nhau, làm rõ trước khi triển khai phần có mâu thuẫn.
 
+## Response chung
+
+Các API có body dùng envelope theo base QLCC:
+
+```json
+{
+  "code": "0",
+  "strCode": "success",
+  "message": "SUCCESSFUL",
+  "content": {}
+}
+```
+
+Danh sách phân trang dùng `PageResponse<T>` trong `content` với ba trường
+`data`, `totalPages`, `totalElements`. Response 204 không có body.
+Khi lỗi, `strCode` là một `HttpErrorCode`; `content` chứa
+`timestamp`, HTTP `status`, `path` và `fieldErrors`.
+
 ## Xác thực
 
 - `POST /api/auth/register`: nhận username/password/fullName, trả User với status
   `'OFFLINE'` và không trả password/hash. Username trùng trả 409.
 - `POST /api/auth/login`: nhận username/password, tạo session ngẫu nhiên hạn 365 ngày
   (31.536.000 giây), chỉ lưu hash + userId + expiresAt và đặt cookie `token`.
-- Response JSON đăng nhập chỉ là `{ "message": "Đăng nhập thành công" }`.
+- Response đăng nhập không chứa token; `content` là
+  `{ "message": "Đăng nhập thành công" }` trong `BaseResponse`.
 - Cookie session HttpOnly; Secure trên HTTPS; Path=/; SameSite=Lax cho cùng site.
   Cross-site cần SameSite=None; Secure và bảo vệ CSRF phù hợp.
 - Không có access token hoặc refresh token. Trình duyệt tự gửi cookie session;
@@ -26,8 +45,15 @@ Nếu docs và sheet khác nhau, làm rõ trước khi triển khai phần có m
   Thu hồi phiên, xóa cookie; token đã hết hạn/thu hồi vẫn trả 204.
   Phần đóng WS sẽ nối vào logout khi module WebSocket được triển khai.
 - `GET /api/users/me`: yêu cầu cookie session hợp lệ, trả User của người đang đăng nhập.
-  Thiếu/sai/hết hạn/đã thu hồi session trả 401 với code `'UNAUTHENTICATED'`.
+  Thiếu/sai/hết hạn/đã thu hồi session trả 401 với `strCode: 'UNAUTHENTICATED'`.
   Status hiện là `'OFFLINE'` cho tới khi có presence WebSocket.
+- `PUT /api/users/me`: yêu cầu cookie session hợp lệ và nhận đầy đủ hai trường
+  `{ "fullName": "Nguyễn Văn An", "avatarFileId": null }`.
+  `fullName` không được rỗng, tối đa 100 ký tự và được trim trước khi lưu.
+  `avatarFileId` phải có trong JSON; giá trị `null` dùng để xóa avatar.
+  Khi khác null, file phải tồn tại, do chính user upload, chưa gắn vào hội thoại
+  và có MIME `image/*`. File không tồn tại trả 404; file không được phép trả 403.
+  Response 200 là User đã cập nhật. Không cho sửa `id`, `username` hoặc `status`.
 
 ## Hội thoại DIRECT và tin đầu
 
