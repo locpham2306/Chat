@@ -9,9 +9,13 @@ import com.chat.modules.user.mapper.UserMapper;
 import com.chat.modules.user.repository.UserRepository;
 import com.chat.modules.user.service.impl.UserServiceImpl;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -23,6 +27,31 @@ class UserServiceTests {
     private final UserRepository users = mock(UserRepository.class);
     private final FileRepository files = mock(FileRepository.class);
     private final UserServiceImpl service = new UserServiceImpl(users, files, new UserMapper());
+
+    @Test
+    void searchUsersTrimsKeywordExcludesCurrentUserAndMapsPage() {
+        var currentUserId = UUID.randomUUID();
+        var first = user(UUID.randomUUID(), "alpha", "Alpha");
+        var second = user(UUID.randomUUID(), "beta", "Beta");
+        var repositoryPage = new PageImpl<>(List.of(first, second), PageRequest.of(1, 2), 5);
+        when(users.searchPublicProfiles(eq(currentUserId), eq("needle"), any(Pageable.class)))
+                .thenReturn(repositoryPage);
+
+        var response = service.searchUsers(currentUserId, "  needle  ", 1, 2);
+
+        assertThat(response.data()).extracting(user -> user.username())
+                .containsExactly("alpha", "beta");
+        assertThat(response.data()).allMatch(user -> user.status().name().equals("OFFLINE"));
+        assertThat(response.totalPages()).isEqualTo(3);
+        assertThat(response.totalElements()).isEqualTo(5);
+
+        var pageable = org.mockito.ArgumentCaptor.forClass(Pageable.class);
+        verify(users).searchPublicProfiles(eq(currentUserId), eq("needle"), pageable.capture());
+        assertThat(pageable.getValue().getPageNumber()).isEqualTo(1);
+        assertThat(pageable.getValue().getPageSize()).isEqualTo(2);
+        assertThat(pageable.getValue().getSort().getOrderFor("username")).isNotNull();
+        assertThat(pageable.getValue().getSort().getOrderFor("id")).isNotNull();
+    }
 
     @Test
     void updateProfileTrimsFullNameAndAllowsClearingAvatar() {
@@ -76,7 +105,11 @@ class UserServiceTests {
     }
 
     private UserEntity user(UUID id) {
-        var user = new UserEntity("an", "hash", "An");
+        return user(id, "an", "An");
+    }
+
+    private UserEntity user(UUID id, String username, String fullName) {
+        var user = new UserEntity(username, "hash", fullName);
         ReflectionTestUtils.setField(user, "id", id);
         return user;
     }

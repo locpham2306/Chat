@@ -39,10 +39,11 @@ và `revoked_at`. Không lưu token thô trong database hoặc log.
 
 ## Phạm vi hiện tại
 
-Đã có register, login, logout, filter xác thực session và API xem/cập nhật hồ sơ.
+Đã có register, login, logout, filter xác thực session và API xem/cập nhật hồ sơ,
+tìm kiếm user.
 CORS cho HTTP API dùng danh sách origin cụ thể từ cấu hình, cho phép credentials và
-chạy trước filter session để xử lý preflight. CSRF, tìm kiếm user, upload/download file
-và WebSocket được làm ở các bước tiếp theo.
+chạy trước filter session để xử lý preflight. CSRF, upload/download file và WebSocket
+được làm ở các bước tiếp theo.
 
 Test kiểm tra BCrypt, session hạn 365 ngày, hash token trong DB, cookie HttpOnly,
 401 cho session thiếu/sai/đã thu hồi, `GET/PUT /api/users/me`, logout idempotent,

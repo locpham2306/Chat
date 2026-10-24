@@ -1,6 +1,7 @@
 package com.chat.modules.user.service.impl;
 
 import com.chat.common.constant.ErrorConstants;
+import com.chat.common.dto.response.PageResponse;
 import com.chat.exception.NoPermissionException;
 import com.chat.exception.NotFoundException;
 import com.chat.exception.UnauthenticatedException;
@@ -12,11 +13,14 @@ import com.chat.modules.user.enums.UserStatusEnum;
 import com.chat.modules.user.mapper.UserMapper;
 import com.chat.modules.user.repository.UserRepository;
 import com.chat.modules.user.service.UserService;
+import com.chat.utils.PageableUtils;
 import com.chat.utils.StringUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -49,6 +53,21 @@ public class UserServiceImpl implements UserService {
         }
         user.updateProfile(StringUtils.trim(request.fullName()), request.avatarFileId());
         return userMapper.toResponse(user, UserStatusEnum.OFFLINE);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<List<UserResponse>> searchUsers(
+            UUID currentUserId, String keyword, Integer page, Integer size) {
+        String resolvedKeyword = StringUtils.trim(keyword);
+        if (resolvedKeyword == null) {
+            resolvedKeyword = "";
+        }
+        var sort = Sort.by(Sort.Order.asc("username"), Sort.Order.asc("id"));
+        var usersPage = users.searchPublicProfiles(
+                currentUserId, resolvedKeyword, PageableUtils.of(page, size, sort));
+        return PageableUtils.toResponse(
+                usersPage, user -> userMapper.toResponse(user, UserStatusEnum.OFFLINE));
     }
 
     private UserEntity currentUser(UUID userId) {

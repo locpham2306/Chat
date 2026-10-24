@@ -2,7 +2,7 @@
 
 Tóm tắt các quyết định đã thống nhất ngày 20/10/2026.
 HTTP-01 đăng ký, HTTP-02 đăng nhập, HTTP-04 đăng xuất,
-HTTP-05 xem hồ sơ và HTTP-06 cập nhật hồ sơ đã được triển khai.
+HTTP-05 xem hồ sơ, HTTP-06 cập nhật hồ sơ và HTTP-07 tìm kiếm user đã được triển khai.
 Các API còn lại vẫn là thiết kế.
 
 [Bảng API HTTP, WebSocket, model và mã lỗi](https://docs.google.com/spreadsheets/d/1DTv-iWD6VOK5e8GZwOaJ7J8uR1vmnhGx3EfQp_qGDjk/edit)
@@ -54,6 +54,36 @@ Khi lỗi, `strCode` là một `HttpErrorCode`; `content` chứa
   Khi khác null, file phải tồn tại, do chính user upload, chưa gắn vào hội thoại
   và có MIME `image/*`. File không tồn tại trả 404; file không được phép trả 403.
   Response 200 là User đã cập nhật. Không cho sửa `id`, `username` hoặc `status`.
+- `GET /api/users`: yêu cầu cookie session hợp lệ; nhận query `keyword` tùy chọn,
+  `page` mặc định 0 và `size` mặc định 20. `page` phải từ 0; `size` từ 1 đến 100.
+  Tìm không phân biệt hoa/thường theo username hoặc fullName, không trả chính người
+  đang đăng nhập và sắp xếp ổn định theo username rồi id. Query sai trả 400.
+  Response 200 là `BaseResponse<PageResponse<List<User>>>`; `content` có `data`,
+  `totalPages`, `totalElements`. Status hiện là `'OFFLINE'` tới khi có presence WebSocket.
+
+Ví dụ `GET /api/users?keyword=an&page=0&size=20`:
+
+```json
+{
+  "code": "0",
+  "strCode": "success",
+  "message": "SUCCESSFUL",
+  "content": {
+    "data": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "username": "an",
+        "fullName": "Nguyễn Văn An",
+        "avatarFileId": null,
+        "status": "OFFLINE",
+        "lastSeen": null
+      }
+    ],
+    "totalPages": 1,
+    "totalElements": 1
+  }
+}
+```
 
 ## Hội thoại DIRECT và tin đầu
 

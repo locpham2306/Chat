@@ -208,6 +208,47 @@ class ChatApplicationTests {
     }
 
     @Test
+    void searchUsersMatchesPublicProfilesExcludesCurrentUserAndValidatesPagination() {
+        var current = users.saveAndFlush(
+                new UserEntity("FindPersonX7Current", "hash-fixture", "FindPersonX7 Current"));
+        var usernameMatch = users.saveAndFlush(
+                new UserEntity("FindPersonX7Alpha", "hash-fixture", "Alpha"));
+        var fullNameMatch = users.saveAndFlush(
+                new UserEntity("ZedSearchCandidate", "hash-fixture", "findpersonx7 Beta"));
+        var unrelated = users.saveAndFlush(
+                new UserEntity("UnrelatedCandidate", "hash-fixture", "Unrelated"));
+        var issuedSession = sessionService.create(current.getId());
+        var headers = new HttpHeaders();
+        headers.set(HttpHeaders.COOKIE, "token=" + issuedSession.getRawToken());
+
+        var firstPage = restTemplate.exchange(
+                "/api/users?keyword=findpersonx7&page=0&size=1",
+                HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
+        assertThat(firstPage.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(firstPage.getBody())
+                .contains("\"code\":\"0\"", "\"strCode\":\"success\"",
+                        "\"id\":\"" + usernameMatch.getId() + "\"",
+                        "\"status\":\"OFFLINE\"", "\"totalPages\":2", "\"totalElements\":2")
+                .doesNotContain(current.getId().toString(), fullNameMatch.getId().toString(),
+                        unrelated.getId().toString(), "passwordHash");
+
+        var secondPage = restTemplate.exchange(
+                "/api/users?keyword=FINDPERSONX7&page=1&size=1",
+                HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        assertThat(secondPage.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(secondPage.getBody())
+                .contains("\"id\":\"" + fullNameMatch.getId() + "\"")
+                .doesNotContain(current.getId().toString(), usernameMatch.getId().toString());
+
+        var invalidPage = restTemplate.exchange(
+                "/api/users?page=-1&size=101",
+                HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        assertThat(invalidPage.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(invalidPage.getBody()).contains("\"strCode\":\"VALIDATION_ERROR\"");
+    }
+
+    @Test
     void migrationsAreAppliedAndNotRepeated() {
         assertThat(flyway.info().applied()).hasSize(5);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();

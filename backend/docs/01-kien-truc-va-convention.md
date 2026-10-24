@@ -5,7 +5,7 @@
 Hiện có `com.chat.ChatApplication`, phần common cho lỗi HTTP/validation,
 entity trong modules user/auth/conversation/message/file, repository user/auth/file.
 Đã có AuthenticationController/Service, SessionService, cookie service,
-filter xác thực session và UserController cho xem/cập nhật hồ sơ hiện tại.
+filter xác thực session và UserController cho xem/cập nhật hồ sơ, tìm kiếm user.
 Tham khảo cách tổ chức của QLCC; không mang nghiệp vụ chung cư, Core/CMS,
 sync offline hoặc cấu hình nội bộ sang Chat.
 

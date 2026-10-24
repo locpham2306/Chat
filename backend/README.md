@@ -1,8 +1,8 @@
 # Backend
 
 Thư mục dành cho toàn bộ source, build, cấu hình và test của backend Spring Boot.
-Đã dựng entity/schema, API register/login/logout, filter session, xem/cập nhật `/api/users/me`;
-chưa có API chat. Xem [session và cookie](docs/07-session-base.md).
+Đã dựng entity/schema, API register/login/logout, filter session, xem/cập nhật `/api/users/me`
+và tìm kiếm user; chưa có API chat. Xem [session và cookie](docs/07-session-base.md).
 Xem [schema và quan hệ DB](docs/06-database-schema.md).
 Java 21, Spring Boot 3.5.16, Maven Wrapper 3.9.5; root package `com.chat`.
 
@@ -63,7 +63,8 @@ Test MVC kiểm tra validation Việt/Anh, JSON sai, lỗi nghiệp vụ, lỗi 
 ẩn thông tin lỗi nội bộ và response wrapper chung.
 Test auth kiểm tra BCrypt, session hạn 365 ngày, cookie, xác thực `/api/users/me`
 và không serialize token thô. Test hồ sơ kiểm tra request đầy đủ, trim tên,
-xóa avatar và quyền sử dụng file ảnh.
+xóa avatar và quyền sử dụng file ảnh. Test tìm kiếm user kiểm tra username/fullName,
+loại người đang đăng nhập, phân trang và validation query.
 
 ## Xử lý lỗi và validation
 
@@ -98,9 +99,8 @@ Các endpoint `/test/...` chỉ nằm trong test, không được thêm vào ứ
 
 ## Các bước review tiếp theo
 
-1. Tìm kiếm user theo HTTP-07.
-2. Upload/download file và phân quyền file.
-3. Module hội thoại, tin nhắn và WebSocket.
+1. Upload/download file và phân quyền file.
+2. Module hội thoại, tin nhắn và WebSocket.
 
 Mỗi bước dừng để review; chỉ commit/push khi được yêu cầu.
 
