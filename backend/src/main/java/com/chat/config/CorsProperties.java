@@ -1,4 +1,4 @@
-package com.chat.common.config;
+package com.chat.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

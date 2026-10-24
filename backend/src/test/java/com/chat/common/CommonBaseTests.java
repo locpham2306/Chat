@@ -1,6 +1,6 @@
 package com.chat.common;
 
-import com.chat.common.config.CorsProperties;
+import com.chat.config.CorsProperties;
 import com.chat.common.wrapper.BaseResponse;
 import com.chat.utils.PageableUtils;
 import org.junit.jupiter.api.Test;

@@ -74,7 +74,7 @@ xóa avatar và quyền sử dụng file ảnh.
 - `common.dto.response.ErrorDetailResponse`: timestamp UTC, status, path, fieldErrors.
 - `utils.MessageUtils`, `StringUtils`, `PageableUtils`: helper dùng chung đã có nhu cầu.
 - `common.constant.ErrorConstants`: các code ổn định theo hợp đồng.
-- `common.config.ValidationConfig`: Bean Validation dùng chung message bundle.
+- `config.ValidationConfig`: Bean Validation dùng chung message bundle.
 - `messages.properties` / `messages_en.properties`: tiếng Việt mặc định; dùng
   `Accept-Language: en` để nhận tiếng Anh.
 

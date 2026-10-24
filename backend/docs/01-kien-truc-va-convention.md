@@ -16,12 +16,12 @@ Dưới root package `com.chat`:
 ```text
 common/
   base/
-  config/
   wrapper/
   dto/
     response/
   constant/
   enums/
+config/
 exception/
 utils/
 modules/
@@ -56,6 +56,7 @@ WebSocket handler đặt trong module sở hữu nghiệp vụ và gọi service
 - Dùng constructor injection; tránh field injection.
 - Ưu tiên MapStruct khi cần mapping; chỉ tạo `BaseMapper` khi có nhu cầu dùng chung thực tế.
 - `common` chỉ chứa thành phần dùng chung; không biến thành nơi chứa mọi nghiệp vụ.
+- Cấu hình Spring dùng chung nằm ở package gốc `com.chat.config`, theo cấu trúc base QLCC.
 - Exception dùng chung nằm ở package gốc `com.chat.exception`; helper thuần dùng chung nằm ở
   `com.chat.utils`, theo cấu trúc base QLCC.
 - SDK storage/cache và client ngoài nằm sau adapter trong `integration`.
@@ -67,7 +68,7 @@ WebSocket handler đặt trong module sở hữu nghiệp vụ và gọi service
 - Ưu tiên FK ID; dùng quan hệ JPA khi có lý do rõ ràng, tránh serialize entity trực tiếp.
 - Không ép entity kế thừa base có audit/sync không phù hợp schema.
 - `common.base.BaseEntity` chứa createdAt/updatedAt, dùng `@CreatedDate`,
-  `@LastModifiedDate` và `AuditingEntityListener`; bật tại `common.config.JpaAuditingConfig`.
+  `@LastModifiedDate` và `AuditingEntityListener`; bật tại `config.JpaAuditingConfig`.
 - Entity có audit tương ứng kế thừa BaseEntity.
   SessionEntity giữ createdAt/expiresAt/revokedAt riêng cho vòng đời phiên.
 - Dùng Lombok `@Getter` thay getter viết tay. Không dùng `@Data` hoặc setter toàn bộ

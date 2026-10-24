@@ -1,6 +1,6 @@
 package com.chat.exception;
 
-import com.chat.common.config.ValidationConfig;
+import com.chat.config.ValidationConfig;
 import com.chat.common.wrapper.BaseResponse;
 import com.chat.utils.MessageUtils;
 import jakarta.validation.Valid;
