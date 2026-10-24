@@ -35,6 +35,9 @@ Chỉ expose health, không expose env hoặc chi tiết health.
 Đổi port bằng biến môi trường `SERVER_PORT` (mặc định 8086).
 Session token nằm trong cookie HttpOnly và chỉ được lưu hash trong DB.
 Cookie mặc định Secure=true; khi chạy HTTP local dùng `SESSION_COOKIE_SECURE=false`.
+CORS mặc định chỉ cho `http://localhost:3001` và bật credentials để trình duyệt gửi
+cookie session. Cấu hình nhiều origin bằng `CORS_ALLOWED_ORIGINS` phân tách bởi dấu phẩy;
+không dùng wildcard `*`.
 Chưa dùng để triển khai production.
 
 ## Build và kiểm tra

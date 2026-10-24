@@ -104,6 +104,35 @@ class ChatApplicationTests {
     }
 
     @Test
+    void corsAllowsConfiguredFrontendAndRejectsOtherOrigins() {
+        var preflightHeaders = new HttpHeaders();
+        preflightHeaders.setOrigin("http://localhost:3001");
+        preflightHeaders.set("Access-Control-Request-Method", "PUT");
+        preflightHeaders.set("Access-Control-Request-Headers", "content-type");
+        var preflight = restTemplate.exchange(
+                "/api/users/me", HttpMethod.OPTIONS, new HttpEntity<>(preflightHeaders), String.class);
+
+        assertThat(preflight.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(preflight.getHeaders().getAccessControlAllowOrigin()).isEqualTo("http://localhost:3001");
+        assertThat(preflight.getHeaders().getAccessControlAllowCredentials()).isTrue();
+        assertThat(preflight.getHeaders().getAccessControlAllowMethods()).contains(HttpMethod.PUT);
+
+        var actualHeaders = new HttpHeaders();
+        actualHeaders.setOrigin("http://localhost:3001");
+        var unauthenticated = restTemplate.exchange(
+                "/api/users/me", HttpMethod.GET, new HttpEntity<>(actualHeaders), String.class);
+        assertThat(unauthenticated.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(unauthenticated.getHeaders().getAccessControlAllowOrigin()).isEqualTo("http://localhost:3001");
+        assertThat(unauthenticated.getHeaders().getAccessControlAllowCredentials()).isTrue();
+
+        preflightHeaders.setOrigin("http://malicious.example");
+        var rejected = restTemplate.exchange(
+                "/api/users/me", HttpMethod.OPTIONS, new HttpEntity<>(preflightHeaders), String.class);
+        assertThat(rejected.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(rejected.getHeaders().getAccessControlAllowOrigin()).isNull();
+    }
+
+    @Test
     void registerLoginCurrentUserAndLogoutFollowCookieSessionContract() {
         var username = "ApiUser";
         var password = "MatKhauDemo123";

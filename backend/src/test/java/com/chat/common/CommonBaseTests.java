@@ -1,5 +1,6 @@
 package com.chat.common;
 
+import com.chat.common.config.CorsProperties;
 import com.chat.common.wrapper.BaseResponse;
 import com.chat.utils.PageableUtils;
 import org.junit.jupiter.api.Test;
@@ -9,6 +10,7 @@ import org.springframework.data.domain.PageRequest;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CommonBaseTests {
 
@@ -39,5 +41,11 @@ class CommonBaseTests {
         assertThat(response.data()).containsExactly("user-1", "user-2");
         assertThat(response.totalPages()).isEqualTo(3);
         assertThat(response.totalElements()).isEqualTo(5);
+    }
+
+    @Test
+    void corsPropertiesRequireExplicitOriginsWhenUsingCredentials() {
+        assertThatThrownBy(() -> new CorsProperties(List.of("*"), 3600))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }
