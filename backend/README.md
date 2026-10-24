@@ -1,7 +1,7 @@
 # Backend
 
 Thư mục dành cho toàn bộ source, build, cấu hình và test của backend Spring Boot.
-Đã dựng entity/schema và API register/login/logout dùng session cookie;
+Đã dựng entity/schema, API register/login/logout, filter session và `/api/users/me`;
 chưa có API chat. Xem [session và cookie](docs/07-session-base.md).
 Xem [schema và quan hệ DB](docs/06-database-schema.md).
 Java 21, Spring Boot 3.5.16, Maven Wrapper 3.9.5; root package `com.chat`.
@@ -58,7 +58,8 @@ Test bổ sung kiểm tra unique username, UUID/audit, foreign key, unique token
 phiên hết hạn đúng tại expiresAt và thu hồi idempotent.
 Test MVC kiểm tra validation Việt/Anh, JSON sai, lỗi nghiệp vụ, lỗi giao thức HTTP,
 ẩn thông tin lỗi nội bộ và giữ nguyên response thành công.
-Test auth kiểm tra BCrypt, session hạn 365 ngày, cookie và không serialize token thô.
+Test auth kiểm tra BCrypt, session hạn 365 ngày, cookie, xác thực `/api/users/me`
+và không serialize token thô.
 
 ## Xử lý lỗi và validation
 
@@ -84,13 +85,13 @@ Không đưa password, token hoặc chi tiết SQL vào message/arguments.
 
 Các lỗi giao thức vẫn giữ HTTP status/header gốc, ví dụ 405 với header Allow;
 405/406 dùng code `VALIDATION_ERROR`, không chuyển thành 500.
-Phần này xử lý lỗi Spring MVC; lỗi filter/security và WS sẽ được tích hợp riêng ở bước tương ứng.
+Filter session chuyển lỗi xác thực qua cùng Error model; lỗi WS sẽ được tích hợp ở bước tương ứng.
 Các endpoint `/test/...` chỉ nằm trong test, không được thêm vào ứng dụng.
 
 ## Các bước review tiếp theo
 
-1. Thêm filter xác thực session và API hồ sơ bản thân.
-2. Cập nhật profile, avatar/file và module nghiệp vụ chat.
+1. Cập nhật profile bản thân và avatar/file.
+2. Module nghiệp vụ, phân quyền hội thoại và WebSocket.
 
 Mỗi bước dừng để review; chỉ commit/push khi được yêu cầu.
 

@@ -1,7 +1,8 @@
 # Hợp đồng API chat
 
 Tóm tắt các quyết định đã thống nhất ngày 20/10/2026.
-HTTP-01 đăng ký, HTTP-02 đăng nhập và HTTP-04 đăng xuất đã được triển khai.
+HTTP-01 đăng ký, HTTP-02 đăng nhập, HTTP-04 đăng xuất
+và HTTP-05 hồ sơ bản thân đã được triển khai.
 Các API còn lại vẫn là thiết kế.
 
 [Bảng API HTTP, WebSocket, model và mã lỗi](https://docs.google.com/spreadsheets/d/1DTv-iWD6VOK5e8GZwOaJ7J8uR1vmnhGx3EfQp_qGDjk/edit)
@@ -24,6 +25,9 @@ Nếu docs và sheet khác nhau, làm rõ trước khi triển khai phần có m
   Thiếu cả hai hoặc hai giá trị khác nhau trả 400.
   Thu hồi phiên, xóa cookie; token đã hết hạn/thu hồi vẫn trả 204.
   Phần đóng WS sẽ nối vào logout khi module WebSocket được triển khai.
+- `GET /api/users/me`: yêu cầu cookie session hợp lệ, trả User của người đang đăng nhập.
+  Thiếu/sai/hết hạn/đã thu hồi session trả 401 với code `'UNAUTHENTICATED'`.
+  Status hiện là `'OFFLINE'` cho tới khi có presence WebSocket.
 
 ## Hội thoại DIRECT và tin đầu
 

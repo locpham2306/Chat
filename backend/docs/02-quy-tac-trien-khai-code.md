@@ -41,7 +41,7 @@
   Không đưa giá trị bị reject hoặc query string vào response lỗi.
 - Lỗi giao thức Spring MVC giữ status/header gốc (ví dụ 405 + Allow);
   lỗi 4xx không có code riêng dùng `VALIDATION_ERROR`.
-- Lỗi security filter và WS chưa được xử lý bởi MVC advice; bổ sung tại bước triển khai tương ứng.
+- Filter session chuyển lỗi qua MVC advice để giữ nguyên Error model; lỗi WS xử lý riêng.
 
 ## Session và phân quyền
 

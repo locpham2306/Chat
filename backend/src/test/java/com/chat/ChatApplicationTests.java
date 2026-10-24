@@ -102,7 +102,7 @@ class ChatApplicationTests {
     }
 
     @Test
-    void registerLoginAndLogoutFollowCookieSessionContract() {
+    void registerLoginCurrentUserAndLogoutFollowCookieSessionContract() {
         var username = "ApiUser";
         var password = "MatKhauDemo123";
         var register = restTemplate.postForEntity("/api/auth/register",
@@ -127,14 +127,35 @@ class ChatApplicationTests {
                 sessionTokens.hash(rawToken), Instant.now()).orElseThrow();
         assertThat(stored.getUserId()).isEqualTo(user.getId());
 
-        var logoutHeaders = new HttpHeaders();
-        logoutHeaders.set(HttpHeaders.COOKIE, "token=" + rawToken);
+        var unauthenticated = restTemplate.getForEntity("/api/users/me", String.class);
+        assertThat(unauthenticated.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(unauthenticated.getBody()).contains("\"code\":\"UNAUTHENTICATED\"");
+
+        var invalidHeaders = new HttpHeaders();
+        invalidHeaders.set(HttpHeaders.COOKIE, "token=invalid");
+        var invalidSession = restTemplate.exchange("/api/users/me", HttpMethod.GET,
+                new HttpEntity<>(invalidHeaders), String.class);
+        assertThat(invalidSession.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        var sessionHeaders = new HttpHeaders();
+        sessionHeaders.set(HttpHeaders.COOKIE, "token=" + rawToken);
+        var currentUser = restTemplate.exchange("/api/users/me", HttpMethod.GET,
+                new HttpEntity<>(sessionHeaders), String.class);
+        assertThat(currentUser.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(currentUser.getBody())
+                .contains("\"id\":\"" + user.getId() + "\"", "\"username\":\"ApiUser\"",
+                        "\"fullName\":\"Nguyễn Văn An\"", "\"status\":\"OFFLINE\"")
+                .doesNotContain(password, "passwordHash", "token");
+
         var logout = restTemplate.exchange("/api/auth/logout", HttpMethod.POST,
-                new HttpEntity<>(logoutHeaders), Void.class);
+                new HttpEntity<>(sessionHeaders), Void.class);
         assertThat(logout.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
         assertThat(logout.getHeaders().getFirst(HttpHeaders.SET_COOKIE))
                 .contains("token=;", "Max-Age=0", "Path=/", "HttpOnly", "Secure", "SameSite=Lax");
         assertThat(sessionService.findActive(rawToken)).isEmpty();
+        var revokedSession = restTemplate.exchange("/api/users/me", HttpMethod.GET,
+                new HttpEntity<>(sessionHeaders), String.class);
+        assertThat(revokedSession.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test

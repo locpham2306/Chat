@@ -14,7 +14,7 @@ Chat/
 Backend có khung Java 21 / Spring Boot 3.5.16 / Maven và health check.
 Đã thêm xử lý lỗi HTTP và Bean Validation dùng message bundle.
 Cấu hình persistence dùng MySQL, JPA và Flyway; có schema/entity chat, repository user/session,
-API register/login/logout và session cookie hạn 365 ngày. Chưa có API chat.
+API register/login/logout, `/api/users/me` và session cookie hạn 365 ngày. Chưa có API chat.
 Framework frontend chưa chốt.
 
 BE phát triển trên nhánh `backend`, code nằm trong `backend/`.
