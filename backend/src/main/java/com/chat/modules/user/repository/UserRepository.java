@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
+import java.util.Collection;
 import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<UserEntity, UUID> {
@@ -17,6 +18,8 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
     boolean existsByUsername(String username);
 
     boolean existsByAvatarFileId(UUID avatarFileId);
+
+    long countByIdIn(Collection<UUID> ids);
 
     @Query(UserQueries.SEARCH_PUBLIC_PROFILES)
     Page<UserEntity> searchPublicProfiles(

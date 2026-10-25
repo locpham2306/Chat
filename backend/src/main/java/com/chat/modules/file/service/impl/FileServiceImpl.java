@@ -115,6 +115,10 @@ public class FileServiceImpl implements FileService {
         if (userId.equals(file.getUploaderId()) || users.existsByAvatarFileId(file.getId())) {
             return true;
         }
+        if (file.getConversationId() == null
+                && members.countActiveMembershipsForConversationAvatar(userId, file.getId()) > 0) {
+            return true;
+        }
         return file.getConversationId() != null
                 && members.existsByConversationIdAndUserIdAndLeftAtIsNull(file.getConversationId(), userId);
     }

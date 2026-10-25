@@ -1,8 +1,9 @@
 # Schema chat
 
 Schema cho phạm vi API đã thống nhất; entity chỉ mô hình hóa dữ liệu.
-Auth/session, hồ sơ, tìm kiếm user, lookup DIRECT và upload/download file có phân quyền
-đã được triển khai; tạo/cập nhật hội thoại, tin nhắn và WebSocket chưa được triển khai.
+Auth/session, hồ sơ, tìm kiếm user, lookup DIRECT, tạo GROUP và upload/download file có
+phân quyền đã được triển khai; danh sách/cập nhật hội thoại, tin nhắn và WebSocket chưa
+được triển khai.
 
 | Bảng | Entity | Nội dung |
 | --- | --- | --- |

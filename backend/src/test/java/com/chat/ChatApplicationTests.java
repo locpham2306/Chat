@@ -12,6 +12,7 @@ import com.chat.modules.conversation.entity.ConversationReadStateEntity;
 import com.chat.modules.conversation.entity.ConversationMemberEntity;
 import com.chat.modules.conversation.enums.MemberRoleEnum;
 import com.chat.modules.conversation.repository.ConversationRepository;
+import com.chat.modules.conversation.repository.ConversationMemberRepository;
 import com.chat.modules.file.entity.FileEntity;
 import com.chat.modules.message.entity.MessageEntity;
 import com.chat.modules.message.entity.MessageAttachmentEntity;
@@ -83,6 +84,9 @@ class ChatApplicationTests {
 
     @Autowired
     private ConversationRepository conversations;
+
+    @Autowired
+    private ConversationMemberRepository conversationMembers;
 
     @Autowired
     private SessionService sessionService;
@@ -371,6 +375,99 @@ class ChatApplicationTests {
                 "/api/conversations/direct",
                 HttpMethod.GET, new HttpEntity<>(headers), String.class);
         assertThat(omitted.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void createGroupAssignsRolesAndAllowsMembersToReadGroupAvatar() throws Exception {
+        byte[] avatarContent = "group-avatar".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var owner = users.saveAndFlush(
+                new UserEntity("GroupApiOwner", "hash-fixture", "Group Owner"));
+        var member = users.saveAndFlush(
+                new UserEntity("GroupApiMember", "hash-fixture", "Group Member"));
+        var outsider = users.saveAndFlush(
+                new UserEntity("GroupApiOutsider", "hash-fixture", "Group Outsider"));
+        var ownerSession = sessionService.create(owner.getId());
+        var memberSession = sessionService.create(member.getId());
+        var outsiderSession = sessionService.create(outsider.getId());
+
+        var uploadHeaders = sessionHeaders(ownerSession.getRawToken());
+        uploadHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);
+        var multipart = new LinkedMultiValueMap<String, Object>();
+        var avatarPart = new ByteArrayResource(avatarContent) {
+            @Override
+            public String getFilename() {
+                return "group.png";
+            }
+        };
+        var avatarHeaders = new HttpHeaders();
+        avatarHeaders.setContentType(MediaType.IMAGE_PNG);
+        multipart.add("file", new HttpEntity<>(avatarPart, avatarHeaders));
+        var upload = restTemplate.exchange("/api/files", HttpMethod.POST,
+                new HttpEntity<>(multipart, uploadHeaders), String.class);
+        var avatarId = UUID.fromString(objectMapper.readTree(upload.getBody())
+                .path("content").path("id").asText());
+
+        var groupHeaders = sessionHeaders(ownerSession.getRawToken());
+        groupHeaders.setContentType(MediaType.APPLICATION_JSON);
+        var create = restTemplate.exchange("/api/conversations/group", HttpMethod.POST,
+                new HttpEntity<>(Map.of(
+                        "name", "  Nhóm BTL  ",
+                        "memberIds", java.util.List.of(member.getId()),
+                        "avatarFileId", avatarId), groupHeaders),
+                String.class);
+
+        assertThat(create.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        var content = objectMapper.readTree(create.getBody()).path("content");
+        var conversationId = UUID.fromString(content.path("id").asText());
+        assertThat(content.path("type").asText()).isEqualTo("GROUP");
+        assertThat(content.path("name").asText()).isEqualTo("Nhóm BTL");
+        assertThat(content.path("avatarFileId").asText()).isEqualTo(avatarId.toString());
+        assertThat(content.path("ownerId").asText()).isEqualTo(owner.getId().toString());
+        assertThat(content.path("memberCount").asInt()).isEqualTo(2);
+        assertThat(content.path("createdAt").asText()).isNotBlank();
+
+        assertThat(conversations.findById(conversationId)).get()
+                .extracting(ConversationEntity::getType, ConversationEntity::getName,
+                        ConversationEntity::getOwnerId, ConversationEntity::getAvatarFileId)
+                .containsExactly(com.chat.modules.conversation.enums.ConversationTypeEnum.GROUP,
+                        "Nhóm BTL", owner.getId(), avatarId);
+        assertThat(conversationMembers.findByConversationIdAndUserId(conversationId, owner.getId()))
+                .get().extracting(ConversationMemberEntity::getRole).isEqualTo(MemberRoleEnum.OWNER);
+        assertThat(conversationMembers.findByConversationIdAndUserId(conversationId, member.getId()))
+                .get().extracting(ConversationMemberEntity::getRole).isEqualTo(MemberRoleEnum.MEMBER);
+
+        var memberDownload = restTemplate.exchange("/api/files/" + avatarId, HttpMethod.GET,
+                new HttpEntity<>(sessionHeaders(memberSession.getRawToken())), byte[].class);
+        assertThat(memberDownload.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(memberDownload.getBody()).isEqualTo(avatarContent);
+
+        var outsiderDownload = restTemplate.exchange("/api/files/" + avatarId, HttpMethod.GET,
+                new HttpEntity<>(sessionHeaders(outsiderSession.getRawToken())), byte[].class);
+        assertThat(outsiderDownload.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        long countBeforeInvalidRequest = conversations.count();
+        var selfOnly = restTemplate.exchange("/api/conversations/group", HttpMethod.POST,
+                new HttpEntity<>(Map.of(
+                        "name", "Invalid group",
+                        "memberIds", java.util.List.of(owner.getId())), groupHeaders),
+                String.class);
+        assertThat(selfOnly.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(conversations.count()).isEqualTo(countBeforeInvalidRequest);
+
+        var unknownUser = restTemplate.exchange("/api/conversations/group", HttpMethod.POST,
+                new HttpEntity<>(Map.of(
+                        "name", "Invalid group",
+                        "memberIds", java.util.List.of(UUID.randomUUID())), groupHeaders),
+                String.class);
+        assertThat(unknownUser.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(conversations.count()).isEqualTo(countBeforeInvalidRequest);
+
+        var invalidPayload = restTemplate.exchange("/api/conversations/group", HttpMethod.POST,
+                new HttpEntity<>(Map.of("name", " ", "memberIds", java.util.List.of()), groupHeaders),
+                String.class);
+        assertThat(invalidPayload.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(invalidPayload.getBody()).contains("\"strCode\":\"VALIDATION_ERROR\"");
+        assertThat(conversations.count()).isEqualTo(countBeforeInvalidRequest);
     }
 
     @Test

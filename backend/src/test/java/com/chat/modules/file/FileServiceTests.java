@@ -81,7 +81,7 @@ class FileServiceTests {
     }
 
     @Test
-    void downloadAllowsUploaderPublicAvatarAndActiveConversationMember() {
+    void downloadAllowsUploaderUserAvatarGroupAvatarAndActiveConversationMember() {
         var uploaderId = UUID.randomUUID();
         var viewerId = UUID.randomUUID();
         var file = file(uploaderId);
@@ -95,6 +95,10 @@ class FileServiceTests {
         assertThat(service.download(viewerId, file.getId()).resource()).isSameAs(resource);
 
         when(users.existsByAvatarFileId(file.getId())).thenReturn(false);
+        when(members.countActiveMembershipsForConversationAvatar(viewerId, file.getId())).thenReturn(1L);
+        assertThat(service.download(viewerId, file.getId()).resource()).isSameAs(resource);
+
+        when(members.countActiveMembershipsForConversationAvatar(viewerId, file.getId())).thenReturn(0L);
         var conversationId = UUID.randomUUID();
         file.bindToConversation(conversationId);
         when(members.existsByConversationIdAndUserIdAndLeftAtIsNull(conversationId, viewerId)).thenReturn(true);

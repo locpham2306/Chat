@@ -3,6 +3,7 @@
 Tóm tắt các quyết định đã thống nhất ngày 20/10/2026.
 HTTP-01 đăng ký, HTTP-02 đăng nhập, HTTP-04 đăng xuất,
 HTTP-05 xem hồ sơ, HTTP-06 cập nhật hồ sơ, HTTP-07 tìm kiếm user, HTTP-08 lookup DIRECT,
+HTTP-09 tạo GROUP,
 HTTP-18 upload file và HTTP-19 download file đã được triển khai.
 Các API còn lại vẫn là thiết kế.
 
@@ -95,7 +96,7 @@ Ví dụ `GET /api/users?keyword=an&page=0&size=20`:
 - `GET /api/files/{id}`: yêu cầu cookie session hợp lệ và trả binary với
   `Content-Disposition: attachment`, `Cache-Control: private, no-store` và
   `X-Content-Type-Options: nosniff`. Được tải khi user là người upload, file đang là
-  avatar user, hoặc user là thành viên hiện tại của hội thoại chứa file.
+  avatar user, hoặc user là thành viên hiện tại của hội thoại chứa file/nhóm có avatar đó.
 - File không tồn tại trả 404; không có quyền trả 403; file rỗng/tên sai trả 400;
   quá dung lượng trả 413; MIME không hỗ trợ trả 415.
 
@@ -130,6 +131,14 @@ Ví dụ response upload:
 HTTP-08 đã triển khai với `recipientId` là UUID bắt buộc. Thiếu/sai UUID hoặc chọn
 chính mình trả 400; recipient không tồn tại trả 404. Response 200 dùng `BaseResponse`
 và có `type: 'DIRECT'`; response 204 không có body.
+
+HTTP-09 đã triển khai tại `POST /api/conversations/group`. `name` bắt buộc, tối đa
+100 ký tự; `memberIds` phải chứa ít nhất một user khác người tạo. ID trùng và ID của
+người tạo được loại khỏi danh sách trước khi lưu; nếu còn ID không tồn tại thì toàn bộ
+request trả 404 và không tạo group. Người tạo được gán `role: 'OWNER'`, các user còn
+lại có `role: 'MEMBER'`. Avatar tùy chọn phải tồn tại, là `image/*`, do người tạo upload
+và chưa gắn vào hội thoại; sai quyền trả 403. Conversation và membership được tạo trong
+cùng transaction. Response 201 có `type: 'GROUP'` và `memberCount` đã gồm OWNER.
 
 ```json
 {
