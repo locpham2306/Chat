@@ -2,7 +2,7 @@
 
 Tóm tắt các quyết định đã thống nhất ngày 20/10/2026.
 HTTP-01 đăng ký, HTTP-02 đăng nhập, HTTP-04 đăng xuất,
-HTTP-05 xem hồ sơ, HTTP-06 cập nhật hồ sơ, HTTP-07 tìm kiếm user,
+HTTP-05 xem hồ sơ, HTTP-06 cập nhật hồ sơ, HTTP-07 tìm kiếm user, HTTP-08 lookup DIRECT,
 HTTP-18 upload file và HTTP-19 download file đã được triển khai.
 Các API còn lại vẫn là thiết kế.
 
@@ -126,6 +126,10 @@ Ví dụ response upload:
    Constraint cặp user không phân biệt thứ tự ngăn hai hội thoại khi gửi đồng thời.
 5. Sau commit, `MESSAGE_ACK` trả conversationId để FE cập nhật URL.
 6. Đã có hội thoại: gửi `SEND_MESSAGE` bằng conversationId.
+
+HTTP-08 đã triển khai với `recipientId` là UUID bắt buộc. Thiếu/sai UUID hoặc chọn
+chính mình trả 400; recipient không tồn tại trả 404. Response 200 dùng `BaseResponse`
+và có `type: 'DIRECT'`; response 204 không có body.
 
 ```json
 {

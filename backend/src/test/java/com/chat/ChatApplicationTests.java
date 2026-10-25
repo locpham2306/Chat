@@ -11,6 +11,7 @@ import com.chat.modules.conversation.entity.ConversationEntity;
 import com.chat.modules.conversation.entity.ConversationReadStateEntity;
 import com.chat.modules.conversation.entity.ConversationMemberEntity;
 import com.chat.modules.conversation.enums.MemberRoleEnum;
+import com.chat.modules.conversation.repository.ConversationRepository;
 import com.chat.modules.file.entity.FileEntity;
 import com.chat.modules.message.entity.MessageEntity;
 import com.chat.modules.message.entity.MessageAttachmentEntity;
@@ -79,6 +80,9 @@ class ChatApplicationTests {
 
     @Autowired
     private SessionRepository sessions;
+
+    @Autowired
+    private ConversationRepository conversations;
 
     @Autowired
     private SessionService sessionService;
@@ -313,6 +317,60 @@ class ChatApplicationTests {
                 new HttpEntity<>(sessionHeaders(viewerSession.getRawToken())), byte[].class);
         assertThat(avatarDownload.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(avatarDownload.getBody()).isEqualTo(content);
+    }
+
+    @Test
+    void directConversationLookupNeverCreatesAnEmptyConversation() throws Exception {
+        var current = users.saveAndFlush(
+                new UserEntity("DirectLookupCurrent", "hash-fixture", "Direct Current"));
+        var recipient = users.saveAndFlush(
+                new UserEntity("DirectLookupRecipient", "hash-fixture", "Direct Recipient"));
+        var issuedSession = sessionService.create(current.getId());
+        var headers = sessionHeaders(issuedSession.getRawToken());
+        long conversationCount = conversations.count();
+
+        var missing = restTemplate.exchange(
+                "/api/conversations/direct?recipientId=" + recipient.getId(),
+                HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
+        assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(missing.getBody()).isNull();
+        assertThat(conversations.count()).isEqualTo(conversationCount);
+
+        var conversation = conversations.saveAndFlush(
+                ConversationEntity.direct(recipient.getId(), current.getId()));
+        var found = restTemplate.exchange(
+                "/api/conversations/direct?recipientId=" + recipient.getId(),
+                HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
+        assertThat(found.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var content = objectMapper.readTree(found.getBody()).path("content");
+        assertThat(content.path("id").asText()).isEqualTo(conversation.getId().toString());
+        assertThat(content.path("type").asText()).isEqualTo("DIRECT");
+        assertThat(content.path("memberIds")).hasSize(2);
+        assertThat(content.path("memberIds").toString())
+                .contains(current.getId().toString(), recipient.getId().toString());
+        assertThat(content.path("createdAt").asText()).isNotBlank();
+
+        var self = restTemplate.exchange(
+                "/api/conversations/direct?recipientId=" + current.getId(),
+                HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        assertThat(self.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        var unknown = restTemplate.exchange(
+                "/api/conversations/direct?recipientId=" + UUID.randomUUID(),
+                HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        assertThat(unknown.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+
+        var invalid = restTemplate.exchange(
+                "/api/conversations/direct?recipientId=not-a-uuid",
+                HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        assertThat(invalid.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        var omitted = restTemplate.exchange(
+                "/api/conversations/direct",
+                HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        assertThat(omitted.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
