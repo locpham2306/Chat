@@ -4,7 +4,7 @@
 
 - MySQL 8.4, Spring Data JPA, HikariCP, Flyway.
 - Dependency version do Spring Boot BOM quản lý.
-- Bước 4 thêm V1 users, V2 sessions và entity/repository; chưa có service/API auth.
+- V1 thêm users, V2 thêm sessions; service/API auth và session đã được triển khai.
 - V3 thêm conversations, conversation_members, messages, files, message_attachments
   và FK avatar. Xem [schema đầy đủ](06-database-schema.md).
 - V4 chuẩn hóa 3NF: tách read state, bỏ conversation_id lặp ở attachment;
@@ -38,6 +38,10 @@ riêng trong container; migration không thay đổi cấu hình global của My
 | `DB_PASSWORD` | Mật khẩu MySQL, bắt buộc |
 | `DB_POOL_SIZE` | Số connection tối đa, mặc định 10 |
 | `SERVER_PORT` | Port HTTP, mặc định 8086 |
+| `FILE_STORAGE_ROOT` | Thư mục lưu payload file, mặc định `./uploads` |
+| `FILE_MAX_SIZE` | Dung lượng tối đa mỗi file, mặc định `20MB` |
+| `FILE_MAX_REQUEST_SIZE` | Dung lượng tối đa multipart request, mặc định `21MB` |
+| `FILE_ALLOWED_CONTENT_TYPES` | Danh sách MIME cho phép, phân tách bằng dấu phẩy; hỗ trợ dạng `image/*` |
 
 URL mẫu dùng `connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=UTF-8`.
 Không tắt TLS mặc định trong cấu hình chung; TLS/certificate cấu hình theo môi trường.
@@ -65,12 +69,12 @@ Chỉ chạy migration local vào schema `chat` khi được yêu cầu.
 
 ### users — V1
 
-- `id`: UUID do Hibernate sinh, DB lưu BINARY(16); API sau này serialize thành UUID string.
+- `id`: UUID do Hibernate sinh, DB lưu BINARY(16); API serialize thành UUID string.
 - `username`: tối đa 50 ký tự, unique tại DB. Collation `utf8mb4_0900_as_ci`
   không phân biệt hoa/thường nhưng phân biệt dấu; `An` và `an` là cùng username.
-  Quy tắc ký tự/trim sẽ validate tại API đăng ký, không silently normalize ở entity.
-- `password_hash`: tối đa 255 ký tự; chỉ nhận mật khẩu đã được encode bởi auth service.
-  Chưa triển khai encoder hoặc lưu mật khẩu thật trong bước này.
+  Quy tắc ký tự/trim được validate tại API đăng ký, không silently normalize ở entity.
+- `password_hash`: tối đa 255 ký tự; chỉ nhận mật khẩu đã được BCrypt encode bởi auth service.
+  Không lưu mật khẩu thật.
 - `full_name`: tối đa 100 ký tự, hỗ trợ tiếng Việt/emoji.
 - `avatar_file_id`, `last_seen`: nullable. V3 bổ sung FK avatar tới files.
 - `created_at`, `updated_at`: JPA Auditing ghi thời gian UTC qua BaseEntity.
@@ -81,10 +85,10 @@ Chỉ chạy migration local vào schema `chat` khi được yêu cầu.
 
 - `id`: UUID/BINARY(16); `user_id`: FK tới users, không cascade delete.
 - `token_hash`: SHA-256 lowercase hex 64 ký tự, unique, so sánh binary.
-  Không có cột chứa token thô; sinh token và tính digest sẽ nằm trong auth service.
+  Không có cột chứa token thô; auth service sinh token và tính digest.
 - `created_at`, `expires_at`, `revoked_at`: UTC, DATETIME(6); revoked_at nullable.
 - DB check `expires_at > created_at`; index user_id và expires_at.
-- Thời hạn 365 ngày sẽ được auth service tính khi cấp phiên, không tự gia hạn trong repository.
+- Thời hạn 365 ngày được auth service tính khi cấp phiên, không tự gia hạn trong repository.
 - Lookup phiên hợp lệ: đúng hash, revoked_at null, expires_at > thời điểm hiện tại.
   Tại đúng expires_at phiên đã hết hạn.
 - Thu hồi dùng một UPDATE có điều kiện revoked_at null; gọi lần nữa không đổi thời điểm thu hồi.
@@ -102,7 +106,8 @@ chỉ áp dụng trên container test mới, không sửa lịch sử migration 
 Kiểm tra migration chạy thành công và không chạy lại, UTF-8/emoji, rollback,
 health và endpoint env không expose. Có test mapping UUID/audit, unique username/hash,
 FK session, expiry boundary, revocation idempotent và Hibernate validate schema.
-Chưa kiểm thử luồng login/cookie vì API đó chưa được triển khai.
+Đã kiểm thử luồng register/login/logout, cookie session, hồ sơ, tìm kiếm user và
+upload/download file có phân quyền.
 `ChatSchemaMigrationTests` nâng cấp V3 có dữ liệu lên V4, kiểm tra giữ mốc đọc/audit,
 liên kết tin/file và chặn cập nhật sai hội thoại cả ở dòng con lẫn dòng cha.
 

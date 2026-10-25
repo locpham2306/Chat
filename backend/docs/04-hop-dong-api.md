@@ -2,7 +2,8 @@
 
 Tóm tắt các quyết định đã thống nhất ngày 20/10/2026.
 HTTP-01 đăng ký, HTTP-02 đăng nhập, HTTP-04 đăng xuất,
-HTTP-05 xem hồ sơ, HTTP-06 cập nhật hồ sơ và HTTP-07 tìm kiếm user đã được triển khai.
+HTTP-05 xem hồ sơ, HTTP-06 cập nhật hồ sơ, HTTP-07 tìm kiếm user,
+HTTP-18 upload file và HTTP-19 download file đã được triển khai.
 Các API còn lại vẫn là thiết kế.
 
 [Bảng API HTTP, WebSocket, model và mã lỗi](https://docs.google.com/spreadsheets/d/1DTv-iWD6VOK5e8GZwOaJ7J8uR1vmnhGx3EfQp_qGDjk/edit)
@@ -81,6 +82,36 @@ Ví dụ `GET /api/users?keyword=an&page=0&size=20`:
     ],
     "totalPages": 1,
     "totalElements": 1
+  }
+}
+```
+
+## File
+
+- `POST /api/files`: yêu cầu cookie session hợp lệ, nhận `multipart/form-data` với part
+  tên `file`, tối đa 20 MiB mặc định. MIME phải thuộc danh sách cấu hình cho phép.
+  Payload được lưu tại storage, database chỉ lưu metadata. Response 201 là
+  `BaseResponse<File>`; không trả `storageKey` hoặc đường dẫn filesystem.
+- `GET /api/files/{id}`: yêu cầu cookie session hợp lệ và trả binary với
+  `Content-Disposition: attachment`, `Cache-Control: private, no-store` và
+  `X-Content-Type-Options: nosniff`. Được tải khi user là người upload, file đang là
+  avatar user, hoặc user là thành viên hiện tại của hội thoại chứa file.
+- File không tồn tại trả 404; không có quyền trả 403; file rỗng/tên sai trả 400;
+  quá dung lượng trả 413; MIME không hỗ trợ trả 415.
+
+Ví dụ response upload:
+
+```json
+{
+  "code": "0",
+  "strCode": "success",
+  "message": "SUCCESSFUL",
+  "content": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "anh-dai-dien.png",
+    "contentType": "image/png",
+    "size": 102400,
+    "downloadUrl": "/api/files/550e8400-e29b-41d4-a716-446655440000"
   }
 }
 ```

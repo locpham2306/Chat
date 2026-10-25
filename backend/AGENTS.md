@@ -7,5 +7,6 @@
 - Tuân thủ `docs/01-kien-truc-va-convention.md` và `docs/02-quy-tac-trien-khai-code.md`.
 - Theo `docs/03-git-workflow.md`; khi hoàn thiện mới gộp vào `main`.
 - Khi đổi API, cập nhật `docs/04-hop-dong-api.md` và tài liệu liên quan để FE đối chiếu.
-- HTTP-07 tìm kiếm user đã triển khai; bước tiếp theo là upload/download file và phân quyền file. Làm từng bước; chỉ commit/push khi người dùng yêu cầu.
+- HTTP-18/HTTP-19 upload/download file và phân quyền đã triển khai; bước tiếp theo là
+  HTTP-08 lookup hội thoại DIRECT không tạo dữ liệu. Làm từng bước; chỉ commit/push khi người dùng yêu cầu.
 - MySQL 8.4; schema thay đổi qua Flyway, Hibernate chỉ validate. Không chạy migration lên database ngoài dự án.

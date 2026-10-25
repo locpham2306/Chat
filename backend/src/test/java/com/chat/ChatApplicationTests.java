@@ -14,6 +14,7 @@ import com.chat.modules.conversation.enums.MemberRoleEnum;
 import com.chat.modules.file.entity.FileEntity;
 import com.chat.modules.message.entity.MessageEntity;
 import com.chat.modules.message.entity.MessageAttachmentEntity;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.flywaydb.core.Flyway;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -35,6 +37,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.util.LinkedMultiValueMap;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -47,7 +50,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "spring.flyway.locations=classpath:db/migration,classpath:db/test-migration",
-        "app.session.cookie.secure=true"
+        "app.session.cookie.secure=true",
+        "app.file.storage-root=target/test-uploads"
 })
 class ChatApplicationTests {
 
@@ -87,6 +91,9 @@ class ChatApplicationTests {
 
     @Autowired
     private EntityManager entityManager;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Test
     void healthEndpointReportsUpWithoutExposingDetails() {
@@ -246,6 +253,66 @@ class ChatApplicationTests {
                 HttpMethod.GET, new HttpEntity<>(headers), String.class);
         assertThat(invalidPage.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(invalidPage.getBody()).contains("\"strCode\":\"VALIDATION_ERROR\"");
+    }
+
+    @Test
+    void uploadAndDownloadFileEnforceOwnerAndAvatarPermissions() throws Exception {
+        byte[] content = "Xin chào từ file".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var owner = users.saveAndFlush(new UserEntity("FileApiOwner", "hash-fixture", "File Owner"));
+        var viewer = users.saveAndFlush(new UserEntity("FileApiViewer", "hash-fixture", "File Viewer"));
+        var ownerSession = sessionService.create(owner.getId());
+        var viewerSession = sessionService.create(viewer.getId());
+
+        var uploadHeaders = sessionHeaders(ownerSession.getRawToken());
+        uploadHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);
+        var multipart = new LinkedMultiValueMap<String, Object>();
+        var filePart = new ByteArrayResource(content) {
+            @Override
+            public String getFilename() {
+                return "avatar.png";
+            }
+        };
+        var fileHeaders = new HttpHeaders();
+        fileHeaders.setContentType(MediaType.IMAGE_PNG);
+        multipart.add("file", new HttpEntity<>(filePart, fileHeaders));
+
+        var upload = restTemplate.exchange("/api/files", HttpMethod.POST,
+                new HttpEntity<>(multipart, uploadHeaders), String.class);
+
+        assertThat(upload.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        var uploadJson = objectMapper.readTree(upload.getBody());
+        var fileId = UUID.fromString(uploadJson.path("content").path("id").asText());
+        assertThat(uploadJson.path("content").path("name").asText()).isEqualTo("avatar.png");
+        assertThat(uploadJson.path("content").path("contentType").asText()).isEqualTo("image/png");
+        assertThat(uploadJson.path("content").path("size").asLong()).isEqualTo(content.length);
+        assertThat(uploadJson.path("content").path("downloadUrl").asText())
+                .isEqualTo("/api/files/" + fileId);
+        var metadata = entityManager.find(FileEntity.class, fileId);
+        assertThat(metadata.getStorageKey()).doesNotContain("avatar.png");
+
+        var ownerDownload = restTemplate.exchange("/api/files/" + fileId, HttpMethod.GET,
+                new HttpEntity<>(sessionHeaders(ownerSession.getRawToken())), byte[].class);
+        assertThat(ownerDownload.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(ownerDownload.getBody()).isEqualTo(content);
+        assertThat(ownerDownload.getHeaders().getContentType()).isEqualTo(MediaType.IMAGE_PNG);
+        assertThat(ownerDownload.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+                .contains("attachment", "avatar.png");
+        assertThat(ownerDownload.getHeaders().getFirst("X-Content-Type-Options")).isEqualTo("nosniff");
+
+        var forbidden = restTemplate.exchange("/api/files/" + fileId, HttpMethod.GET,
+                new HttpEntity<>(sessionHeaders(viewerSession.getRawToken())), byte[].class);
+        assertThat(forbidden.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        var profileHeaders = sessionHeaders(ownerSession.getRawToken());
+        profileHeaders.setContentType(MediaType.APPLICATION_JSON);
+        var updateProfile = restTemplate.exchange("/api/users/me", HttpMethod.PUT,
+                new HttpEntity<>(new UpdateProfileRequest("File Owner", fileId), profileHeaders), String.class);
+        assertThat(updateProfile.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        var avatarDownload = restTemplate.exchange("/api/files/" + fileId, HttpMethod.GET,
+                new HttpEntity<>(sessionHeaders(viewerSession.getRawToken())), byte[].class);
+        assertThat(avatarDownload.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(avatarDownload.getBody()).isEqualTo(content);
     }
 
     @Test
@@ -458,6 +525,12 @@ class ChatApplicationTests {
             var message = persist(new MessageEntity(second.getId(), user.getId(), "file-1", null));
             persist(new MessageAttachmentEntity(message.getId(), file.getId(), 0));
         })).hasRootCauseInstanceOf(java.sql.SQLException.class);
+    }
+
+    private HttpHeaders sessionHeaders(String rawToken) {
+        var headers = new HttpHeaders();
+        headers.set(HttpHeaders.COOKIE, "token=" + rawToken);
+        return headers;
     }
 
     private <T> T persist(T entity) {

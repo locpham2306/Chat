@@ -1,8 +1,9 @@
 # Backend
 
 Thư mục dành cho toàn bộ source, build, cấu hình và test của backend Spring Boot.
-Đã dựng entity/schema, API register/login/logout, filter session, xem/cập nhật `/api/users/me`
-và tìm kiếm user; chưa có API chat. Xem [session và cookie](docs/07-session-base.md).
+Đã dựng entity/schema, API register/login/logout, filter session, xem/cập nhật `/api/users/me`,
+tìm kiếm user và upload/download file có phân quyền; chưa có API chat.
+Xem [session và cookie](docs/07-session-base.md).
 Xem [schema và quan hệ DB](docs/06-database-schema.md).
 Java 21, Spring Boot 3.5.16, Maven Wrapper 3.9.5; root package `com.chat`.
 
@@ -38,6 +39,9 @@ Cookie mặc định Secure=true; khi chạy HTTP local dùng `SESSION_COOKIE_SE
 CORS mặc định chỉ cho `http://localhost:3001` và bật credentials để trình duyệt gửi
 cookie session. Cấu hình nhiều origin bằng `CORS_ALLOWED_ORIGINS` phân tách bởi dấu phẩy;
 không dùng wildcard `*`.
+File được lưu ngoài database tại `FILE_STORAGE_ROOT` (mặc định `./uploads`), còn bảng
+`files` chỉ lưu metadata. Giới hạn mặc định là 20 MiB/file; có thể cấu hình bằng
+`FILE_MAX_SIZE`, `FILE_MAX_REQUEST_SIZE` và `FILE_ALLOWED_CONTENT_TYPES`.
 Chưa dùng để triển khai production.
 
 ## Build và kiểm tra
@@ -65,6 +69,8 @@ Test auth kiểm tra BCrypt, session hạn 365 ngày, cookie, xác thực `/api/
 và không serialize token thô. Test hồ sơ kiểm tra request đầy đủ, trim tên,
 xóa avatar và quyền sử dụng file ảnh. Test tìm kiếm user kiểm tra username/fullName,
 loại người đang đăng nhập, phân trang và validation query.
+Test file kiểm tra giới hạn dung lượng/MIME, metadata an toàn và quyền tải của uploader,
+avatar công khai cho user đã đăng nhập, thành viên hội thoại và người không có quyền.
 
 ## Xử lý lỗi và validation
 
@@ -99,7 +105,7 @@ Các endpoint `/test/...` chỉ nằm trong test, không được thêm vào ứ
 
 ## Các bước review tiếp theo
 
-1. Upload/download file và phân quyền file.
+1. Lookup hội thoại DIRECT không tạo dữ liệu (`HTTP-08`).
 2. Module hội thoại, tin nhắn và WebSocket.
 
 Mỗi bước dừng để review; chỉ commit/push khi được yêu cầu.

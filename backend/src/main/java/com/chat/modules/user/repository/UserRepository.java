@@ -16,6 +16,8 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
 
     boolean existsByUsername(String username);
 
+    boolean existsByAvatarFileId(UUID avatarFileId);
+
     @Query(UserQueries.SEARCH_PUBLIC_PROFILES)
     Page<UserEntity> searchPublicProfiles(
             @Param("currentUserId") UUID currentUserId,

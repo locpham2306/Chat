@@ -3,9 +3,11 @@
 ## Phạm vi
 
 Hiện có `com.chat.ChatApplication`, phần common cho lỗi HTTP/validation,
-entity trong modules user/auth/conversation/message/file, repository user/auth/file.
+entity trong modules user/auth/conversation/message/file, repository user/auth/file/conversation.
 Đã có AuthenticationController/Service, SessionService, cookie service,
 filter xác thực session và UserController cho xem/cập nhật hồ sơ, tìm kiếm user.
+FileController/Service xử lý upload, download và phân quyền; local storage nằm sau
+adapter `integration.storage` để có thể thay implementation mà không đổi nghiệp vụ.
 Tham khảo cách tổ chức của QLCC; không mang nghiệp vụ chung cư, Core/CMS,
 sync offline hoặc cấu hình nội bộ sang Chat.
 
