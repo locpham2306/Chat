@@ -1,12 +1,15 @@
 package com.chat.modules.conversation.repository;
 
 import com.chat.modules.conversation.entity.ConversationMemberEntity;
+import com.chat.modules.conversation.repository.projection.ConversationCountProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.UUID;
 import java.util.Optional;
+import java.util.Collection;
+import java.util.List;
 
 public interface ConversationMemberRepository extends JpaRepository<ConversationMemberEntity, UUID> {
     boolean existsByConversationIdAndUserIdAndLeftAtIsNull(UUID conversationId, UUID userId);
@@ -17,4 +20,8 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
     long countActiveMembershipsForConversationAvatar(
             @Param("userId") UUID userId,
             @Param("avatarFileId") UUID avatarFileId);
+
+    @Query(ConversationMemberQueries.COUNT_ACTIVE_MEMBERS_BY_CONVERSATIONS)
+    List<ConversationCountProjection> countActiveMembersByConversationIds(
+            @Param("conversationIds") Collection<UUID> conversationIds);
 }

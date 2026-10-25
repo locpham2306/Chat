@@ -11,6 +11,28 @@ public final class ConversationQueries {
                     AND conversation.directUserHighId = :firstUserId))
             """;
 
+    public static final String FIND_ACTIVE_FOR_USER = """
+            SELECT conversation
+            FROM ConversationEntity conversation, ConversationMemberEntity member
+            WHERE member.conversationId = conversation.id
+              AND member.userId = :userId
+              AND member.leftAt IS NULL
+            ORDER BY COALESCE(
+                (SELECT MAX(message.createdAt)
+                 FROM MessageEntity message
+                 WHERE message.conversationId = conversation.id),
+                conversation.createdAt) DESC,
+                conversation.id DESC
+            """;
+
+    public static final String COUNT_ACTIVE_FOR_USER = """
+            SELECT COUNT(conversation)
+            FROM ConversationEntity conversation, ConversationMemberEntity member
+            WHERE member.conversationId = conversation.id
+              AND member.userId = :userId
+              AND member.leftAt IS NULL
+            """;
+
     private ConversationQueries() {
     }
 }

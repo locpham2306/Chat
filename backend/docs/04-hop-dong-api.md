@@ -3,7 +3,7 @@
 Tóm tắt các quyết định đã thống nhất ngày 20/10/2026.
 HTTP-01 đăng ký, HTTP-02 đăng nhập, HTTP-04 đăng xuất,
 HTTP-05 xem hồ sơ, HTTP-06 cập nhật hồ sơ, HTTP-07 tìm kiếm user, HTTP-08 lookup DIRECT,
-HTTP-09 tạo GROUP,
+HTTP-09 tạo GROUP, HTTP-10 danh sách hội thoại,
 HTTP-18 upload file và HTTP-19 download file đã được triển khai.
 Các API còn lại vẫn là thiết kế.
 
@@ -139,6 +139,20 @@ request trả 404 và không tạo group. Người tạo được gán `role: 'O
 lại có `role: 'MEMBER'`. Avatar tùy chọn phải tồn tại, là `image/*`, do người tạo upload
 và chưa gắn vào hội thoại; sai quyền trả 403. Conversation và membership được tạo trong
 cùng transaction. Response 201 có `type: 'GROUP'` và `memberCount` đã gồm OWNER.
+
+HTTP-10 đã triển khai tại `GET /api/conversations`. `page` mặc định 0 và phải từ 0;
+`size` mặc định 20 và phải từ 1 đến 100. Chỉ trả hội thoại mà user có membership đang
+hoạt động, sắp xếp theo hoạt động mới nhất rồi theo id để ổn định. Response 200 là
+`BaseResponse<PageResponse<List<Conversation>>>`; dữ liệu nằm trong `content.data`,
+kèm `totalPages` và `totalElements`.
+
+Mỗi phần tử có `id`, `type: 'DIRECT' | 'GROUP'`, `name`, `avatarFileId`, `ownerId`,
+`memberCount`, `createdAt`, `lastMessage` và `unreadCount`. GROUP chưa có tin vẫn xuất
+hiện với `lastMessage: null`. Nếu có tin cuối, `lastMessage` gồm `id`, `conversationId`,
+`senderId`, `clientMessageId`, `content`, `attachments`, `createdAt`; mỗi attachment dùng
+model File của API upload/download. `unreadCount` được tính sau mốc đọc theo cặp
+`createdAt`/`id`; chưa có mốc đọc thì đếm toàn bộ tin trong hội thoại. Query phân trang
+không hợp lệ trả 400, thiếu hoặc sai session trả 401.
 
 ```json
 {

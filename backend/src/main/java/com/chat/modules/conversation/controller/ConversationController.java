@@ -1,13 +1,17 @@
 package com.chat.modules.conversation.controller;
 
+import com.chat.common.dto.response.PageResponse;
 import com.chat.common.wrapper.BaseResponse;
 import com.chat.modules.auth.security.SessionAuthenticationFilter;
 import com.chat.modules.auth.service.SessionIdentity;
 import com.chat.modules.conversation.dto.request.CreateGroupRequest;
+import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
 import com.chat.modules.conversation.dto.response.DirectConversationResponse;
 import com.chat.modules.conversation.dto.response.GroupConversationResponse;
 import com.chat.modules.conversation.service.ConversationService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -26,6 +31,17 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ConversationController {
     private final ConversationService conversations;
+
+    @GetMapping
+    public BaseResponse<PageResponse<List<ConversationListItemResponse>>> getConversations(
+            @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
+            @RequestParam(defaultValue = "0")
+            @Min(value = 0, message = "{validation.min}") Integer page,
+            @RequestParam(defaultValue = "20")
+            @Min(value = 1, message = "{validation.min}")
+            @Max(value = 100, message = "{validation.max}") Integer size) {
+        return BaseResponse.success(conversations.getConversations(session.userId(), page, size));
+    }
 
     @GetMapping("/direct")
     public ResponseEntity<BaseResponse<DirectConversationResponse>> findDirectConversation(

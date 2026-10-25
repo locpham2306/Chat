@@ -7,7 +7,7 @@
 - Tuân thủ `docs/01-kien-truc-va-convention.md` và `docs/02-quy-tac-trien-khai-code.md`.
 - Theo `docs/03-git-workflow.md`; khi hoàn thiện mới gộp vào `main`.
 - Khi đổi API, cập nhật `docs/04-hop-dong-api.md` và tài liệu liên quan để FE đối chiếu.
-- HTTP-08 lookup DIRECT, HTTP-09 tạo GROUP và HTTP-18/HTTP-19 file đã triển khai; bước
-  tiếp theo theo thứ tự trong hợp đồng là HTTP-10 danh sách hội thoại. Làm từng bước;
+- HTTP-08 lookup DIRECT, HTTP-09 tạo GROUP, HTTP-10 danh sách hội thoại và HTTP-18/HTTP-19
+  file đã triển khai; bước tiếp theo theo thứ tự trong hợp đồng là HTTP-11 chi tiết hội thoại. Làm từng bước;
   chỉ commit/push khi người dùng yêu cầu.
 - MySQL 8.4; schema thay đổi qua Flyway, Hibernate chỉ validate. Không chạy migration lên database ngoài dự án.

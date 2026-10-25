@@ -9,12 +9,19 @@ import com.chat.modules.conversation.enums.MemberRoleEnum;
 import com.chat.modules.conversation.mapper.ConversationMapper;
 import com.chat.modules.conversation.repository.ConversationMemberRepository;
 import com.chat.modules.conversation.repository.ConversationRepository;
+import com.chat.modules.conversation.repository.projection.ConversationCountProjection;
 import com.chat.modules.conversation.service.impl.ConversationServiceImpl;
 import com.chat.modules.file.entity.FileEntity;
 import com.chat.modules.file.repository.FileRepository;
+import com.chat.modules.message.entity.MessageAttachmentEntity;
+import com.chat.modules.message.entity.MessageEntity;
+import com.chat.modules.message.mapper.MessageMapper;
+import com.chat.modules.message.repository.MessageAttachmentRepository;
+import com.chat.modules.message.repository.MessageRepository;
 import com.chat.modules.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -29,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -40,9 +48,12 @@ class ConversationServiceTests {
     private final ConversationMemberRepository members = mock(ConversationMemberRepository.class);
     private final UserRepository users = mock(UserRepository.class);
     private final FileRepository files = mock(FileRepository.class);
+    private final MessageRepository messages = mock(MessageRepository.class);
+    private final MessageAttachmentRepository attachments = mock(MessageAttachmentRepository.class);
     private final Clock clock = Clock.fixed(Instant.parse("2026-10-20T08:00:00Z"), ZoneOffset.UTC);
     private final ConversationServiceImpl service = new ConversationServiceImpl(
-            conversations, members, users, files, new ConversationMapper(), clock);
+            conversations, members, users, files, messages, attachments,
+            new ConversationMapper(), new MessageMapper(), clock);
 
     @Test
     void directLookupReturnsExistingConversationWithoutCreatingData() {
@@ -172,6 +183,70 @@ class ConversationServiceTests {
         assertStatus(() -> service.createGroup(currentUserId,
                 new CreateGroupRequest("Nhóm", List.of(memberId), avatarId)), HttpStatus.FORBIDDEN);
         verifyNoInteractions(conversations, members);
+    }
+
+    @Test
+    void getConversationsBuildsPageWithLatestMessageAttachmentsAndUnreadCount() {
+        var currentUserId = UUID.randomUUID();
+        var otherUserId = UUID.randomUUID();
+        var group = ConversationEntity.group(currentUserId, "Nhóm", null);
+        var direct = ConversationEntity.direct(currentUserId, otherUserId);
+        var groupId = UUID.randomUUID();
+        var directId = UUID.randomUUID();
+        ReflectionTestUtils.setField(group, "id", groupId);
+        ReflectionTestUtils.setField(group, "createdAt", clock.instant());
+        ReflectionTestUtils.setField(direct, "id", directId);
+        ReflectionTestUtils.setField(direct, "createdAt", clock.instant());
+        when(conversations.findActiveForUser(eq(currentUserId), any()))
+                .thenReturn(new PageImpl<>(List.of(group, direct)));
+        var groupMemberCount = count(groupId, 3);
+        var directMemberCount = count(directId, 2);
+        var groupUnreadCount = count(groupId, 1);
+        when(members.countActiveMembersByConversationIds(anyCollection()))
+                .thenReturn(List.of(groupMemberCount, directMemberCount));
+        when(messages.countUnreadByConversationIds(eq(currentUserId), anyCollection()))
+                .thenReturn(List.of(groupUnreadCount));
+
+        var message = new MessageEntity(groupId, otherUserId, "client-1", "Xin chào");
+        var messageId = UUID.randomUUID();
+        ReflectionTestUtils.setField(message, "id", messageId);
+        ReflectionTestUtils.setField(message, "createdAt", clock.instant());
+        when(messages.findLatestByConversationIds(anyCollection())).thenReturn(List.of(message));
+        var file = new FileEntity(otherUserId, "hello.txt", "storage-key", "text/plain", 5);
+        var fileId = UUID.randomUUID();
+        ReflectionTestUtils.setField(file, "id", fileId);
+        var attachment = new MessageAttachmentEntity(messageId, fileId, 0);
+        when(attachments.findByMessageIdInOrderByMessageIdAscPositionAsc(anyCollection()))
+                .thenReturn(List.of(attachment));
+        when(files.findAllById(anyCollection())).thenReturn(List.of(file));
+
+        var result = service.getConversations(currentUserId, 0, 20);
+
+        assertThat(result.totalElements()).isEqualTo(2);
+        assertThat(result.totalPages()).isEqualTo(1);
+        assertThat(result.data()).hasSize(2);
+        var groupResult = result.data().getFirst();
+        assertThat(groupResult.id()).isEqualTo(groupId);
+        assertThat(groupResult.type()).isEqualTo(ConversationTypeEnum.GROUP);
+        assertThat(groupResult.memberCount()).isEqualTo(3);
+        assertThat(groupResult.unreadCount()).isEqualTo(1);
+        assertThat(groupResult.lastMessage().id()).isEqualTo(messageId);
+        assertThat(groupResult.lastMessage().attachments()).singleElement().satisfies(fileResponse -> {
+            assertThat(fileResponse.id()).isEqualTo(fileId);
+            assertThat(fileResponse.downloadUrl()).isEqualTo("/api/files/" + fileId);
+        });
+        var directResult = result.data().get(1);
+        assertThat(directResult.type()).isEqualTo(ConversationTypeEnum.DIRECT);
+        assertThat(directResult.memberCount()).isEqualTo(2);
+        assertThat(directResult.lastMessage()).isNull();
+        assertThat(directResult.unreadCount()).isZero();
+    }
+
+    private ConversationCountProjection count(UUID conversationId, long total) {
+        var projection = mock(ConversationCountProjection.class);
+        when(projection.getConversationId()).thenReturn(conversationId);
+        when(projection.getTotal()).thenReturn(total);
+        return projection;
     }
 
     private void assertStatus(org.assertj.core.api.ThrowableAssert.ThrowingCallable action, HttpStatus status) {

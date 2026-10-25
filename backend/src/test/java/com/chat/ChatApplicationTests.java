@@ -471,6 +471,77 @@ class ChatApplicationTests {
     }
 
     @Test
+    void conversationListReturnsOnlyMembershipsOrderedByLatestActivity() throws Exception {
+        var fixture = new TransactionTemplate(transactionManager).execute(status -> {
+            var current = users.saveAndFlush(
+                    new UserEntity("ConversationListCurrent", "hash-fixture", "List Current"));
+            var other = users.saveAndFlush(
+                    new UserEntity("ConversationListOther", "hash-fixture", "List Other"));
+            var active = persist(ConversationEntity.group(current.getId(), "Active group", null));
+            var currentMember = persist(new ConversationMemberEntity(
+                    active.getId(), current.getId(), MemberRoleEnum.MEMBER, Instant.now()));
+            persist(new ConversationMemberEntity(
+                    active.getId(), other.getId(), MemberRoleEnum.OWNER, Instant.now()));
+            var empty = persist(ConversationEntity.group(current.getId(), "Empty group", null));
+            persist(new ConversationMemberEntity(
+                    empty.getId(), current.getId(), MemberRoleEnum.OWNER, Instant.now()));
+            var hidden = persist(ConversationEntity.group(other.getId(), "Hidden group", null));
+            persist(new ConversationMemberEntity(
+                    hidden.getId(), other.getId(), MemberRoleEnum.OWNER, Instant.now()));
+
+            var readMessage = persist(new MessageEntity(
+                    active.getId(), other.getId(), "list-read", "Đã đọc"));
+            persist(new ConversationReadStateEntity(currentMember.getId(), readMessage.getId()));
+            var file = new FileEntity(other.getId(), "latest.txt", "list/latest.txt", "text/plain", 6);
+            file.bindToConversation(active.getId());
+            persist(file);
+            var latestMessage = persist(new MessageEntity(
+                    active.getId(), other.getId(), "list-latest", "Mới nhất"));
+            persist(new MessageAttachmentEntity(latestMessage.getId(), file.getId(), 0));
+            return new ConversationListFixture(
+                    current.getId(), active.getId(), empty.getId(), hidden.getId(),
+                    latestMessage.getId(), file.getId());
+        });
+
+        var issuedSession = sessionService.create(fixture.currentUserId());
+        var headers = sessionHeaders(issuedSession.getRawToken());
+        var firstPage = restTemplate.exchange(
+                "/api/conversations?page=0&size=1", HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
+
+        assertThat(firstPage.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var firstContent = objectMapper.readTree(firstPage.getBody()).path("content");
+        assertThat(firstContent.path("totalElements").asLong()).isEqualTo(2);
+        assertThat(firstContent.path("totalPages").asLong()).isEqualTo(2);
+        assertThat(firstContent.path("data")).hasSize(1);
+        var item = firstContent.path("data").get(0);
+        assertThat(item.path("id").asText()).isEqualTo(fixture.activeConversationId().toString());
+        assertThat(item.path("type").asText()).isEqualTo("GROUP");
+        assertThat(item.path("memberCount").asLong()).isEqualTo(2);
+        assertThat(item.path("unreadCount").asLong()).isEqualTo(1);
+        assertThat(item.path("lastMessage").path("id").asText())
+                .isEqualTo(fixture.latestMessageId().toString());
+        assertThat(item.path("lastMessage").path("attachments")).hasSize(1);
+        assertThat(item.path("lastMessage").path("attachments").get(0).path("id").asText())
+                .isEqualTo(fixture.fileId().toString());
+        assertThat(firstPage.getBody()).doesNotContain(fixture.hiddenConversationId().toString());
+
+        var secondPage = restTemplate.exchange(
+                "/api/conversations?page=1&size=1", HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
+        var secondItem = objectMapper.readTree(secondPage.getBody())
+                .path("content").path("data").get(0);
+        assertThat(secondItem.path("id").asText()).isEqualTo(fixture.emptyConversationId().toString());
+        assertThat(secondItem.path("lastMessage").isNull()).isTrue();
+        assertThat(secondItem.path("unreadCount").asLong()).isZero();
+
+        var invalidPage = restTemplate.exchange(
+                "/api/conversations?page=-1&size=101", HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
+        assertThat(invalidPage.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void migrationsAreAppliedAndNotRepeated() {
         assertThat(flyway.info().applied()).hasSize(5);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
@@ -692,5 +763,14 @@ class ChatApplicationTests {
         entityManager.persist(entity);
         entityManager.flush();
         return entity;
+    }
+
+    private record ConversationListFixture(
+            UUID currentUserId,
+            UUID activeConversationId,
+            UUID emptyConversationId,
+            UUID hiddenConversationId,
+            UUID latestMessageId,
+            UUID fileId) {
     }
 }

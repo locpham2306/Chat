@@ -10,6 +10,14 @@ public final class ConversationMemberQueries {
               AND conversation.avatarFileId = :avatarFileId
             """;
 
+    public static final String COUNT_ACTIVE_MEMBERS_BY_CONVERSATIONS = """
+            SELECT member.conversationId AS conversationId, COUNT(member) AS total
+            FROM ConversationMemberEntity member
+            WHERE member.conversationId IN :conversationIds
+              AND member.leftAt IS NULL
+            GROUP BY member.conversationId
+            """;
+
     private ConversationMemberQueries() {
     }
 }

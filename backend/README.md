@@ -4,7 +4,8 @@ Thư mục dành cho toàn bộ source, build, cấu hình và test của backen
 Đã dựng entity/schema, API register/login/logout, filter session, xem/cập nhật `/api/users/me`,
 tìm kiếm user và upload/download file có phân quyền; chưa có API gửi tin nhắn.
 Lookup hội thoại DIRECT đã có và không tạo dữ liệu khi hai user chưa từng nhắn tin;
-API tạo nhóm tạo OWNER/MEMBER trong cùng transaction.
+API tạo nhóm tạo OWNER/MEMBER trong cùng transaction. Danh sách hội thoại chỉ trả
+membership đang hoạt động, sắp xếp theo hoạt động mới nhất và kèm tin cuối/số chưa đọc.
 Xem [session và cookie](docs/07-session-base.md).
 Xem [schema và quan hệ DB](docs/06-database-schema.md).
 Java 21, Spring Boot 3.5.16, Maven Wrapper 3.9.5; root package `com.chat`.
@@ -77,6 +78,8 @@ Test HTTP-08 kiểm tra lookup hai chiều, 200/204, recipient sai và bảo đ�
 hội thoại rỗng.
 Test HTTP-09 kiểm tra role, member trùng, user/avatar không hợp lệ, rollback và quyền
 xem avatar nhóm.
+Test HTTP-10 kiểm tra phân trang, chỉ lấy membership đang hoạt động, thứ tự hoạt động,
+memberCount, lastMessage kèm attachment và unreadCount theo mốc đọc.
 
 ## Xử lý lỗi và validation
 
@@ -111,7 +114,7 @@ Các endpoint `/test/...` chỉ nằm trong test, không được thêm vào ứ
 
 ## Các bước review tiếp theo
 
-1. Danh sách hội thoại của mình (`HTTP-10`).
+1. Chi tiết một hội thoại (`HTTP-11`).
 2. Tiếp tục lần lượt các API HTTP trong hợp đồng, sau đó tới WebSocket.
 
 Mỗi bước dừng để review; chỉ commit/push khi được yêu cầu.
