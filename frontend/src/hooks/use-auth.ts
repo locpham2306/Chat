@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import authApi from '~/apis/auth.api'
 import { isUnauthorizedError } from '~/lib/api-error'
+import { wsClient } from '~/lib/websocket-client'
 import { useAuthStore } from '~/stores/use-auth-store'
+import { useWebSocketStore } from '~/stores/use-websocket-store'
 import type { LoginBody, RegisterBody } from '~/types/auth.type'
 
 export const profileQueryKey = ['auth', 'profile'] as const
@@ -20,6 +22,8 @@ export const logoutSession = async (queryClient: QueryClient) => {
     }
   }
 
+  wsClient.disconnect()
+  useWebSocketStore.getState().reset()
   useAuthStore.getState().logout()
   queryClient.clear()
 }
