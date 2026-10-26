@@ -30,7 +30,7 @@ export const ConversationList = ({
     size: pageSize
   })
 
-  const items: ConversationSummary[] = Array.isArray(data?.items) ? data.items : []
+  const items: ConversationSummary[] = Array.isArray(data?.data) ? data.data : []
   const totalElements = data?.totalElements ?? items.length
   const totalPages = data?.totalPages ?? (items.length > 0 ? 1 : 0)
 

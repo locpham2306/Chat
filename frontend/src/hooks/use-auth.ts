@@ -4,13 +4,24 @@ import { isUnauthorizedError } from '~/lib/api-error'
 import { wsClient } from '~/lib/websocket-client'
 import { useAuthStore } from '~/stores/use-auth-store'
 import { useWebSocketStore } from '~/stores/use-websocket-store'
-import type { LoginBody, RegisterBody } from '~/types/auth.type'
+import type { LoginBody, LoginResponse, RegisterBody } from '~/types/auth.type'
+import type { User } from '~/types/user.type'
 
 export const profileQueryKey = ['auth', 'profile'] as const
 
-const getProfile = async () => {
+export const getProfile = async (): Promise<User> => {
   const response = await authApi.getProfile()
-  return response.data
+  return response.data.content
+}
+
+const login = async (body: LoginBody): Promise<LoginResponse> => {
+  const response = await authApi.login(body)
+  return response.data.content
+}
+
+const register = async (body: RegisterBody): Promise<User> => {
+  const response = await authApi.register(body)
+  return response.data.content
 }
 
 export const logoutSession = async (queryClient: QueryClient) => {
@@ -32,7 +43,7 @@ export const useLoginMutation = () => {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (body: LoginBody) => authApi.login(body),
+    mutationFn: login,
     onSuccess: () => {
       queryClient.removeQueries({ queryKey: profileQueryKey })
     }
@@ -41,7 +52,7 @@ export const useLoginMutation = () => {
 
 export const useRegisterMutation = () => {
   return useMutation({
-    mutationFn: (body: RegisterBody) => authApi.register(body)
+    mutationFn: register
   })
 }
 

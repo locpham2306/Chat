@@ -52,7 +52,7 @@ const UserSearchDialogContent = ({ onSelectUser, selectingUserId, selectionError
   const [searchParams, setSearchParams] = useState(() => createSearchParams(''))
   const searchQuery = useUserSearchQuery(searchParams.keyword, searchParams.page, PAGE_SIZE)
 
-  const users = searchQuery.data?.items ?? []
+  const users = searchQuery.data?.data ?? []
   const totalPages = searchQuery.data?.totalPages ?? 0
   const totalElements = searchQuery.data?.totalElements ?? 0
   const isDebouncing = keyword.trim() !== searchParams.keyword
