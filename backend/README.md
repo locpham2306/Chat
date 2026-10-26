@@ -34,6 +34,32 @@ không bọc giá trị trong dấu nháy hoặc thêm `export`. Biến môi tr�
 Trong VS Code chọn cấu hình `Chat Backend (8086)` rồi F5/Ctrl+F5.
 App yêu cầu database hoạt động; không tự tạo database hay âm thầm chuyển sang database in-memory.
 
+### Nạp dữ liệu mẫu local
+
+Khởi động backend một lần để Flyway tạo schema V1–V4, sau đó chạy script từ thư mục
+`backend/`. Dữ liệu mẫu chỉ dành cho database local, không chạy trên môi trường dùng chung
+hoặc production.
+
+PowerShell/MySQL CLI:
+
+```powershell
+mysql --default-character-set=utf8mb4 -u root -p chat -e "source scripts/seed-dev.sql"
+```
+
+MySQL Workbench: mở `scripts/seed-dev.sql`, chọn schema `chat` rồi chạy toàn bộ script.
+Script có thể chạy lại, không nằm trong Flyway và không tự chạy khi start ứng dụng.
+
+Các tài khoản mẫu dùng chung mật khẩu `123456`:
+
+- `seed_an`
+- `seed_binh`
+- `seed_chi`
+- `seed_dung`
+
+Seed tạo một hội thoại DIRECT, một GROUP có tin nhắn và một GROUP chưa có tin để kiểm
+tra danh sách hội thoại, tin cuối và số chưa đọc. Không seed session; đăng nhập qua
+`POST /api/auth/login` để backend tự tạo cookie session hợp lệ.
+
 Kiểm tra: `GET http://localhost:8086/actuator/health` trả `{"status":"UP"}`.
 Chỉ expose health, không expose env hoặc chi tiết health.
 Đổi port bằng biến môi trường `SERVER_PORT` (mặc định 8086).

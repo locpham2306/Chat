@@ -61,6 +61,10 @@ không thêm quote/export. Biến môi trường vẫn ghi đè giá trị trong
 - `clean-disabled=true`: không cho Flyway clean xóa schema.
 - `spring.sql.init.mode=never`: không trộn thêm `schema.sql`/`data.sql` với Flyway.
 
+Dữ liệu giả local nằm riêng tại `scripts/seed-dev.sql`, không phải migration và không
+được đóng gói để tự chạy cùng ứng dụng. Chỉ chạy thủ công sau khi Flyway đã tạo schema;
+xem lệnh và tài khoản mẫu trong `backend/README.md`.
+
 Khi chạy app trên database Chat, Flyway tạo users/sessions và bảng lịch sử migration.
 Kiểm thử dùng MySQL 8.4 trong Docker; máy local hiện là MySQL 8.0.37.
 Chỉ chạy migration local vào schema `chat` khi được yêu cầu.
