@@ -3,10 +3,12 @@ import { AlertCircle, LoaderCircle, RefreshCw } from 'lucide-react'
 import { Navigate, Outlet } from 'react-router-dom'
 import { Button } from '~/components/ui/button'
 import { useProfileQuery } from '~/hooks/use-auth'
+import { useWebSocketLifecycle } from '~/hooks/use-websocket'
 import { isUnauthorizedError } from '~/lib/api-error'
 import { useAuthStore } from '~/stores/use-auth-store'
 
 export const ProtectedRoute = () => {
+  useWebSocketLifecycle()
   const login = useAuthStore((state) => state.login)
   const logout = useAuthStore((state) => state.logout)
   const profileQuery = useProfileQuery()

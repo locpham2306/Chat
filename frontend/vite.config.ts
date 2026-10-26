@@ -8,7 +8,17 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [tailwindcss(), react(), babel({ presets: [reactCompilerPreset()] })],
   server: {
-    port: 3001
+    port: 3001,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8086',
+        changeOrigin: true
+      },
+      '/ws': {
+        target: 'http://localhost:8086',
+        ws: true
+      }
+    }
   },
   preview: {
     port: 3001
