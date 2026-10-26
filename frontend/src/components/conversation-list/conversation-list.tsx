@@ -1,21 +1,27 @@
+import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react'
 import { useState } from 'react'
-import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '~/components/ui/button'
 import { ScrollArea } from '~/components/ui/scroll-area'
 import { useConversationsQuery } from '~/hooks/use-conversation'
+import type { ConversationSummary } from '~/types/conversation.type'
 import { ConversationEmpty } from './conversation-empty'
 import { ConversationError } from './conversation-error'
 import { ConversationItem } from './conversation-item'
 import { ConversationSkeleton } from './conversation-skeleton'
-import type { ConversationSummary } from '~/types/conversation.type'
 
 interface ConversationListProps {
   activeId?: string
   onSelectConversation: (id: string) => void
+  onOpenUserSearch?: () => void
   onOpenCreateGroup?: () => void
 }
 
-export const ConversationList = ({ activeId, onSelectConversation, onOpenCreateGroup }: ConversationListProps) => {
+export const ConversationList = ({
+  activeId,
+  onSelectConversation,
+  onOpenUserSearch,
+  onOpenCreateGroup
+}: ConversationListProps) => {
   const [page, setPage] = useState(0)
   const pageSize = 20
 
@@ -38,16 +44,28 @@ export const ConversationList = ({ activeId, onSelectConversation, onOpenCreateG
             {isLoading ? 'Đang tải...' : `${totalElements} cuộc trò chuyện`}
           </p>
         </div>
-        <Button
-          variant='ghost'
-          size='icon'
-          className='h-8 w-8'
-          onClick={onOpenCreateGroup}
-          title='Tạo nhóm mới'
-          aria-label='Tạo nhóm mới'
-        >
-          <Plus className='h-4 w-4' />
-        </Button>
+        <div className='flex items-center gap-1'>
+          <Button
+            variant='ghost'
+            size='icon'
+            className='h-8 w-8'
+            onClick={onOpenUserSearch}
+            title='Tìm người dùng'
+            aria-label='Tìm người dùng'
+          >
+            <Search className='h-4 w-4' />
+          </Button>
+          <Button
+            variant='ghost'
+            size='icon'
+            className='h-8 w-8'
+            onClick={onOpenCreateGroup}
+            title='Tạo nhóm mới'
+            aria-label='Tạo nhóm mới'
+          >
+            <Plus className='h-4 w-4' />
+          </Button>
+        </div>
       </div>
 
       {/* Main List Area */}
