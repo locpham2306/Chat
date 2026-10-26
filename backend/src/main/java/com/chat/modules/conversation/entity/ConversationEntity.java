@@ -64,4 +64,15 @@ public class ConversationEntity extends BaseEntity {
         conversation.avatarFileId = avatarFileId;
         return conversation;
     }
+
+    public void updateGroup(String name, UUID avatarFileId) {
+        if (type != ConversationTypeEnum.GROUP) {
+            throw new IllegalStateException("Only group conversations can be updated");
+        }
+        if (name == null || name.isBlank() || name.length() > 100) {
+            throw new IllegalArgumentException("Invalid group name");
+        }
+        this.name = name;
+        this.avatarFileId = avatarFileId;
+    }
 }

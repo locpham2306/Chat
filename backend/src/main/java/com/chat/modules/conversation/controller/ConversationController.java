@@ -5,6 +5,7 @@ import com.chat.common.wrapper.BaseResponse;
 import com.chat.modules.auth.security.SessionAuthenticationFilter;
 import com.chat.modules.auth.service.SessionIdentity;
 import com.chat.modules.conversation.dto.request.CreateGroupRequest;
+import com.chat.modules.conversation.dto.request.UpdateConversationRequest;
 import com.chat.modules.conversation.dto.response.ConversationDetailResponse;
 import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
 import com.chat.modules.conversation.dto.response.DirectConversationResponse;
@@ -19,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -50,6 +52,14 @@ public class ConversationController {
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id) {
         return BaseResponse.success(conversations.getConversation(session.userId(), id));
+    }
+
+    @PutMapping("/{id}")
+    public BaseResponse<ConversationDetailResponse> updateConversation(
+            @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateConversationRequest request) {
+        return BaseResponse.success(conversations.updateConversation(session.userId(), id, request));
     }
 
     @GetMapping("/direct")

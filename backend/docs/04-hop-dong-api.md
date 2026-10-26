@@ -3,7 +3,7 @@
 Tóm tắt các quyết định đã thống nhất ngày 20/10/2026.
 HTTP-01 đăng ký, HTTP-02 đăng nhập, HTTP-04 đăng xuất,
 HTTP-05 xem hồ sơ, HTTP-06 cập nhật hồ sơ, HTTP-07 tìm kiếm user, HTTP-08 lookup DIRECT,
-HTTP-09 tạo GROUP, HTTP-10 danh sách hội thoại, HTTP-11 chi tiết hội thoại,
+HTTP-09 tạo GROUP, HTTP-10 danh sách, HTTP-11 chi tiết, HTTP-12 cập nhật hội thoại,
 HTTP-18 upload file và HTTP-19 download file đã được triển khai.
 Các API còn lại vẫn là thiết kế.
 
@@ -160,6 +160,16 @@ hoặc thành viên đã rời trả 403. Response 200 gồm `id`, `type: 'DIREC
 `name`, `avatarFileId`, `ownerId`, `memberCount`, `createdAt`; `memberCount` chỉ đếm
 thành viên đang hoạt động. Với DIRECT, các trường riêng của GROUP là null theo schema.
 Thiếu hoặc sai session trả 401.
+
+HTTP-12 đã triển khai tại `PUT /api/conversations/{id}`. Body phải có đủ `name` và
+`avatarFileId`; `name` bắt buộc, được trim và tối đa 100 ký tự; `avatarFileId: null`
+dùng để xóa avatar. Chỉ OWNER có membership đang hoạt động được sửa GROUP. Hội thoại
+không tồn tại trả 404; DIRECT trả 409; người không phải OWNER trả 403.
+
+Avatar khác null phải tồn tại, là `image/*`, do OWNER upload và chưa gắn vào hội thoại;
+file không tồn tại trả 404, file sai quyền hoặc sai loại trả 403. Việc kiểm tra quyền,
+file và cập nhật chạy trong cùng transaction. Response 200 có `type: 'GROUP'` cùng
+`id`, `name`, `avatarFileId`, `ownerId`, `memberCount`, `createdAt`.
 
 ```json
 {

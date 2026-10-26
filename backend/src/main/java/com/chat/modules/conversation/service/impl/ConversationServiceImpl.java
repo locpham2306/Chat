@@ -3,9 +3,11 @@ package com.chat.modules.conversation.service.impl;
 import com.chat.common.constant.ErrorConstants;
 import com.chat.common.dto.response.PageResponse;
 import com.chat.exception.BadRequestException;
+import com.chat.exception.ConflictException;
 import com.chat.exception.NotFoundException;
 import com.chat.exception.NoPermissionException;
 import com.chat.modules.conversation.dto.request.CreateGroupRequest;
+import com.chat.modules.conversation.dto.request.UpdateConversationRequest;
 import com.chat.modules.conversation.dto.response.ConversationDetailResponse;
 import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
 import com.chat.modules.conversation.dto.response.DirectConversationResponse;
@@ -145,6 +147,29 @@ public class ConversationServiceImpl implements ConversationService {
         if (!members.existsByConversationIdAndUserIdAndLeftAtIsNull(conversationId, currentUserId)) {
             throw new NoPermissionException(ErrorConstants.FORBIDDEN);
         }
+        var memberCount = members.countByConversationIdAndLeftAtIsNull(conversationId);
+        return conversationMapper.toDetailResponse(conversation, memberCount);
+    }
+
+    @Override
+    @Transactional
+    public ConversationDetailResponse updateConversation(
+            UUID currentUserId, UUID conversationId, UpdateConversationRequest request) {
+        var conversation = conversations.findById(conversationId)
+                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+        if (conversation.getType() != ConversationTypeEnum.GROUP) {
+            throw new ConflictException("conversation.directCannotBeUpdated");
+        }
+        var membership = members.findByConversationIdAndUserIdAndLeftAtIsNull(
+                        conversationId, currentUserId)
+                .orElseThrow(() -> new NoPermissionException(ErrorConstants.FORBIDDEN));
+        if (membership.getRole() != MemberRoleEnum.OWNER
+                || !currentUserId.equals(conversation.getOwnerId())) {
+            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+        }
+        validateGroupAvatar(currentUserId, request.avatarFileId());
+
+        conversation.updateGroup(StringUtils.trim(request.name()), request.avatarFileId());
         var memberCount = members.countByConversationIdAndLeftAtIsNull(conversationId);
         return conversationMapper.toDetailResponse(conversation, memberCount);
     }

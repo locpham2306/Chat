@@ -2,6 +2,7 @@ package com.chat.modules.conversation;
 
 import com.chat.exception.BusinessException;
 import com.chat.modules.conversation.dto.request.CreateGroupRequest;
+import com.chat.modules.conversation.dto.request.UpdateConversationRequest;
 import com.chat.modules.conversation.entity.ConversationEntity;
 import com.chat.modules.conversation.entity.ConversationMemberEntity;
 import com.chat.modules.conversation.enums.ConversationTypeEnum;
@@ -281,6 +282,87 @@ class ConversationServiceTests {
 
         assertStatus(() -> service.getConversation(currentUserId, conversationId), HttpStatus.FORBIDDEN);
         verify(members, never()).countByConversationIdAndLeftAtIsNull(conversationId);
+    }
+
+    @Test
+    void updateConversationAllowsOwnerAndTrimsName() {
+        var ownerId = UUID.randomUUID();
+        var conversationId = UUID.randomUUID();
+        var avatarId = UUID.randomUUID();
+        var conversation = ConversationEntity.group(ownerId, "Tên cũ", null);
+        ReflectionTestUtils.setField(conversation, "id", conversationId);
+        ReflectionTestUtils.setField(conversation, "createdAt", clock.instant());
+        var ownerMembership = new ConversationMemberEntity(
+                conversationId, ownerId, MemberRoleEnum.OWNER, clock.instant());
+        var avatar = new FileEntity(ownerId, "group.png", "group-avatar", "image/png", 10);
+        ReflectionTestUtils.setField(avatar, "id", avatarId);
+        when(conversations.findById(conversationId)).thenReturn(Optional.of(conversation));
+        when(members.findByConversationIdAndUserIdAndLeftAtIsNull(conversationId, ownerId))
+                .thenReturn(Optional.of(ownerMembership));
+        when(files.findById(avatarId)).thenReturn(Optional.of(avatar));
+        when(members.countByConversationIdAndLeftAtIsNull(conversationId)).thenReturn(3L);
+
+        var result = service.updateConversation(ownerId, conversationId,
+                new UpdateConversationRequest("  Tên mới  ", avatarId));
+
+        assertThat(result.name()).isEqualTo("Tên mới");
+        assertThat(result.avatarFileId()).isEqualTo(avatarId);
+        assertThat(result.memberCount()).isEqualTo(3);
+        assertThat(conversation.getName()).isEqualTo("Tên mới");
+        assertThat(conversation.getAvatarFileId()).isEqualTo(avatarId);
+    }
+
+    @Test
+    void updateConversationRejectsUnknownConversationAndDirectConversation() {
+        var currentUserId = UUID.randomUUID();
+        var conversationId = UUID.randomUUID();
+        var request = new UpdateConversationRequest("Tên mới", null);
+        when(conversations.findById(conversationId)).thenReturn(Optional.empty());
+
+        assertStatus(() -> service.updateConversation(currentUserId, conversationId, request),
+                HttpStatus.NOT_FOUND);
+        verifyNoInteractions(members, files);
+
+        var direct = ConversationEntity.direct(currentUserId, UUID.randomUUID());
+        when(conversations.findById(conversationId)).thenReturn(Optional.of(direct));
+
+        assertStatus(() -> service.updateConversation(currentUserId, conversationId, request),
+                HttpStatus.CONFLICT);
+        verifyNoInteractions(members, files);
+    }
+
+    @Test
+    void updateConversationRejectsNonOwnerAndInvalidAvatar() {
+        var ownerId = UUID.randomUUID();
+        var currentUserId = UUID.randomUUID();
+        var conversationId = UUID.randomUUID();
+        var avatarId = UUID.randomUUID();
+        var conversation = ConversationEntity.group(ownerId, "Tên cũ", null);
+        var member = new ConversationMemberEntity(
+                conversationId, currentUserId, MemberRoleEnum.MEMBER, clock.instant());
+        when(conversations.findById(conversationId)).thenReturn(Optional.of(conversation));
+        when(members.findByConversationIdAndUserIdAndLeftAtIsNull(conversationId, currentUserId))
+                .thenReturn(Optional.of(member));
+
+        assertStatus(() -> service.updateConversation(currentUserId, conversationId,
+                new UpdateConversationRequest("Tên mới", avatarId)), HttpStatus.FORBIDDEN);
+        verifyNoInteractions(files);
+
+        var ownerMembership = new ConversationMemberEntity(
+                conversationId, ownerId, MemberRoleEnum.OWNER, clock.instant());
+        when(members.findByConversationIdAndUserIdAndLeftAtIsNull(conversationId, ownerId))
+                .thenReturn(Optional.of(ownerMembership));
+        when(files.findById(avatarId)).thenReturn(Optional.empty());
+        assertStatus(() -> service.updateConversation(ownerId, conversationId,
+                new UpdateConversationRequest("Tên mới", avatarId)), HttpStatus.NOT_FOUND);
+
+        var foreignAvatar = new FileEntity(
+                currentUserId, "group.png", "foreign-avatar", "image/png", 10);
+        when(files.findById(avatarId)).thenReturn(Optional.of(foreignAvatar));
+        assertStatus(() -> service.updateConversation(ownerId, conversationId,
+                new UpdateConversationRequest("Tên mới", avatarId)), HttpStatus.FORBIDDEN);
+        assertThat(conversation.getName()).isEqualTo("Tên cũ");
+        assertThat(conversation.getAvatarFileId()).isNull();
     }
 
     private ConversationCountProjection count(UUID conversationId, long total) {

@@ -18,6 +18,9 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
 
     Optional<ConversationMemberEntity> findByConversationIdAndUserId(UUID conversationId, UUID userId);
 
+    Optional<ConversationMemberEntity> findByConversationIdAndUserIdAndLeftAtIsNull(
+            UUID conversationId, UUID userId);
+
     @Query(ConversationMemberQueries.COUNT_ACTIVE_MEMBERSHIPS_FOR_CONVERSATION_AVATAR)
     long countActiveMembershipsForConversationAvatar(
             @Param("userId") UUID userId,

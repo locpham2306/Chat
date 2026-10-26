@@ -609,6 +609,105 @@ class ChatApplicationTests {
     }
 
     @Test
+    void updateConversationRequiresGroupOwnerAndValidAvatar() throws Exception {
+        var fixture = new TransactionTemplate(transactionManager).execute(status -> {
+            var owner = users.saveAndFlush(
+                    new UserEntity("ConversationUpdateOwner", "hash-fixture", "Update Owner"));
+            var member = users.saveAndFlush(
+                    new UserEntity("ConversationUpdateMember", "hash-fixture", "Update Member"));
+            var group = persist(ConversationEntity.group(owner.getId(), "Tên nhóm cũ", null));
+            persist(new ConversationMemberEntity(
+                    group.getId(), owner.getId(), MemberRoleEnum.OWNER, Instant.now()));
+            persist(new ConversationMemberEntity(
+                    group.getId(), member.getId(), MemberRoleEnum.MEMBER, Instant.now()));
+            var direct = persist(ConversationEntity.direct(owner.getId(), member.getId()));
+            var validAvatar = persist(new FileEntity(
+                    owner.getId(), "owner.png", "update/owner.png", "image/png", 10));
+            var foreignAvatar = persist(new FileEntity(
+                    member.getId(), "member.png", "update/member.png", "image/png", 10));
+            return new UpdateConversationFixture(
+                    owner.getId(), member.getId(), group.getId(), direct.getId(),
+                    validAvatar.getId(), foreignAvatar.getId());
+        });
+
+        var ownerSession = sessionService.create(fixture.ownerId());
+        var ownerHeaders = sessionHeaders(ownerSession.getRawToken());
+        ownerHeaders.setContentType(MediaType.APPLICATION_JSON);
+        var updated = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId(), HttpMethod.PUT,
+                new HttpEntity<>(Map.of(
+                        "name", "  Nhóm đã đổi  ",
+                        "avatarFileId", fixture.validAvatarId()), ownerHeaders),
+                String.class);
+
+        assertThat(updated.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var content = objectMapper.readTree(updated.getBody()).path("content");
+        assertThat(content.path("id").asText()).isEqualTo(fixture.groupId().toString());
+        assertThat(content.path("type").asText()).isEqualTo("GROUP");
+        assertThat(content.path("name").asText()).isEqualTo("Nhóm đã đổi");
+        assertThat(content.path("avatarFileId").asText()).isEqualTo(fixture.validAvatarId().toString());
+        assertThat(content.path("ownerId").asText()).isEqualTo(fixture.ownerId().toString());
+        assertThat(content.path("memberCount").asLong()).isEqualTo(2);
+        assertThat(conversations.findById(fixture.groupId())).get()
+                .extracting(ConversationEntity::getName, ConversationEntity::getAvatarFileId)
+                .containsExactly("Nhóm đã đổi", fixture.validAvatarId());
+
+        var clearAvatar = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId(), HttpMethod.PUT,
+                new HttpEntity<>("{\"name\":\"Nhóm không avatar\",\"avatarFileId\":null}", ownerHeaders),
+                String.class);
+        assertThat(clearAvatar.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(objectMapper.readTree(clearAvatar.getBody())
+                .path("content").path("avatarFileId").isNull()).isTrue();
+
+        var memberSession = sessionService.create(fixture.memberId());
+        var memberHeaders = sessionHeaders(memberSession.getRawToken());
+        memberHeaders.setContentType(MediaType.APPLICATION_JSON);
+        var forbiddenMember = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId(), HttpMethod.PUT,
+                new HttpEntity<>("{\"name\":\"Không được sửa\",\"avatarFileId\":null}", memberHeaders),
+                String.class);
+        assertThat(forbiddenMember.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        var direct = restTemplate.exchange(
+                "/api/conversations/" + fixture.directId(), HttpMethod.PUT,
+                new HttpEntity<>("{\"name\":\"Direct\",\"avatarFileId\":null}", ownerHeaders),
+                String.class);
+        assertThat(direct.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+
+        var missingConversation = restTemplate.exchange(
+                "/api/conversations/" + UUID.randomUUID(), HttpMethod.PUT,
+                new HttpEntity<>("{\"name\":\"Không tồn tại\",\"avatarFileId\":null}", ownerHeaders),
+                String.class);
+        assertThat(missingConversation.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+
+        var missingFile = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId(), HttpMethod.PUT,
+                new HttpEntity<>(Map.of(
+                        "name", "File không tồn tại", "avatarFileId", UUID.randomUUID()), ownerHeaders),
+                String.class);
+        assertThat(missingFile.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+
+        var forbiddenFile = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId(), HttpMethod.PUT,
+                new HttpEntity<>(Map.of(
+                        "name", "File sai quyền", "avatarFileId", fixture.foreignAvatarId()), ownerHeaders),
+                String.class);
+        assertThat(forbiddenFile.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        var missingAvatarKey = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId(), HttpMethod.PUT,
+                new HttpEntity<>(Map.of("name", "Thiếu key"), ownerHeaders), String.class);
+        assertThat(missingAvatarKey.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        var invalidName = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId(), HttpMethod.PUT,
+                new HttpEntity<>("{\"name\":\" \",\"avatarFileId\":null}", ownerHeaders),
+                String.class);
+        assertThat(invalidName.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void migrationsAreAppliedAndNotRepeated() {
         assertThat(flyway.info().applied()).hasSize(5);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
@@ -847,5 +946,14 @@ class ChatApplicationTests {
             UUID formerMemberId,
             UUID outsiderId,
             UUID conversationId) {
+    }
+
+    private record UpdateConversationFixture(
+            UUID ownerId,
+            UUID memberId,
+            UUID groupId,
+            UUID directId,
+            UUID validAvatarId,
+            UUID foreignAvatarId) {
     }
 }

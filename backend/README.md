@@ -6,7 +6,8 @@ tìm kiếm user và upload/download file có phân quyền; chưa có API gửi
 Lookup hội thoại DIRECT đã có và không tạo dữ liệu khi hai user chưa từng nhắn tin;
 API tạo nhóm tạo OWNER/MEMBER trong cùng transaction. Danh sách hội thoại chỉ trả
 membership đang hoạt động, sắp xếp theo hoạt động mới nhất và kèm tin cuối/số chưa đọc.
-API chi tiết hội thoại chỉ cho thành viên đang hoạt động truy cập.
+API chi tiết hội thoại chỉ cho thành viên đang hoạt động truy cập; OWNER có thể cập nhật
+tên và avatar của GROUP.
 Xem [session và cookie](docs/07-session-base.md).
 Xem [schema và quan hệ DB](docs/06-database-schema.md).
 Java 21, Spring Boot 3.5.16, Maven Wrapper 3.9.5; root package `com.chat`.
@@ -109,6 +110,8 @@ Test HTTP-10 kiểm tra phân trang, chỉ lấy membership đang hoạt động
 memberCount, lastMessage kèm attachment và unreadCount theo mốc đọc.
 Test HTTP-11 kiểm tra response chi tiết, memberCount hiện tại, hội thoại không tồn tại,
 người ngoài, thành viên đã rời, ID sai và session thiếu.
+Test HTTP-12 kiểm tra quyền OWNER, trim tên, đặt/xóa avatar, file sai quyền/không tồn tại,
+body thiếu/sai và từ chối cập nhật DIRECT.
 
 ## Xử lý lỗi và validation
 
@@ -143,7 +146,7 @@ Các endpoint `/test/...` chỉ nằm trong test, không được thêm vào ứ
 
 ## Các bước review tiếp theo
 
-1. Cập nhật tên và avatar nhóm (`HTTP-12`).
+1. Danh sách thành viên (`HTTP-13`).
 2. Tiếp tục lần lượt các API HTTP trong hợp đồng, sau đó tới WebSocket.
 
 Mỗi bước dừng để review; chỉ commit/push khi được yêu cầu.
