@@ -1,16 +1,18 @@
-import { useRef, useState } from 'react'
+import axios from 'axios'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ChatEmptyState, ChatLayout } from '~/components/chat-layout'
 import { ConversationList } from '~/components/conversation-list/conversation-list'
 import { DirectConversationDraft } from '~/components/direct-conversation'
 import { UserSearchDialog } from '~/components/user-search'
-import { useDirectConversationMutation } from '~/hooks/use-conversation'
+import { useDirectConversationLookupQuery, useDirectConversationMutation } from '~/hooks/use-conversation'
 import { getApiErrorMessage } from '~/lib/api-error'
 import { cn } from '~/lib/utils'
 import type { User } from '~/types/user.type'
 
 interface DirectConversationLocationState {
   recipient?: User
+  chatNotFound?: boolean
 }
 
 export const ChatPage = () => {
@@ -22,7 +24,42 @@ export const ChatPage = () => {
   const selectionVersion = useRef(0)
   const directConversationMutation = useDirectConversationMutation()
   const recipientId = searchParams.get('recipientId')
-  const recipient = (location.state as DirectConversationLocationState | null)?.recipient
+  const locationState = location.state as DirectConversationLocationState | null
+  const recipient = locationState?.recipient
+  const chatNotFound = Boolean(locationState?.chatNotFound)
+
+  const { data: lookupData, isLoading: isLookingUp, error: lookupError } = useDirectConversationLookupQuery(recipientId)
+
+  useEffect(() => {
+    if (!recipientId) return
+
+    if (lookupData?.kind === 'existing') {
+      navigate(`/chat/${lookupData.conversationId}`, { replace: true })
+    }
+  }, [recipientId, lookupData, navigate])
+
+  useEffect(() => {
+    if (!recipientId || !lookupError) return
+
+    if (axios.isAxiosError(lookupError)) {
+      const status = lookupError.response?.status
+      if (status === 400 || status === 404) {
+        navigate('/chat', { replace: true, state: { chatNotFound: true } })
+      }
+    }
+  }, [recipientId, lookupError, navigate])
+
+  const draftRecipient: User | undefined = lookupData?.peer
+    ? {
+        id: lookupData.peer.id,
+        username: lookupData.peer.username,
+        fullName: lookupData.peer.fullName,
+        avatarFileId: lookupData.peer.avatarFileId,
+        status: (lookupData.peer.status as User['status']) || 'OFFLINE',
+        lastSeen: null
+      }
+    : recipient
+
   const hasOpenChat = Boolean(conversationId || recipientId)
 
   const handleSelectConversation = (id: string) => {
@@ -93,9 +130,18 @@ export const ChatPage = () => {
         {conversationId ? (
           <ChatLayout conversationId={conversationId} onBack={handleBackToList} />
         ) : recipientId ? (
-          <DirectConversationDraft recipientId={recipientId} recipient={recipient} onBack={handleBackToList} />
+          isLookingUp ? (
+            <div className='flex flex-1 h-full items-center justify-center bg-background'>
+              <div className='flex flex-col items-center gap-2'>
+                <div className='h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent' />
+                <span className='text-xs text-muted-foreground'>Đang tải cuộc trò chuyện...</span>
+              </div>
+            </div>
+          ) : (
+            <DirectConversationDraft recipientId={recipientId} recipient={draftRecipient} onBack={handleBackToList} />
+          )
         ) : (
-          <ChatEmptyState />
+          <ChatEmptyState notice={chatNotFound ? 'Không tìm thấy người dùng hoặc cuộc hội thoại.' : undefined} />
         )}
       </section>
 

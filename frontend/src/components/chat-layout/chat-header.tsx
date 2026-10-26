@@ -1,5 +1,5 @@
 import { ArrowLeft, MoreVertical, Users, User as UserIcon } from 'lucide-react'
-import { Avatar, AvatarFallback } from '~/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import { Button } from '~/components/ui/button'
 
 interface ChatHeaderProps {
@@ -11,7 +11,7 @@ interface ChatHeaderProps {
   onOpenInfo?: () => void
 }
 
-export const ChatHeader = ({ title, isGroup = false, subtitle, onBack, onOpenInfo }: ChatHeaderProps) => {
+export const ChatHeader = ({ title, isGroup = false, subtitle, avatarUrl, onBack, onOpenInfo }: ChatHeaderProps) => {
   return (
     <div className='h-14 border-b px-4 flex items-center justify-between bg-card/50 backdrop-blur shrink-0'>
       <div className='flex items-center gap-3 min-w-0'>
@@ -28,6 +28,7 @@ export const ChatHeader = ({ title, isGroup = false, subtitle, onBack, onOpenInf
         )}
 
         <Avatar className='h-9 w-9 shrink-0'>
+          {avatarUrl && <AvatarImage src={avatarUrl} alt={title} />}
           <AvatarFallback className={isGroup ? 'bg-primary/10 text-primary' : undefined}>
             {isGroup ? <Users className='h-4 w-4' /> : <UserIcon className='h-4 w-4' />}
           </AvatarFallback>
