@@ -150,10 +150,28 @@ kèm `totalPages` và `totalElements`.
 Mỗi phần tử có `id`, `type: 'DIRECT' | 'GROUP'`, `name`, `avatarFileId`, `ownerId`,
 `memberCount`, `createdAt`, `lastMessage` và `unreadCount`. GROUP chưa có tin vẫn xuất
 hiện với `lastMessage: null`. Nếu có tin cuối, `lastMessage` gồm `id`, `conversationId`,
-`senderId`, `clientMessageId`, `content`, `attachments`, `createdAt`; mỗi attachment dùng
-model File của API upload/download. `unreadCount` được tính sau mốc đọc theo cặp
+`sender`, `clientMessageId`, `content`, `attachments`, `createdAt`; `sender` gồm `id` và
+`fullName` để FE hiển thị người gửi tin cuối, không trả riêng `senderId`. Mỗi attachment
+dùng model File của API upload/download. `unreadCount` được tính sau mốc đọc theo cặp
 `createdAt`/`id`; chưa có mốc đọc thì đếm toàn bộ tin trong hội thoại. Query phân trang
 không hợp lệ trả 400, thiếu hoặc sai session trả 401.
+
+```json
+{
+  "lastMessage": {
+    "id": "00000000-0000-0000-0000-000000000404",
+    "conversationId": "00000000-0000-0000-0000-000000000202",
+    "sender": {
+      "id": "00000000-0000-0000-0000-000000000103",
+      "fullName": "Bùi Huy Hoàng"
+    },
+    "clientMessageId": "seed-group-002",
+    "content": "Đã xem, response ổn rồi",
+    "attachments": [],
+    "createdAt": "2026-10-26T03:54:26.449720Z"
+  }
+}
+```
 
 HTTP-11 đã triển khai tại `GET /api/conversations/{id}`. `id` phải là UUID hợp lệ;
 hội thoại không tồn tại trả 404. Chỉ membership có `leftAt: null` được xem; người ngoài

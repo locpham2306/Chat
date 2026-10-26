@@ -217,6 +217,9 @@ public class ConversationServiceImpl implements ConversationService {
             return Map.of();
         }
         var messageIds = messageEntities.stream().map(MessageEntity::getId).toList();
+        var senderIds = messageEntities.stream().map(MessageEntity::getSenderId).distinct().toList();
+        var sendersById = users.findAllById(senderIds).stream().collect(Collectors.toMap(
+                user -> user.getId(), Function.identity()));
         var attachmentLinks = attachments.findByMessageIdInOrderByMessageIdAscPositionAsc(messageIds);
         var fileIds = attachmentLinks.stream().map(link -> link.getFileId()).distinct().toList();
         var filesById = fileIds.isEmpty()
@@ -233,7 +236,10 @@ public class ConversationServiceImpl implements ConversationService {
         return messageEntities.stream().collect(Collectors.toMap(
                 MessageEntity::getId,
                 message -> messageMapper.toResponse(
-                        message, filesByMessageId.getOrDefault(message.getId(), List.of()))));
+                        message,
+                        Optional.ofNullable(sendersById.get(message.getSenderId()))
+                                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND)),
+                        filesByMessageId.getOrDefault(message.getId(), List.of()))));
     }
 
     private void validateGroupAvatar(UUID currentUserId, UUID avatarFileId) {

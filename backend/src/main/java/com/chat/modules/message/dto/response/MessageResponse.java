@@ -9,7 +9,7 @@ import java.util.UUID;
 public record MessageResponse(
         UUID id,
         UUID conversationId,
-        UUID senderId,
+        MessageSenderResponse sender,
         String clientMessageId,
         String content,
         List<FileResponse> attachments,

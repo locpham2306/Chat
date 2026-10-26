@@ -107,7 +107,7 @@ hội thoại rỗng.
 Test HTTP-09 kiểm tra role, member trùng, user/avatar không hợp lệ, rollback và quyền
 xem avatar nhóm.
 Test HTTP-10 kiểm tra phân trang, chỉ lấy membership đang hoạt động, thứ tự hoạt động,
-memberCount, lastMessage kèm attachment và unreadCount theo mốc đọc.
+memberCount, lastMessage kèm thông tin người gửi/attachment và unreadCount theo mốc đọc.
 Test HTTP-11 kiểm tra response chi tiết, memberCount hiện tại, hội thoại không tồn tại,
 người ngoài, thành viên đã rời, ID sai và session thiếu.
 Test HTTP-12 kiểm tra quyền OWNER, trim tên, đặt/xóa avatar, file sai quyền/không tồn tại,

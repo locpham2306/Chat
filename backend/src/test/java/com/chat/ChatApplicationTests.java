@@ -500,7 +500,7 @@ class ChatApplicationTests {
             persist(new MessageAttachmentEntity(latestMessage.getId(), file.getId(), 0));
             return new ConversationListFixture(
                     current.getId(), active.getId(), empty.getId(), hidden.getId(),
-                    latestMessage.getId(), file.getId());
+                    other.getId(), latestMessage.getId(), file.getId());
         });
 
         var issuedSession = sessionService.create(fixture.currentUserId());
@@ -521,6 +521,11 @@ class ChatApplicationTests {
         assertThat(item.path("unreadCount").asLong()).isEqualTo(1);
         assertThat(item.path("lastMessage").path("id").asText())
                 .isEqualTo(fixture.latestMessageId().toString());
+        assertThat(item.path("lastMessage").path("sender").path("id").asText())
+                .isEqualTo(fixture.senderId().toString());
+        assertThat(item.path("lastMessage").path("sender").path("fullName").asText())
+                .isEqualTo("List Other");
+        assertThat(item.path("lastMessage").has("senderId")).isFalse();
         assertThat(item.path("lastMessage").path("attachments")).hasSize(1);
         assertThat(item.path("lastMessage").path("attachments").get(0).path("id").asText())
                 .isEqualTo(fixture.fileId().toString());
@@ -1013,6 +1018,7 @@ class ChatApplicationTests {
             UUID activeConversationId,
             UUID emptyConversationId,
             UUID hiddenConversationId,
+            UUID senderId,
             UUID latestMessageId,
             UUID fileId) {
     }

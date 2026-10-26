@@ -218,6 +218,9 @@ class ConversationServiceTests {
         ReflectionTestUtils.setField(message, "id", messageId);
         ReflectionTestUtils.setField(message, "createdAt", clock.instant());
         when(messages.findLatestByConversationIds(anyCollection())).thenReturn(List.of(message));
+        var sender = new UserEntity("sender", "hash", "Người gửi");
+        ReflectionTestUtils.setField(sender, "id", otherUserId);
+        when(users.findAllById(anyCollection())).thenReturn(List.of(sender));
         var file = new FileEntity(otherUserId, "hello.txt", "storage-key", "text/plain", 5);
         var fileId = UUID.randomUUID();
         ReflectionTestUtils.setField(file, "id", fileId);
@@ -237,6 +240,8 @@ class ConversationServiceTests {
         assertThat(groupResult.memberCount()).isEqualTo(3);
         assertThat(groupResult.unreadCount()).isEqualTo(1);
         assertThat(groupResult.lastMessage().id()).isEqualTo(messageId);
+        assertThat(groupResult.lastMessage().sender().id()).isEqualTo(otherUserId);
+        assertThat(groupResult.lastMessage().sender().fullName()).isEqualTo("Người gửi");
         assertThat(groupResult.lastMessage().attachments()).singleElement().satisfies(fileResponse -> {
             assertThat(fileResponse.id()).isEqualTo(fileId);
             assertThat(fileResponse.downloadUrl()).isEqualTo("/api/files/" + fileId);
