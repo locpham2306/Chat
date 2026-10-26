@@ -542,6 +542,73 @@ class ChatApplicationTests {
     }
 
     @Test
+    void conversationDetailRequiresActiveMembership() throws Exception {
+        var fixture = new TransactionTemplate(transactionManager).execute(status -> {
+            var owner = users.saveAndFlush(
+                    new UserEntity("ConversationDetailOwner", "hash-fixture", "Detail Owner"));
+            var member = users.saveAndFlush(
+                    new UserEntity("ConversationDetailMember", "hash-fixture", "Detail Member"));
+            var formerMember = users.saveAndFlush(
+                    new UserEntity("ConversationDetailFormer", "hash-fixture", "Detail Former"));
+            var outsider = users.saveAndFlush(
+                    new UserEntity("ConversationDetailOutsider", "hash-fixture", "Detail Outsider"));
+            var conversation = persist(ConversationEntity.group(owner.getId(), "Nhóm chi tiết", null));
+            persist(new ConversationMemberEntity(
+                    conversation.getId(), owner.getId(), MemberRoleEnum.OWNER, Instant.now()));
+            persist(new ConversationMemberEntity(
+                    conversation.getId(), member.getId(), MemberRoleEnum.MEMBER, Instant.now()));
+            var inactiveMembership = new ConversationMemberEntity(
+                    conversation.getId(), formerMember.getId(), MemberRoleEnum.MEMBER,
+                    Instant.now().minusSeconds(60));
+            ReflectionTestUtils.setField(inactiveMembership, "leftAt", Instant.now());
+            persist(inactiveMembership);
+            return new ConversationDetailFixture(
+                    owner.getId(), member.getId(), formerMember.getId(), outsider.getId(),
+                    conversation.getId());
+        });
+
+        var memberSession = sessionService.create(fixture.memberId());
+        var detail = restTemplate.exchange(
+                "/api/conversations/" + fixture.conversationId(), HttpMethod.GET,
+                new HttpEntity<>(sessionHeaders(memberSession.getRawToken())), String.class);
+
+        assertThat(detail.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var content = objectMapper.readTree(detail.getBody()).path("content");
+        assertThat(content.path("id").asText()).isEqualTo(fixture.conversationId().toString());
+        assertThat(content.path("type").asText()).isEqualTo("GROUP");
+        assertThat(content.path("name").asText()).isEqualTo("Nhóm chi tiết");
+        assertThat(content.path("ownerId").asText()).isEqualTo(fixture.ownerId().toString());
+        assertThat(content.path("memberCount").asLong()).isEqualTo(2);
+        assertThat(content.path("createdAt").asText()).isNotBlank();
+
+        var outsiderSession = sessionService.create(fixture.outsiderId());
+        var forbidden = restTemplate.exchange(
+                "/api/conversations/" + fixture.conversationId(), HttpMethod.GET,
+                new HttpEntity<>(sessionHeaders(outsiderSession.getRawToken())), String.class);
+        assertThat(forbidden.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        var formerSession = sessionService.create(fixture.formerMemberId());
+        var formerMember = restTemplate.exchange(
+                "/api/conversations/" + fixture.conversationId(), HttpMethod.GET,
+                new HttpEntity<>(sessionHeaders(formerSession.getRawToken())), String.class);
+        assertThat(formerMember.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        var missing = restTemplate.exchange(
+                "/api/conversations/" + UUID.randomUUID(), HttpMethod.GET,
+                new HttpEntity<>(sessionHeaders(memberSession.getRawToken())), String.class);
+        assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+
+        var invalidId = restTemplate.exchange(
+                "/api/conversations/not-a-uuid", HttpMethod.GET,
+                new HttpEntity<>(sessionHeaders(memberSession.getRawToken())), String.class);
+        assertThat(invalidId.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        var unauthenticated = restTemplate.getForEntity(
+                "/api/conversations/" + fixture.conversationId(), String.class);
+        assertThat(unauthenticated.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
     void migrationsAreAppliedAndNotRepeated() {
         assertThat(flyway.info().applied()).hasSize(5);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
@@ -772,5 +839,13 @@ class ChatApplicationTests {
             UUID hiddenConversationId,
             UUID latestMessageId,
             UUID fileId) {
+    }
+
+    private record ConversationDetailFixture(
+            UUID ownerId,
+            UUID memberId,
+            UUID formerMemberId,
+            UUID outsiderId,
+            UUID conversationId) {
     }
 }

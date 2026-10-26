@@ -6,6 +6,7 @@ import com.chat.exception.BadRequestException;
 import com.chat.exception.NotFoundException;
 import com.chat.exception.NoPermissionException;
 import com.chat.modules.conversation.dto.request.CreateGroupRequest;
+import com.chat.modules.conversation.dto.response.ConversationDetailResponse;
 import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
 import com.chat.modules.conversation.dto.response.DirectConversationResponse;
 import com.chat.modules.conversation.dto.response.GroupConversationResponse;
@@ -39,9 +40,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -134,6 +135,18 @@ public class ConversationServiceImpl implements ConversationService {
                         unreadCounts.getOrDefault(conversation.getId(), 0L)))
                 .toList();
         return PageResponse.of(data, conversationsPage.getTotalPages(), conversationsPage.getTotalElements());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ConversationDetailResponse getConversation(UUID currentUserId, UUID conversationId) {
+        var conversation = conversations.findById(conversationId)
+                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+        if (!members.existsByConversationIdAndUserIdAndLeftAtIsNull(conversationId, currentUserId)) {
+            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+        }
+        var memberCount = members.countByConversationIdAndLeftAtIsNull(conversationId);
+        return conversationMapper.toDetailResponse(conversation, memberCount);
     }
 
     private Map<UUID, MessageResponse> mapMessagesWithAttachments(Collection<MessageEntity> messageEntities) {

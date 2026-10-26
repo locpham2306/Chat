@@ -242,6 +242,47 @@ class ConversationServiceTests {
         assertThat(directResult.unreadCount()).isZero();
     }
 
+    @Test
+    void getConversationReturnsDetailForActiveMember() {
+        var currentUserId = UUID.randomUUID();
+        var conversationId = UUID.randomUUID();
+        var conversation = ConversationEntity.group(currentUserId, "Nhóm BTL", null);
+        ReflectionTestUtils.setField(conversation, "id", conversationId);
+        ReflectionTestUtils.setField(conversation, "createdAt", clock.instant());
+        when(conversations.findById(conversationId)).thenReturn(Optional.of(conversation));
+        when(members.existsByConversationIdAndUserIdAndLeftAtIsNull(conversationId, currentUserId))
+                .thenReturn(true);
+        when(members.countByConversationIdAndLeftAtIsNull(conversationId)).thenReturn(3L);
+
+        var result = service.getConversation(currentUserId, conversationId);
+
+        assertThat(result.id()).isEqualTo(conversationId);
+        assertThat(result.type()).isEqualTo(ConversationTypeEnum.GROUP);
+        assertThat(result.name()).isEqualTo("Nhóm BTL");
+        assertThat(result.ownerId()).isEqualTo(currentUserId);
+        assertThat(result.memberCount()).isEqualTo(3);
+        assertThat(result.createdAt()).isEqualTo(clock.instant());
+    }
+
+    @Test
+    void getConversationRejectsUnknownConversationAndNonMember() {
+        var currentUserId = UUID.randomUUID();
+        var conversationId = UUID.randomUUID();
+        when(conversations.findById(conversationId)).thenReturn(Optional.empty());
+
+        assertStatus(() -> service.getConversation(currentUserId, conversationId), HttpStatus.NOT_FOUND);
+        verifyNoInteractions(members);
+
+        var conversation = ConversationEntity.group(UUID.randomUUID(), "Nhóm", null);
+        ReflectionTestUtils.setField(conversation, "id", conversationId);
+        when(conversations.findById(conversationId)).thenReturn(Optional.of(conversation));
+        when(members.existsByConversationIdAndUserIdAndLeftAtIsNull(conversationId, currentUserId))
+                .thenReturn(false);
+
+        assertStatus(() -> service.getConversation(currentUserId, conversationId), HttpStatus.FORBIDDEN);
+        verify(members, never()).countByConversationIdAndLeftAtIsNull(conversationId);
+    }
+
     private ConversationCountProjection count(UUID conversationId, long total) {
         var projection = mock(ConversationCountProjection.class);
         when(projection.getConversationId()).thenReturn(conversationId);

@@ -3,7 +3,7 @@
 Tóm tắt các quyết định đã thống nhất ngày 20/10/2026.
 HTTP-01 đăng ký, HTTP-02 đăng nhập, HTTP-04 đăng xuất,
 HTTP-05 xem hồ sơ, HTTP-06 cập nhật hồ sơ, HTTP-07 tìm kiếm user, HTTP-08 lookup DIRECT,
-HTTP-09 tạo GROUP, HTTP-10 danh sách hội thoại,
+HTTP-09 tạo GROUP, HTTP-10 danh sách hội thoại, HTTP-11 chi tiết hội thoại,
 HTTP-18 upload file và HTTP-19 download file đã được triển khai.
 Các API còn lại vẫn là thiết kế.
 
@@ -153,6 +153,13 @@ hiện với `lastMessage: null`. Nếu có tin cuối, `lastMessage` gồm `id`
 model File của API upload/download. `unreadCount` được tính sau mốc đọc theo cặp
 `createdAt`/`id`; chưa có mốc đọc thì đếm toàn bộ tin trong hội thoại. Query phân trang
 không hợp lệ trả 400, thiếu hoặc sai session trả 401.
+
+HTTP-11 đã triển khai tại `GET /api/conversations/{id}`. `id` phải là UUID hợp lệ;
+hội thoại không tồn tại trả 404. Chỉ membership có `leftAt: null` được xem; người ngoài
+hoặc thành viên đã rời trả 403. Response 200 gồm `id`, `type: 'DIRECT' | 'GROUP'`,
+`name`, `avatarFileId`, `ownerId`, `memberCount`, `createdAt`; `memberCount` chỉ đếm
+thành viên đang hoạt động. Với DIRECT, các trường riêng của GROUP là null theo schema.
+Thiếu hoặc sai session trả 401.
 
 ```json
 {

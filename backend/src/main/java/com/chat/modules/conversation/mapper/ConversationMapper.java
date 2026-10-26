@@ -1,7 +1,8 @@
 package com.chat.modules.conversation.mapper;
 
-import com.chat.modules.conversation.dto.response.DirectConversationResponse;
+import com.chat.modules.conversation.dto.response.ConversationDetailResponse;
 import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
+import com.chat.modules.conversation.dto.response.DirectConversationResponse;
 import com.chat.modules.conversation.dto.response.GroupConversationResponse;
 import com.chat.modules.conversation.entity.ConversationEntity;
 import com.chat.modules.message.dto.response.MessageResponse;
@@ -46,5 +47,16 @@ public class ConversationMapper {
                 conversation.getCreatedAt(),
                 lastMessage,
                 unreadCount);
+    }
+
+    public ConversationDetailResponse toDetailResponse(ConversationEntity conversation, long memberCount) {
+        return new ConversationDetailResponse(
+                conversation.getId(),
+                conversation.getType(),
+                conversation.getName(),
+                conversation.getAvatarFileId(),
+                conversation.getOwnerId(),
+                memberCount,
+                conversation.getCreatedAt());
     }
 }
