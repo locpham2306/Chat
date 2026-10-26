@@ -1,24 +1,66 @@
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
 import conversationApi, { type GetConversationsParams } from '~/apis/conversation.api'
 import type { ApiPage } from '~/types/api-response.type'
-import type { ConversationSummary } from '~/types/conversation.type'
+import type { ConversationDetail, ConversationPeer, ConversationSummary } from '~/types/conversation.type'
 
 export const conversationKeys = {
   all: ['conversations'] as const,
-  list: (params?: GetConversationsParams) => ['conversations', 'list', params] as const
+  list: (params?: GetConversationsParams) => ['conversations', 'list', params] as const,
+  detail: (id?: string) => ['conversations', 'detail', id] as const,
+  directLookup: (recipientId?: string) => ['conversations', 'direct', recipientId] as const
 }
 
 export type DirectConversationLookupResult =
-  { kind: 'existing'; conversationId: string } | { kind: 'new'; recipientId: string }
+  | { kind: 'existing'; conversationId: string; peer?: ConversationPeer | null }
+  | { kind: 'new'; recipientId: string; peer?: ConversationPeer | null }
 
 export const lookupDirectConversation = async (recipientId: string): Promise<DirectConversationLookupResult> => {
   const response = await conversationApi.findDirectConversation(recipientId)
 
-  if (response.status === 204 || !response.data) {
+  if (response.status === 204 || !response.data?.content) {
     return { kind: 'new', recipientId }
   }
 
-  return { kind: 'existing', conversationId: response.data.content.id }
+  const content = response.data.content
+
+  if ('conversation' in content) {
+    if (content.conversation?.id) {
+      return {
+        kind: 'existing',
+        conversationId: content.conversation.id,
+        peer: content.peer
+      }
+    }
+    return {
+      kind: 'new',
+      recipientId,
+      peer: content.peer
+    }
+  }
+
+  if ('id' in content && content.id) {
+    return { kind: 'existing', conversationId: content.id }
+  }
+
+  return { kind: 'new', recipientId }
+}
+
+export const getConversationDetail = async (id: string): Promise<ConversationDetail> => {
+  const response = await conversationApi.getConversationDetail(id)
+  return response.data.content
+}
+
+export const useConversationDetailQuery = (conversationId?: string) => {
+  return useQuery<ConversationDetail, Error>({
+    queryKey: conversationKeys.detail(conversationId),
+    queryFn: () => {
+      if (!conversationId) throw new Error('Missing conversationId')
+      return getConversationDetail(conversationId)
+    },
+    enabled: Boolean(conversationId),
+    staleTime: 30_000,
+    retry: false
+  })
 }
 
 export const getConversations = async (params?: GetConversationsParams): Promise<ApiPage<ConversationSummary[]>> => {
@@ -39,3 +81,16 @@ export const useDirectConversationMutation = () =>
   useMutation({
     mutationFn: lookupDirectConversation
   })
+
+export const useDirectConversationLookupQuery = (recipientId?: string | null) => {
+  return useQuery({
+    queryKey: conversationKeys.directLookup(recipientId || undefined),
+    queryFn: () => {
+      if (!recipientId) throw new Error('Missing recipientId')
+      return lookupDirectConversation(recipientId)
+    },
+    enabled: Boolean(recipientId),
+    staleTime: 10_000,
+    retry: false
+  })
+}
