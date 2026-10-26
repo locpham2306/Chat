@@ -10,7 +10,15 @@ export const conversationKeys = {
 
 const getConversations = async (params?: GetConversationsParams): Promise<Page<ConversationSummary>> => {
   const response = await conversationApi.getConversations(params)
-  return response.data
+  const result = response.data.content
+
+  return {
+    items: result?.data ?? [],
+    page: params?.page ?? 0,
+    size: params?.size ?? 20,
+    totalElements: result?.totalElements ?? 0,
+    totalPages: result?.totalPages ?? 0
+  }
 }
 
 export const useConversationsQuery = (params?: GetConversationsParams) => {

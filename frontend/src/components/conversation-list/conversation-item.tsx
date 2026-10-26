@@ -31,7 +31,10 @@ export const ConversationItem = ({ conversation, isActive = false, onSelect }: C
   const isGroup = conversation.type === 'GROUP'
   const title = isGroup
     ? conversation.name || 'Nhóm chat'
-    : ('title' in conversation && typeof conversation.title === 'string' && conversation.title) || 'Hội thoại trực tiếp'
+    : conversation.name ||
+      conversation.lastMessage?.sender?.fullName ||
+      ('title' in conversation && typeof conversation.title === 'string' && conversation.title) ||
+      'Hội thoại trực tiếp'
   const time = formatMessageTime(conversation.lastMessage?.createdAt || conversation.createdAt)
 
   const previewText = conversation.lastMessage

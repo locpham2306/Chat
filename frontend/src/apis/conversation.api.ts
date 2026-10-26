@@ -1,6 +1,6 @@
 import http from '~/lib/http'
+import type { ApiPage, ApiResponse } from '~/types/api-response.type'
 import type { ConversationSummary } from '~/types/conversation.type'
-import type { Page } from '~/types/pagination.type'
 
 export interface GetConversationsParams {
   page?: number
@@ -9,7 +9,7 @@ export interface GetConversationsParams {
 
 const conversationApi = {
   getConversations: (params?: GetConversationsParams) =>
-    http.get<Page<ConversationSummary>>('/api/conversations', { params })
+    http.get<ApiResponse<ApiPage<ConversationSummary[]>>>('/api/conversations', { params })
 }
 
 export default conversationApi

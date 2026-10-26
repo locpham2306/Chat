@@ -10,20 +10,27 @@ interface BaseConversation {
 
 export interface DirectConversation extends BaseConversation {
   type: 'DIRECT'
-  memberIds: string[]
+  memberIds?: string[]
 }
 
 export interface GroupConversation extends BaseConversation {
   type: 'GROUP'
   name: string
   avatarFileId: string | null
-  ownerId: string
-  memberCount: number
+  ownerId?: string | null
+  memberCount?: number
 }
 
 export type Conversation = DirectConversation | GroupConversation
 
-export type ConversationSummary = Conversation & {
-  lastMessage: Message | null
+export interface ConversationSummary {
+  id: string
+  type: ConversationType
+  name?: string | null
+  avatarFileId?: string | null
+  ownerId?: string | null
+  memberCount?: number
+  createdAt: string
+  lastMessage?: Message | null
   unreadCount: number
 }
