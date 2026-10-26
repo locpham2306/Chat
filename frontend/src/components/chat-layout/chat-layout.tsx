@@ -56,10 +56,20 @@ export const ChatLayout = ({ conversationId, onBack, onSendMessage, onAttachFile
     }
   }
 
+  const avatarFileId = isGroup ? conversation?.avatarFileId : conversation?.peer?.avatarFileId
+  const avatarUrl = avatarFileId ? `/api/files/${avatarFileId}` : null
+
   return (
     <div className='flex flex-col h-full w-full bg-background overflow-hidden'>
       {/* 1. Chat Header */}
-      <ChatHeader title={title} isGroup={isGroup} subtitle={subtitle} onBack={onBack} onOpenInfo={onOpenInfo} />
+      <ChatHeader
+        title={title}
+        isGroup={isGroup}
+        subtitle={subtitle}
+        avatarUrl={avatarUrl}
+        onBack={onBack}
+        onOpenInfo={onOpenInfo}
+      />
 
       {/* 2. Messages Area */}
       <ChatMessagesArea conversationId={conversationId} title={title} isGroup={isGroup} isLoading={isLoading} />

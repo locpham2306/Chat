@@ -28,7 +28,7 @@ export const ChatPage = () => {
   const recipient = locationState?.recipient
   const chatNotFound = Boolean(locationState?.chatNotFound)
 
-  const { data: lookupData, error: lookupError } = useDirectConversationLookupQuery(recipientId)
+  const { data: lookupData, isLoading: isLookingUp, error: lookupError } = useDirectConversationLookupQuery(recipientId)
 
   useEffect(() => {
     if (!recipientId) return
@@ -130,7 +130,16 @@ export const ChatPage = () => {
         {conversationId ? (
           <ChatLayout conversationId={conversationId} onBack={handleBackToList} />
         ) : recipientId ? (
-          <DirectConversationDraft recipientId={recipientId} recipient={draftRecipient} onBack={handleBackToList} />
+          isLookingUp ? (
+            <div className='flex flex-1 h-full items-center justify-center bg-background'>
+              <div className='flex flex-col items-center gap-2'>
+                <div className='h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent' />
+                <span className='text-xs text-muted-foreground'>Đang tải cuộc trò chuyện...</span>
+              </div>
+            </div>
+          ) : (
+            <DirectConversationDraft recipientId={recipientId} recipient={draftRecipient} onBack={handleBackToList} />
+          )
         ) : (
           <ChatEmptyState notice={chatNotFound ? 'Không tìm thấy người dùng hoặc cuộc hội thoại.' : undefined} />
         )}
