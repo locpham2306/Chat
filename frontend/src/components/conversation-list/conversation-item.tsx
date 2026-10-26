@@ -2,6 +2,7 @@ import { Users, User as UserIcon } from 'lucide-react'
 import { Avatar, AvatarFallback } from '~/components/ui/avatar'
 import { Badge } from '~/components/ui/badge'
 import { cn } from '~/lib/utils'
+import { useAuthStore } from '~/stores/use-auth-store'
 import type { ConversationSummary } from '~/types/conversation.type'
 
 interface ConversationItemProps {
@@ -28,15 +29,38 @@ const formatMessageTime = (dateString?: string | null) => {
 }
 
 export const ConversationItem = ({ conversation, isActive = false, onSelect }: ConversationItemProps) => {
+  const currentUser = useAuthStore((state) => state.user)
   const isGroup = conversation.type === 'GROUP'
+  const lastMsg = conversation.lastMessage
+  const currentUserId = currentUser?.id
+
+  const isMe = Boolean(
+    (lastMsg?.sender?.id && lastMsg.sender.id === currentUserId) ||
+    (lastMsg?.senderId && lastMsg.senderId === currentUserId)
+  )
+
+  const otherSenderName = !isMe && lastMsg?.sender?.fullName ? lastMsg.sender.fullName : null
+
   const title = isGroup
     ? conversation.name || 'Nhóm chat'
-    : ('title' in conversation && typeof conversation.title === 'string' && conversation.title) || 'Hội thoại trực tiếp'
-  const time = formatMessageTime(conversation.lastMessage?.createdAt || conversation.createdAt)
+    : ('title' in conversation && typeof conversation.title === 'string' && conversation.title) ||
+      otherSenderName ||
+      'Hội thoại trực tiếp'
 
-  const previewText = conversation.lastMessage
-    ? conversation.lastMessage.content || (conversation.lastMessage.attachments?.length ? '[Tệp đính kèm]' : '...')
-    : 'Chưa có tin nhắn'
+  const time = formatMessageTime(lastMsg?.createdAt || conversation.createdAt)
+
+  const getPreviewText = () => {
+    if (!lastMsg) return 'Chưa có tin nhắn'
+
+    const senderName = isMe ? 'Bạn' : lastMsg.sender?.fullName || ''
+    const contentText =
+      lastMsg.content?.trim() || (lastMsg.attachments && lastMsg.attachments.length > 0 ? '[Tệp đính kèm]' : '...')
+
+    if (!senderName) return contentText
+    return `${senderName}: ${contentText}`
+  }
+
+  const previewText = getPreviewText()
 
   return (
     <div
