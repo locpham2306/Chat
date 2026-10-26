@@ -5,6 +5,7 @@ import com.chat.modules.conversation.dto.request.CreateGroupRequest;
 import com.chat.modules.conversation.dto.request.UpdateConversationRequest;
 import com.chat.modules.conversation.dto.response.ConversationDetailResponse;
 import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
+import com.chat.modules.conversation.dto.response.ConversationMemberResponse;
 import com.chat.modules.conversation.dto.response.DirectConversationResponse;
 import com.chat.modules.conversation.dto.response.GroupConversationResponse;
 
@@ -24,4 +25,7 @@ public interface ConversationService {
 
     ConversationDetailResponse updateConversation(
             UUID currentUserId, UUID conversationId, UpdateConversationRequest request);
+
+    PageResponse<List<ConversationMemberResponse>> getConversationMembers(
+            UUID currentUserId, UUID conversationId, Integer page, Integer size);
 }

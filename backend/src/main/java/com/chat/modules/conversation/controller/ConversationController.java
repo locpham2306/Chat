@@ -8,6 +8,7 @@ import com.chat.modules.conversation.dto.request.CreateGroupRequest;
 import com.chat.modules.conversation.dto.request.UpdateConversationRequest;
 import com.chat.modules.conversation.dto.response.ConversationDetailResponse;
 import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
+import com.chat.modules.conversation.dto.response.ConversationMemberResponse;
 import com.chat.modules.conversation.dto.response.DirectConversationResponse;
 import com.chat.modules.conversation.dto.response.GroupConversationResponse;
 import com.chat.modules.conversation.service.ConversationService;
@@ -52,6 +53,19 @@ public class ConversationController {
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id) {
         return BaseResponse.success(conversations.getConversation(session.userId(), id));
+    }
+
+    @GetMapping("/{id}/members")
+    public BaseResponse<PageResponse<List<ConversationMemberResponse>>> getConversationMembers(
+            @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "0")
+            @Min(value = 0, message = "{validation.min}") Integer page,
+            @RequestParam(defaultValue = "20")
+            @Min(value = 1, message = "{validation.min}")
+            @Max(value = 100, message = "{validation.max}") Integer size) {
+        return BaseResponse.success(
+                conversations.getConversationMembers(session.userId(), id, page, size));
     }
 
     @PutMapping("/{id}")

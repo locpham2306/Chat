@@ -8,6 +8,7 @@ import com.chat.modules.conversation.entity.ConversationMemberEntity;
 import com.chat.modules.conversation.enums.ConversationTypeEnum;
 import com.chat.modules.conversation.enums.MemberRoleEnum;
 import com.chat.modules.conversation.mapper.ConversationMapper;
+import com.chat.modules.conversation.mapper.ConversationMemberMapper;
 import com.chat.modules.conversation.repository.ConversationMemberRepository;
 import com.chat.modules.conversation.repository.ConversationRepository;
 import com.chat.modules.conversation.repository.projection.ConversationCountProjection;
@@ -19,6 +20,9 @@ import com.chat.modules.message.entity.MessageEntity;
 import com.chat.modules.message.mapper.MessageMapper;
 import com.chat.modules.message.repository.MessageAttachmentRepository;
 import com.chat.modules.message.repository.MessageRepository;
+import com.chat.modules.user.entity.UserEntity;
+import com.chat.modules.user.enums.UserStatusEnum;
+import com.chat.modules.user.mapper.UserMapper;
 import com.chat.modules.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -54,7 +58,8 @@ class ConversationServiceTests {
     private final Clock clock = Clock.fixed(Instant.parse("2026-10-20T08:00:00Z"), ZoneOffset.UTC);
     private final ConversationServiceImpl service = new ConversationServiceImpl(
             conversations, members, users, files, messages, attachments,
-            new ConversationMapper(), new MessageMapper(), clock);
+            new ConversationMapper(), new ConversationMemberMapper(new UserMapper()),
+            new MessageMapper(), clock);
 
     @Test
     void directLookupReturnsExistingConversationWithoutCreatingData() {
@@ -363,6 +368,60 @@ class ConversationServiceTests {
                 new UpdateConversationRequest("Tên mới", avatarId)), HttpStatus.FORBIDDEN);
         assertThat(conversation.getName()).isEqualTo("Tên cũ");
         assertThat(conversation.getAvatarFileId()).isNull();
+    }
+
+    @Test
+    void getConversationMembersReturnsActiveMembersWithPublicProfiles() {
+        var conversationId = UUID.randomUUID();
+        var ownerId = UUID.randomUUID();
+        var memberId = UUID.randomUUID();
+        var ownerJoinedAt = clock.instant().minusSeconds(60);
+        var memberJoinedAt = clock.instant();
+        var ownerMembership = new ConversationMemberEntity(
+                conversationId, ownerId, MemberRoleEnum.OWNER, ownerJoinedAt);
+        var memberMembership = new ConversationMemberEntity(
+                conversationId, memberId, MemberRoleEnum.MEMBER, memberJoinedAt);
+        var owner = new UserEntity("owner", "hash", "Chủ nhóm");
+        var member = new UserEntity("member", "hash", "Thành viên");
+        ReflectionTestUtils.setField(owner, "id", ownerId);
+        ReflectionTestUtils.setField(member, "id", memberId);
+        when(conversations.existsById(conversationId)).thenReturn(true);
+        when(members.existsByConversationIdAndUserIdAndLeftAtIsNull(conversationId, memberId))
+                .thenReturn(true);
+        when(members.findByConversationIdAndLeftAtIsNull(eq(conversationId), any()))
+                .thenReturn(new PageImpl<>(List.of(ownerMembership, memberMembership)));
+        when(users.findAllById(anyCollection())).thenReturn(List.of(owner, member));
+
+        var result = service.getConversationMembers(memberId, conversationId, 0, 20);
+
+        assertThat(result.totalElements()).isEqualTo(2);
+        assertThat(result.data()).hasSize(2);
+        assertThat(result.data().getFirst().user().id()).isEqualTo(ownerId);
+        assertThat(result.data().getFirst().user().status()).isEqualTo(UserStatusEnum.OFFLINE);
+        assertThat(result.data().getFirst().role()).isEqualTo(MemberRoleEnum.OWNER);
+        assertThat(result.data().getFirst().joinedAt()).isEqualTo(ownerJoinedAt);
+        assertThat(result.data().get(1).user().id()).isEqualTo(memberId);
+        assertThat(result.data().get(1).role()).isEqualTo(MemberRoleEnum.MEMBER);
+        assertThat(result.data().get(1).joinedAt()).isEqualTo(memberJoinedAt);
+    }
+
+    @Test
+    void getConversationMembersRejectsUnknownConversationAndNonMember() {
+        var currentUserId = UUID.randomUUID();
+        var conversationId = UUID.randomUUID();
+        when(conversations.existsById(conversationId)).thenReturn(false);
+
+        assertStatus(() -> service.getConversationMembers(currentUserId, conversationId, 0, 20),
+                HttpStatus.NOT_FOUND);
+        verifyNoInteractions(members);
+
+        when(conversations.existsById(conversationId)).thenReturn(true);
+        when(members.existsByConversationIdAndUserIdAndLeftAtIsNull(conversationId, currentUserId))
+                .thenReturn(false);
+        assertStatus(() -> service.getConversationMembers(currentUserId, conversationId, 0, 20),
+                HttpStatus.FORBIDDEN);
+        verify(members, never()).findByConversationIdAndLeftAtIsNull(eq(conversationId), any());
+        verifyNoInteractions(users);
     }
 
     private ConversationCountProjection count(UUID conversationId, long total) {

@@ -708,6 +708,83 @@ class ChatApplicationTests {
     }
 
     @Test
+    void conversationMembersReturnsOnlyActiveMembersWithPagination() throws Exception {
+        var fixture = new TransactionTemplate(transactionManager).execute(status -> {
+            var owner = users.saveAndFlush(
+                    new UserEntity("MembersApiOwner", "hash-fixture", "Members Owner"));
+            var current = users.saveAndFlush(
+                    new UserEntity("MembersApiCurrent", "hash-fixture", "Members Current"));
+            var other = users.saveAndFlush(
+                    new UserEntity("MembersApiOther", "hash-fixture", "Members Other"));
+            var former = users.saveAndFlush(
+                    new UserEntity("MembersApiFormer", "hash-fixture", "Members Former"));
+            var outsider = users.saveAndFlush(
+                    new UserEntity("MembersApiOutsider", "hash-fixture", "Members Outsider"));
+            var conversation = persist(ConversationEntity.group(owner.getId(), "Nhóm thành viên", null));
+            var now = Instant.now();
+            persist(new ConversationMemberEntity(
+                    conversation.getId(), owner.getId(), MemberRoleEnum.OWNER, now.minusSeconds(300)));
+            persist(new ConversationMemberEntity(
+                    conversation.getId(), current.getId(), MemberRoleEnum.MEMBER, now.minusSeconds(240)));
+            persist(new ConversationMemberEntity(
+                    conversation.getId(), other.getId(), MemberRoleEnum.MEMBER, now.minusSeconds(180)));
+            var formerMembership = new ConversationMemberEntity(
+                    conversation.getId(), former.getId(), MemberRoleEnum.MEMBER, now.minusSeconds(360));
+            ReflectionTestUtils.setField(formerMembership, "leftAt", now.minusSeconds(60));
+            persist(formerMembership);
+            return new ConversationMembersFixture(
+                    owner.getId(), current.getId(), other.getId(), former.getId(),
+                    outsider.getId(), conversation.getId());
+        });
+
+        var currentSession = sessionService.create(fixture.currentUserId());
+        var headers = sessionHeaders(currentSession.getRawToken());
+        var firstPage = restTemplate.exchange(
+                "/api/conversations/" + fixture.conversationId() + "/members?page=0&size=2",
+                HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
+        assertThat(firstPage.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var firstContent = objectMapper.readTree(firstPage.getBody()).path("content");
+        assertThat(firstContent.path("totalElements").asLong()).isEqualTo(3);
+        assertThat(firstContent.path("totalPages").asLong()).isEqualTo(2);
+        assertThat(firstContent.path("data")).hasSize(2);
+        var ownerItem = firstContent.path("data").get(0);
+        assertThat(ownerItem.path("user").path("id").asText())
+                .isEqualTo(fixture.ownerId().toString());
+        assertThat(ownerItem.path("user").path("username").asText()).isEqualTo("MembersApiOwner");
+        assertThat(ownerItem.path("user").path("status").asText()).isEqualTo("OFFLINE");
+        assertThat(ownerItem.path("role").asText()).isEqualTo("OWNER");
+        assertThat(ownerItem.path("joinedAt").asText()).isNotBlank();
+        assertThat(firstContent.toString()).doesNotContain(fixture.formerUserId().toString());
+
+        var secondPage = restTemplate.exchange(
+                "/api/conversations/" + fixture.conversationId() + "/members?page=1&size=2",
+                HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        var secondData = objectMapper.readTree(secondPage.getBody()).path("content").path("data");
+        assertThat(secondData).hasSize(1);
+        assertThat(secondData.get(0).path("user").path("id").asText())
+                .isEqualTo(fixture.otherUserId().toString());
+        assertThat(secondData.get(0).path("role").asText()).isEqualTo("MEMBER");
+
+        var outsiderSession = sessionService.create(fixture.outsiderId());
+        var forbidden = restTemplate.exchange(
+                "/api/conversations/" + fixture.conversationId() + "/members",
+                HttpMethod.GET,
+                new HttpEntity<>(sessionHeaders(outsiderSession.getRawToken())), String.class);
+        assertThat(forbidden.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        var missing = restTemplate.exchange(
+                "/api/conversations/" + UUID.randomUUID() + "/members",
+                HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+
+        var invalidPagination = restTemplate.exchange(
+                "/api/conversations/" + fixture.conversationId() + "/members?page=-1&size=101",
+                HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        assertThat(invalidPagination.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void migrationsAreAppliedAndNotRepeated() {
         assertThat(flyway.info().applied()).hasSize(5);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
@@ -955,5 +1032,14 @@ class ChatApplicationTests {
             UUID directId,
             UUID validAvatarId,
             UUID foreignAvatarId) {
+    }
+
+    private record ConversationMembersFixture(
+            UUID ownerId,
+            UUID currentUserId,
+            UUID otherUserId,
+            UUID formerUserId,
+            UUID outsiderId,
+            UUID conversationId) {
     }
 }

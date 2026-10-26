@@ -4,6 +4,7 @@ Tóm tắt các quyết định đã thống nhất ngày 20/10/2026.
 HTTP-01 đăng ký, HTTP-02 đăng nhập, HTTP-04 đăng xuất,
 HTTP-05 xem hồ sơ, HTTP-06 cập nhật hồ sơ, HTTP-07 tìm kiếm user, HTTP-08 lookup DIRECT,
 HTTP-09 tạo GROUP, HTTP-10 danh sách, HTTP-11 chi tiết, HTTP-12 cập nhật hội thoại,
+HTTP-13 danh sách thành viên,
 HTTP-18 upload file và HTTP-19 download file đã được triển khai.
 Các API còn lại vẫn là thiết kế.
 
@@ -170,6 +171,17 @@ Avatar khác null phải tồn tại, là `image/*`, do OWNER upload và chưa g
 file không tồn tại trả 404, file sai quyền hoặc sai loại trả 403. Việc kiểm tra quyền,
 file và cập nhật chạy trong cùng transaction. Response 200 có `type: 'GROUP'` cùng
 `id`, `name`, `avatarFileId`, `ownerId`, `memberCount`, `createdAt`.
+
+HTTP-13 đã triển khai tại `GET /api/conversations/{id}/members`. `page` mặc định 0 và
+phải từ 0; `size` mặc định 20 và phải từ 1 đến 100. Hội thoại không tồn tại trả 404;
+người gọi không có membership đang hoạt động trả 403. Chỉ trả thành viên có
+`leftAt: null`, sắp xếp ổn định theo `joinedAt` rồi `id`.
+
+Response 200 là `BaseResponse<PageResponse<List<Member>>>`; `content` có `data`,
+`totalPages`, `totalElements`. Mỗi phần tử gồm public `user` với
+`status: 'ONLINE' | 'OFFLINE'`, `role: 'OWNER' | 'MEMBER'` và `joinedAt`.
+Status hiện trả `OFFLINE` cho tới khi presence WebSocket được triển khai. Query phân
+trang sai trả 400; thiếu hoặc sai session trả 401.
 
 ```json
 {

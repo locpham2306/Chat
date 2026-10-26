@@ -10,6 +10,7 @@ import com.chat.modules.conversation.dto.request.CreateGroupRequest;
 import com.chat.modules.conversation.dto.request.UpdateConversationRequest;
 import com.chat.modules.conversation.dto.response.ConversationDetailResponse;
 import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
+import com.chat.modules.conversation.dto.response.ConversationMemberResponse;
 import com.chat.modules.conversation.dto.response.DirectConversationResponse;
 import com.chat.modules.conversation.dto.response.GroupConversationResponse;
 import com.chat.modules.conversation.entity.ConversationEntity;
@@ -17,6 +18,7 @@ import com.chat.modules.conversation.entity.ConversationMemberEntity;
 import com.chat.modules.conversation.enums.ConversationTypeEnum;
 import com.chat.modules.conversation.enums.MemberRoleEnum;
 import com.chat.modules.conversation.mapper.ConversationMapper;
+import com.chat.modules.conversation.mapper.ConversationMemberMapper;
 import com.chat.modules.conversation.repository.ConversationMemberRepository;
 import com.chat.modules.conversation.repository.ConversationRepository;
 import com.chat.modules.conversation.service.ConversationService;
@@ -31,6 +33,7 @@ import com.chat.modules.user.repository.UserRepository;
 import com.chat.utils.PageableUtils;
 import com.chat.utils.StringUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,6 +59,7 @@ public class ConversationServiceImpl implements ConversationService {
     private final MessageRepository messages;
     private final MessageAttachmentRepository attachments;
     private final ConversationMapper conversationMapper;
+    private final ConversationMemberMapper conversationMemberMapper;
     private final MessageMapper messageMapper;
     private final Clock clock;
 
@@ -172,6 +176,40 @@ public class ConversationServiceImpl implements ConversationService {
         conversation.updateGroup(StringUtils.trim(request.name()), request.avatarFileId());
         var memberCount = members.countByConversationIdAndLeftAtIsNull(conversationId);
         return conversationMapper.toDetailResponse(conversation, memberCount);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<List<ConversationMemberResponse>> getConversationMembers(
+            UUID currentUserId, UUID conversationId, Integer page, Integer size) {
+        if (!conversations.existsById(conversationId)) {
+            throw new NotFoundException(ErrorConstants.NOT_FOUND);
+        }
+        if (!members.existsByConversationIdAndUserIdAndLeftAtIsNull(
+                conversationId, currentUserId)) {
+            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+        }
+
+        var sort = Sort.by(Sort.Order.asc("joinedAt"), Sort.Order.asc("id"));
+        var membershipsPage = members.findByConversationIdAndLeftAtIsNull(
+                conversationId, PageableUtils.of(page, size, sort));
+        if (membershipsPage.isEmpty()) {
+            return PageResponse.of(
+                    List.of(), membershipsPage.getTotalPages(), membershipsPage.getTotalElements());
+        }
+        var userIds = membershipsPage.getContent().stream()
+                .map(ConversationMemberEntity::getUserId)
+                .toList();
+        var usersById = users.findAllById(userIds).stream()
+                .collect(Collectors.toMap(user -> user.getId(), Function.identity()));
+        var data = membershipsPage.getContent().stream()
+                .map(membership -> conversationMemberMapper.toResponse(
+                        membership,
+                        Optional.ofNullable(usersById.get(membership.getUserId()))
+                                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND))))
+                .toList();
+        return PageResponse.of(
+                data, membershipsPage.getTotalPages(), membershipsPage.getTotalElements());
     }
 
     private Map<UUID, MessageResponse> mapMessagesWithAttachments(Collection<MessageEntity> messageEntities) {

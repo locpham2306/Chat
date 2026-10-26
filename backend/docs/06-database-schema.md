@@ -2,8 +2,8 @@
 
 Schema cho phạm vi API đã thống nhất; entity chỉ mô hình hóa dữ liệu.
 Auth/session, hồ sơ, tìm kiếm user, lookup DIRECT, tạo GROUP, danh sách/chi tiết/cập nhật
-hội thoại và upload/download file có phân quyền đã được triển khai; quản lý thành viên,
-gửi tin nhắn và WebSocket chưa được triển khai.
+hội thoại, danh sách thành viên và upload/download file có phân quyền đã được triển khai;
+thêm/xóa thành viên, gửi tin nhắn và WebSocket chưa được triển khai.
 
 | Bảng | Entity | Nội dung |
 | --- | --- | --- |
