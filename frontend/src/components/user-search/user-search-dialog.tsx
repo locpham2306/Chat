@@ -19,21 +19,35 @@ interface UserSearchDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSelectUser: (user: User) => void
+  selectingUserId?: string
+  selectionError?: string
 }
 
 const PAGE_SIZE = 20
 
-export const UserSearchDialog = ({ open, onOpenChange, onSelectUser }: UserSearchDialogProps) => {
+export const UserSearchDialog = ({
+  open,
+  onOpenChange,
+  onSelectUser,
+  selectingUserId,
+  selectionError
+}: UserSearchDialogProps) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {open && <UserSearchDialogContent onSelectUser={onSelectUser} />}
+      {open && (
+        <UserSearchDialogContent
+          onSelectUser={onSelectUser}
+          selectingUserId={selectingUserId}
+          selectionError={selectionError}
+        />
+      )}
     </Dialog>
   )
 }
 
-type UserSearchDialogContentProps = Pick<UserSearchDialogProps, 'onSelectUser'>
+type UserSearchDialogContentProps = Pick<UserSearchDialogProps, 'onSelectUser' | 'selectingUserId' | 'selectionError'>
 
-const UserSearchDialogContent = ({ onSelectUser }: UserSearchDialogContentProps) => {
+const UserSearchDialogContent = ({ onSelectUser, selectingUserId, selectionError }: UserSearchDialogContentProps) => {
   const [keyword, setKeyword] = useState('')
   const [searchParams, setSearchParams] = useState(() => createSearchParams(''))
   const searchQuery = useUserSearchQuery(searchParams.keyword, searchParams.page, PAGE_SIZE)
@@ -93,6 +107,12 @@ const UserSearchDialogContent = ({ onSelectUser }: UserSearchDialogContentProps)
         </p>
       </div>
 
+      {selectionError && (
+        <div role='alert' className='shrink-0 border-b bg-destructive/10 px-4 py-3 text-sm text-destructive'>
+          {selectionError}
+        </div>
+      )}
+
       <div className='min-h-0 flex-1 overflow-hidden'>
         {isLoading ? (
           <div role='status' className='flex h-full items-center justify-center gap-2 text-sm text-muted-foreground'>
@@ -126,6 +146,8 @@ const UserSearchDialogContent = ({ onSelectUser }: UserSearchDialogContentProps)
                   key={user.id}
                   type='button'
                   onClick={() => onSelectUser(user)}
+                  disabled={Boolean(selectingUserId)}
+                  aria-busy={selectingUserId === user.id}
                   className='flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
                 >
                   <Avatar className='h-10 w-10 shrink-0'>
@@ -135,9 +157,16 @@ const UserSearchDialogContent = ({ onSelectUser }: UserSearchDialogContentProps)
                     <p className='truncate text-sm font-medium'>{user.fullName || user.username}</p>
                     <p className='truncate text-xs text-muted-foreground'>@{user.username}</p>
                   </div>
-                  <Badge variant={user.status === 'ONLINE' ? 'online' : 'offline'}>
-                    {user.status === 'ONLINE' ? 'Online' : 'Offline'}
-                  </Badge>
+                  {selectingUserId === user.id ? (
+                    <LoaderCircle
+                      className='h-4 w-4 animate-spin text-muted-foreground'
+                      aria-label='Đang mở hội thoại'
+                    />
+                  ) : (
+                    <Badge variant={user.status === 'ONLINE' ? 'online' : 'offline'}>
+                      {user.status === 'ONLINE' ? 'Online' : 'Offline'}
+                    </Badge>
+                  )}
                 </button>
               ))}
             </div>
