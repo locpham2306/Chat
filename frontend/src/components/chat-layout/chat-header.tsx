@@ -39,18 +39,20 @@ export const ChatHeader = ({ title, isGroup = false, subtitle, onBack, onOpenInf
         </div>
       </div>
 
-      <div className='flex items-center gap-1 shrink-0'>
-        <Button
-          variant='ghost'
-          size='icon'
-          onClick={onOpenInfo}
-          className='h-8 w-8 text-muted-foreground hover:text-foreground'
-          aria-label='Tùy chọn hội thoại'
-          title='Tùy chọn hội thoại'
-        >
-          <MoreVertical className='h-4 w-4' />
-        </Button>
-      </div>
+      {onOpenInfo && (
+        <div className='flex shrink-0 items-center gap-1'>
+          <Button
+            variant='ghost'
+            size='icon'
+            onClick={onOpenInfo}
+            className='h-8 w-8 text-muted-foreground hover:text-foreground'
+            aria-label='Tùy chọn hội thoại'
+            title='Tùy chọn hội thoại'
+          >
+            <MoreVertical className='h-4 w-4' />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
