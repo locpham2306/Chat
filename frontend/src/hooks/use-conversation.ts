@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
 import conversationApi, { type GetConversationsParams } from '~/apis/conversation.api'
+import type { ApiPage } from '~/types/api-response.type'
 import type { ConversationSummary } from '~/types/conversation.type'
-import type { Page } from '~/types/pagination.type'
 
 export const conversationKeys = {
   all: ['conversations'] as const,
@@ -21,13 +21,13 @@ export const lookupDirectConversation = async (recipientId: string): Promise<Dir
   return { kind: 'existing', conversationId: response.data.content.id }
 }
 
-const getConversations = async (params?: GetConversationsParams): Promise<Page<ConversationSummary>> => {
+export const getConversations = async (params?: GetConversationsParams): Promise<ApiPage<ConversationSummary[]>> => {
   const response = await conversationApi.getConversations(params)
-  return response.data
+  return response.data.content
 }
 
 export const useConversationsQuery = (params?: GetConversationsParams) => {
-  return useQuery<Page<ConversationSummary>, Error>({
+  return useQuery<ApiPage<ConversationSummary[]>, Error>({
     queryKey: conversationKeys.list(params),
     queryFn: () => getConversations(params),
     staleTime: 10_000,

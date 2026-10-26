@@ -14,7 +14,7 @@ interface ChatLayoutProps {
 export const ChatLayout = ({ conversationId, onBack, onSendMessage, onAttachFile, onOpenInfo }: ChatLayoutProps) => {
   const { data, isLoading } = useConversationsQuery()
 
-  const conversation = data?.items?.find((item) => item.id === conversationId)
+  const conversation = data?.data?.find((item) => item.id === conversationId)
   const isGroup = conversation?.type === 'GROUP'
 
   let title = `Hội thoại #${conversationId.slice(0, 8)}`
