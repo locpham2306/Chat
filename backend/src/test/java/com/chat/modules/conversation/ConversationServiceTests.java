@@ -1,6 +1,7 @@
 package com.chat.modules.conversation;
 
 import com.chat.exception.BusinessException;
+import com.chat.modules.conversation.dto.request.AddConversationMembersRequest;
 import com.chat.modules.conversation.dto.request.CreateGroupRequest;
 import com.chat.modules.conversation.dto.request.UpdateConversationRequest;
 import com.chat.modules.conversation.entity.ConversationEntity;
@@ -524,6 +525,82 @@ class ConversationServiceTests {
         assertStatus(() -> service.getAvailableGroupMembers(
                 currentUserId, conversationId, "", 0, 20), HttpStatus.FORBIDDEN);
         verify(users, never()).searchAvailableGroupMembers(any(), any(), any(), any());
+    }
+
+    @Test
+    void addConversationMembersAddsNewRejoinsFormerAndSkipsExisting() {
+        var ownerId = UUID.randomUUID();
+        var conversationId = UUID.randomUUID();
+        var newUserId = UUID.randomUUID();
+        var activeUserId = UUID.randomUUID();
+        var formerUserId = UUID.randomUUID();
+        var group = ConversationEntity.group(ownerId, "Nhóm", null);
+        ReflectionTestUtils.setField(group, "id", conversationId);
+        var ownerMembership = new ConversationMemberEntity(
+                conversationId, ownerId, MemberRoleEnum.OWNER, clock.instant());
+        var activeMembership = new ConversationMemberEntity(
+                conversationId, activeUserId, MemberRoleEnum.MEMBER, clock.instant().minusSeconds(120));
+        var formerMembership = new ConversationMemberEntity(
+                conversationId, formerUserId, MemberRoleEnum.MEMBER, clock.instant().minusSeconds(120));
+        ReflectionTestUtils.setField(formerMembership, "leftAt", clock.instant().minusSeconds(60));
+        when(conversations.findByIdForUpdate(conversationId)).thenReturn(Optional.of(group));
+        when(members.findByConversationIdAndUserIdAndLeftAtIsNull(conversationId, ownerId))
+                .thenReturn(Optional.of(ownerMembership));
+        when(users.countByIdIn(anyCollection())).thenReturn(3L);
+        when(members.findByConversationIdAndUserIdIn(eq(conversationId), anyCollection()))
+                .thenReturn(List.of(activeMembership, formerMembership));
+
+        var result = service.addConversationMembers(ownerId, conversationId,
+                new AddConversationMembersRequest(
+                        List.of(newUserId, activeUserId, formerUserId, newUserId)));
+
+        assertThat(result.addedUserIds()).containsExactly(newUserId, formerUserId);
+        assertThat(result.existingUserIds()).containsExactly(activeUserId);
+        assertThat(formerMembership.getLeftAt()).isNull();
+        assertThat(formerMembership.getJoinedAt()).isEqualTo(clock.instant());
+        assertThat(formerMembership.getRole()).isEqualTo(MemberRoleEnum.MEMBER);
+        @SuppressWarnings("unchecked")
+        var savedMemberships = (ArgumentCaptor<List<ConversationMemberEntity>>) (ArgumentCaptor<?>)
+                ArgumentCaptor.forClass(List.class);
+        verify(members).saveAllAndFlush(savedMemberships.capture());
+        assertThat(savedMemberships.getValue())
+                .extracting(ConversationMemberEntity::getUserId)
+                .containsExactly(newUserId, formerUserId);
+    }
+
+    @Test
+    void addConversationMembersRequiresExistingGroupOwnerAndKnownUsers() {
+        var currentUserId = UUID.randomUUID();
+        var conversationId = UUID.randomUUID();
+        var request = new AddConversationMembersRequest(List.of(UUID.randomUUID()));
+        when(conversations.findByIdForUpdate(conversationId)).thenReturn(Optional.empty());
+        assertStatus(() -> service.addConversationMembers(currentUserId, conversationId, request),
+                HttpStatus.NOT_FOUND);
+
+        var direct = ConversationEntity.direct(currentUserId, UUID.randomUUID());
+        when(conversations.findByIdForUpdate(conversationId)).thenReturn(Optional.of(direct));
+        assertStatus(() -> service.addConversationMembers(currentUserId, conversationId, request),
+                HttpStatus.CONFLICT);
+
+        var ownerId = UUID.randomUUID();
+        var group = ConversationEntity.group(ownerId, "Nhóm", null);
+        var member = new ConversationMemberEntity(
+                conversationId, currentUserId, MemberRoleEnum.MEMBER, clock.instant());
+        when(conversations.findByIdForUpdate(conversationId)).thenReturn(Optional.of(group));
+        when(members.findByConversationIdAndUserIdAndLeftAtIsNull(conversationId, currentUserId))
+                .thenReturn(Optional.of(member));
+        assertStatus(() -> service.addConversationMembers(currentUserId, conversationId, request),
+                HttpStatus.FORBIDDEN);
+
+        var ownerMembership = new ConversationMemberEntity(
+                conversationId, ownerId, MemberRoleEnum.OWNER, clock.instant());
+        when(members.findByConversationIdAndUserIdAndLeftAtIsNull(conversationId, ownerId))
+                .thenReturn(Optional.of(ownerMembership));
+        when(users.countByIdIn(anyCollection())).thenReturn(0L);
+        assertStatus(() -> service.addConversationMembers(ownerId, conversationId, request),
+                HttpStatus.NOT_FOUND);
+        verify(members, never()).findByConversationIdAndUserIdIn(eq(conversationId), anyCollection());
+        verify(members, never()).saveAllAndFlush(any());
     }
 
     private ConversationCountProjection count(UUID conversationId, long total) {

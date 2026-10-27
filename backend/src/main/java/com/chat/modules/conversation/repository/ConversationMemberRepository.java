@@ -23,6 +23,9 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
     Optional<ConversationMemberEntity> findByConversationIdAndUserIdAndLeftAtIsNull(
             UUID conversationId, UUID userId);
 
+    List<ConversationMemberEntity> findByConversationIdAndUserIdIn(
+            UUID conversationId, Collection<UUID> userIds);
+
     Page<ConversationMemberEntity> findByConversationIdAndLeftAtIsNull(
             UUID conversationId, Pageable pageable);
 

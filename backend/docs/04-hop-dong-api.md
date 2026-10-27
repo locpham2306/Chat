@@ -4,7 +4,7 @@ Tóm tắt các quyết định đã thống nhất ngày 20/10/2026.
 HTTP-01 đăng ký, HTTP-02 đăng nhập, HTTP-04 đăng xuất,
 HTTP-05 xem hồ sơ, HTTP-06 cập nhật hồ sơ, HTTP-07 tìm kiếm user, HTTP-08 lookup DIRECT,
 HTTP-09 tạo GROUP, HTTP-10 danh sách, HTTP-11 chi tiết, HTTP-12 cập nhật hội thoại,
-HTTP-13 danh sách thành viên, HTTP-20 tìm ứng viên thêm vào nhóm,
+HTTP-13 danh sách thành viên, HTTP-14 thêm thành viên, HTTP-20 tìm ứng viên thêm vào nhóm,
 HTTP-18 upload file và HTTP-19 download file đã được triển khai.
 Các API còn lại vẫn là thiết kế.
 
@@ -224,6 +224,35 @@ Response 200 là `BaseResponse<PageResponse<List<Member>>>`; `content` có `data
 `status: 'ONLINE' | 'OFFLINE'`, `role: 'OWNER' | 'MEMBER'` và `joinedAt`.
 Status hiện trả `OFFLINE` cho tới khi presence WebSocket được triển khai. Query phân
 trang sai trả 400; thiếu hoặc sai session trả 401.
+
+HTTP-14 đã triển khai tại `POST /api/conversations/{id}/members`. Body có `memberIds`
+là mảng UUID bắt buộc và không rỗng. Chỉ OWNER có membership đang hoạt động của GROUP
+được thêm thành viên; thành viên mới luôn có `role: 'MEMBER'`. ID trùng trong request
+được loại theo thứ tự xuất hiện. User đang là thành viên được bỏ qua và trả trong
+`existingUserIds`; user từng rời nhóm được kích hoạt lại membership cũ với `joinedAt`
+mới và trả trong `addedUserIds`.
+
+Nếu có bất kỳ user ID nào không tồn tại thì trả 404 và rollback toàn bộ request. Hội
+thoại không tồn tại trả 404; DIRECT trả 409; người không phải OWNER trả 403; body sai
+trả 400. Response 200 dùng `BaseResponse<AddConversationMembersResponse>`. Thao tác
+khóa dòng hội thoại trong transaction để hai request thêm thành viên đồng thời không
+tạo membership trùng.
+
+```json
+{
+  "code": "0",
+  "strCode": "success",
+  "message": "SUCCESSFUL",
+  "content": {
+    "addedUserIds": [
+      "550e8400-e29b-41d4-a716-446655440004"
+    ],
+    "existingUserIds": [
+      "550e8400-e29b-41d4-a716-446655440005"
+    ]
+  }
+}
+```
 
 HTTP-20 đã triển khai tại `GET /api/conversations/{id}/available-members` để FE lấy
 danh sách user có thể thêm vào một GROUP đã tồn tại. Chỉ OWNER có membership đang hoạt

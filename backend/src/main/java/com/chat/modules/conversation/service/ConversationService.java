@@ -1,8 +1,10 @@
 package com.chat.modules.conversation.service;
 
 import com.chat.common.dto.response.PageResponse;
+import com.chat.modules.conversation.dto.request.AddConversationMembersRequest;
 import com.chat.modules.conversation.dto.request.CreateGroupRequest;
 import com.chat.modules.conversation.dto.request.UpdateConversationRequest;
+import com.chat.modules.conversation.dto.response.AddConversationMembersResponse;
 import com.chat.modules.conversation.dto.response.ConversationDetailResponse;
 import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
 import com.chat.modules.conversation.dto.response.ConversationMemberResponse;
@@ -31,4 +33,7 @@ public interface ConversationService {
 
     PageResponse<List<UserResponse>> getAvailableGroupMembers(
             UUID currentUserId, UUID conversationId, String keyword, Integer page, Integer size);
+
+    AddConversationMembersResponse addConversationMembers(
+            UUID currentUserId, UUID conversationId, AddConversationMembersRequest request);
 }

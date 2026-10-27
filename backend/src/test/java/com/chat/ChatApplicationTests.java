@@ -920,6 +920,106 @@ class ChatApplicationTests {
     }
 
     @Test
+    void addConversationMembersAddsRejoinsSkipsExistingAndRollsBackInvalidRequest() throws Exception {
+        var fixture = new TransactionTemplate(transactionManager).execute(status -> {
+            var owner = users.saveAndFlush(
+                    new UserEntity("AddMemberOwner", "hash-fixture", "Add Member Owner"));
+            var active = users.saveAndFlush(
+                    new UserEntity("AddMemberActive", "hash-fixture", "Add Member Active"));
+            var former = users.saveAndFlush(
+                    new UserEntity("AddMemberFormer", "hash-fixture", "Add Member Former"));
+            var candidate = users.saveAndFlush(
+                    new UserEntity("AddMemberCandidate", "hash-fixture", "Add Member Candidate"));
+            var rollbackCandidate = users.saveAndFlush(
+                    new UserEntity("AddMemberRollback", "hash-fixture", "Add Member Rollback"));
+            var group = persist(ConversationEntity.group(owner.getId(), "Nhóm thêm thành viên", null));
+            var direct = persist(ConversationEntity.direct(owner.getId(), candidate.getId()));
+            var now = Instant.now();
+            persist(new ConversationMemberEntity(
+                    group.getId(), owner.getId(), MemberRoleEnum.OWNER, now));
+            persist(new ConversationMemberEntity(
+                    group.getId(), active.getId(), MemberRoleEnum.MEMBER, now));
+            var formerMembership = new ConversationMemberEntity(
+                    group.getId(), former.getId(), MemberRoleEnum.MEMBER, now.minusSeconds(60));
+            ReflectionTestUtils.setField(formerMembership, "leftAt", now);
+            persist(formerMembership);
+            return new AddMembersFixture(
+                    owner.getId(), active.getId(), former.getId(), candidate.getId(),
+                    rollbackCandidate.getId(), group.getId(), direct.getId());
+        });
+
+        var ownerSession = sessionService.create(fixture.ownerId());
+        var headers = sessionHeaders(ownerSession.getRawToken());
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        var request = Map.of("memberIds", java.util.List.of(
+                fixture.candidateId(), fixture.activeMemberId(), fixture.formerId(), fixture.candidateId()));
+        var response = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId() + "/members",
+                HttpMethod.POST, new HttpEntity<>(request, headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var content = objectMapper.readTree(response.getBody()).path("content");
+        assertThat(content.path("addedUserIds")).hasSize(2);
+        assertThat(content.path("addedUserIds").get(0).asText())
+                .isEqualTo(fixture.candidateId().toString());
+        assertThat(content.path("addedUserIds").get(1).asText())
+                .isEqualTo(fixture.formerId().toString());
+        assertThat(content.path("existingUserIds")).hasSize(1);
+        assertThat(content.path("existingUserIds").get(0).asText())
+                .isEqualTo(fixture.activeMemberId().toString());
+        assertThat(conversationMembers.findByConversationIdAndUserId(
+                fixture.groupId(), fixture.candidateId())).isPresent();
+        assertThat(conversationMembers.findByConversationIdAndUserId(
+                fixture.groupId(), fixture.formerId())).get().satisfies(membership -> {
+                    assertThat(membership.getLeftAt()).isNull();
+                    assertThat(membership.getRole()).isEqualTo(MemberRoleEnum.MEMBER);
+                });
+
+        var repeated = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId() + "/members",
+                HttpMethod.POST, new HttpEntity<>(request, headers), String.class);
+        assertThat(repeated.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var repeatedContent = objectMapper.readTree(repeated.getBody()).path("content");
+        assertThat(repeatedContent.path("addedUserIds")).isEmpty();
+        assertThat(repeatedContent.path("existingUserIds")).hasSize(3);
+
+        var rollback = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId() + "/members",
+                HttpMethod.POST,
+                new HttpEntity<>(Map.of("memberIds", java.util.List.of(
+                        fixture.rollbackCandidateId(), UUID.randomUUID())), headers),
+                String.class);
+        assertThat(rollback.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(conversationMembers.findByConversationIdAndUserId(
+                fixture.groupId(), fixture.rollbackCandidateId())).isEmpty();
+
+        var memberSession = sessionService.create(fixture.activeMemberId());
+        var memberHeaders = sessionHeaders(memberSession.getRawToken());
+        memberHeaders.setContentType(MediaType.APPLICATION_JSON);
+        var forbidden = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId() + "/members",
+                HttpMethod.POST,
+                new HttpEntity<>(Map.of("memberIds", java.util.List.of(fixture.rollbackCandidateId())),
+                        memberHeaders),
+                String.class);
+        assertThat(forbidden.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        var direct = restTemplate.exchange(
+                "/api/conversations/" + fixture.directId() + "/members",
+                HttpMethod.POST,
+                new HttpEntity<>(Map.of("memberIds", java.util.List.of(fixture.rollbackCandidateId())), headers),
+                String.class);
+        assertThat(direct.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+
+        var invalid = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId() + "/members",
+                HttpMethod.POST,
+                new HttpEntity<>(Map.of("memberIds", java.util.List.of()), headers),
+                String.class);
+        assertThat(invalid.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void migrationsAreAppliedAndNotRepeated() {
         assertThat(flyway.info().applied()).hasSize(5);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
@@ -1191,5 +1291,15 @@ class ChatApplicationTests {
             UUID formerId,
             UUID candidateId,
             UUID conversationId) {
+    }
+
+    private record AddMembersFixture(
+            UUID ownerId,
+            UUID activeMemberId,
+            UUID formerId,
+            UUID candidateId,
+            UUID rollbackCandidateId,
+            UUID groupId,
+            UUID directId) {
     }
 }

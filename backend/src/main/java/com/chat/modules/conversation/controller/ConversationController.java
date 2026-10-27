@@ -4,8 +4,10 @@ import com.chat.common.dto.response.PageResponse;
 import com.chat.common.wrapper.BaseResponse;
 import com.chat.modules.auth.security.SessionAuthenticationFilter;
 import com.chat.modules.auth.service.SessionIdentity;
+import com.chat.modules.conversation.dto.request.AddConversationMembersRequest;
 import com.chat.modules.conversation.dto.request.CreateGroupRequest;
 import com.chat.modules.conversation.dto.request.UpdateConversationRequest;
+import com.chat.modules.conversation.dto.response.AddConversationMembersResponse;
 import com.chat.modules.conversation.dto.response.ConversationDetailResponse;
 import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
 import com.chat.modules.conversation.dto.response.ConversationMemberResponse;
@@ -67,6 +69,15 @@ public class ConversationController {
             @Max(value = 100, message = "{validation.max}") Integer size) {
         return BaseResponse.success(
                 conversations.getConversationMembers(session.userId(), id, page, size));
+    }
+
+    @PostMapping("/{id}/members")
+    public BaseResponse<AddConversationMembersResponse> addConversationMembers(
+            @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
+            @PathVariable UUID id,
+            @Valid @RequestBody AddConversationMembersRequest request) {
+        return BaseResponse.success(
+                conversations.addConversationMembers(session.userId(), id, request));
     }
 
     @GetMapping("/{id}/available-members")

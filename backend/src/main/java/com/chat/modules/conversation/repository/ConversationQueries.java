@@ -33,6 +33,12 @@ public final class ConversationQueries {
               AND member.leftAt IS NULL
             """;
 
+    public static final String FIND_BY_ID_FOR_UPDATE = """
+            SELECT conversation
+            FROM ConversationEntity conversation
+            WHERE conversation.id = :id
+            """;
+
     private ConversationQueries() {
     }
 }

@@ -8,6 +8,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 @Getter
@@ -45,5 +46,11 @@ public class ConversationMemberEntity extends BaseEntity {
         this.userId = userId;
         this.role = role;
         this.joinedAt = joinedAt;
+    }
+
+    public void rejoin(Instant joinedAt) {
+        this.role = MemberRoleEnum.MEMBER;
+        this.joinedAt = Objects.requireNonNull(joinedAt);
+        this.leftAt = null;
     }
 }

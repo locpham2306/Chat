@@ -2,7 +2,9 @@ package com.chat.modules.conversation.repository;
 
 import com.chat.modules.conversation.entity.ConversationEntity;
 import com.chat.modules.conversation.enums.ConversationTypeEnum;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Page;
@@ -12,6 +14,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface ConversationRepository extends JpaRepository<ConversationEntity, UUID> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(ConversationQueries.FIND_BY_ID_FOR_UPDATE)
+    Optional<ConversationEntity> findByIdForUpdate(@Param("id") UUID id);
 
     @Query(ConversationQueries.FIND_DIRECT_BETWEEN_USERS)
     Optional<ConversationEntity> findDirectBetweenUsers(

@@ -6,8 +6,10 @@ import com.chat.exception.BadRequestException;
 import com.chat.exception.ConflictException;
 import com.chat.exception.NotFoundException;
 import com.chat.exception.NoPermissionException;
+import com.chat.modules.conversation.dto.request.AddConversationMembersRequest;
 import com.chat.modules.conversation.dto.request.CreateGroupRequest;
 import com.chat.modules.conversation.dto.request.UpdateConversationRequest;
+import com.chat.modules.conversation.dto.response.AddConversationMembersResponse;
 import com.chat.modules.conversation.dto.response.ConversationDetailResponse;
 import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
 import com.chat.modules.conversation.dto.response.ConversationMemberResponse;
@@ -259,6 +261,61 @@ public class ConversationServiceImpl implements ConversationService {
                 PageableUtils.of(page, size, sort));
         return PageableUtils.toResponse(
                 usersPage, user -> userMapper.toResponse(user, UserStatusEnum.OFFLINE));
+    }
+
+    @Override
+    @Transactional
+    public AddConversationMembersResponse addConversationMembers(
+            UUID currentUserId,
+            UUID conversationId,
+            AddConversationMembersRequest request) {
+        var conversation = conversations.findByIdForUpdate(conversationId)
+                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+        if (conversation.getType() != ConversationTypeEnum.GROUP) {
+            throw new ConflictException("conversation.membersGroupOnly");
+        }
+        var ownerMembership = members.findByConversationIdAndUserIdAndLeftAtIsNull(
+                        conversationId, currentUserId)
+                .orElseThrow(() -> new NoPermissionException(ErrorConstants.FORBIDDEN));
+        if (ownerMembership.getRole() != MemberRoleEnum.OWNER
+                || !currentUserId.equals(conversation.getOwnerId())) {
+            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+        }
+
+        var requestedUserIds = new LinkedHashSet<>(request.memberIds());
+        if (users.countByIdIn(requestedUserIds) != requestedUserIds.size()) {
+            throw new NotFoundException(ErrorConstants.NOT_FOUND);
+        }
+        var membershipsByUserId = members.findByConversationIdAndUserIdIn(
+                        conversationId, requestedUserIds).stream()
+                .collect(Collectors.toMap(
+                        ConversationMemberEntity::getUserId,
+                        Function.identity()));
+        var addedUserIds = new ArrayList<UUID>();
+        var existingUserIds = new ArrayList<UUID>();
+        var membershipsToSave = new ArrayList<ConversationMemberEntity>();
+        var joinedAt = clock.instant();
+
+        requestedUserIds.forEach(userId -> {
+            var membership = membershipsByUserId.get(userId);
+            if (membership != null && membership.getLeftAt() == null) {
+                existingUserIds.add(userId);
+                return;
+            }
+            if (membership == null) {
+                membership = new ConversationMemberEntity(
+                        conversationId, userId, MemberRoleEnum.MEMBER, joinedAt);
+            } else {
+                membership.rejoin(joinedAt);
+            }
+            membershipsToSave.add(membership);
+            addedUserIds.add(userId);
+        });
+        if (!membershipsToSave.isEmpty()) {
+            members.saveAllAndFlush(membershipsToSave);
+        }
+        return new AddConversationMembersResponse(
+                List.copyOf(addedUserIds), List.copyOf(existingUserIds));
     }
 
     private Map<UUID, MessageResponse> mapMessagesWithAttachments(Collection<MessageEntity> messageEntities) {
