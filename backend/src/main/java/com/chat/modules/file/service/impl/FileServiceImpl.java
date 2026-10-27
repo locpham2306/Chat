@@ -6,7 +6,6 @@ import com.chat.exception.BadRequestException;
 import com.chat.exception.NoPermissionException;
 import com.chat.exception.NotFoundException;
 import com.chat.exception.PayloadTooLargeException;
-import com.chat.exception.UnsupportedFileTypeException;
 import com.chat.integration.storage.FileStorage;
 import com.chat.modules.conversation.repository.ConversationMemberRepository;
 import com.chat.modules.file.dto.response.FileResponse;
@@ -101,13 +100,9 @@ public class FileServiceImpl implements FileService {
     private String normalizeContentType(String rawContentType) {
         try {
             var mediaType = MediaType.parseMediaType(rawContentType == null ? "" : rawContentType);
-            String contentType = (mediaType.getType() + "/" + mediaType.getSubtype()).toLowerCase(Locale.ROOT);
-            if (!properties.allows(contentType)) {
-                throw new UnsupportedFileTypeException("file.unsupportedType");
-            }
-            return contentType;
+            return (mediaType.getType() + "/" + mediaType.getSubtype()).toLowerCase(Locale.ROOT);
         } catch (InvalidMediaTypeException exception) {
-            throw new UnsupportedFileTypeException("file.unsupportedType");
+            return MediaType.APPLICATION_OCTET_STREAM_VALUE;
         }
     }
 

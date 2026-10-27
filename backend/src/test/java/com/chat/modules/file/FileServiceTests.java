@@ -11,13 +11,13 @@ import com.chat.modules.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,7 +37,7 @@ class FileServiceTests {
     private final ConversationMemberRepository members = mock(ConversationMemberRepository.class);
     private final FileStorage storage = mock(FileStorage.class);
     private final FileProperties properties = new FileProperties(
-            Path.of("uploads"), DataSize.ofMegabytes(20), List.of("image/*", "text/plain"));
+            Path.of("uploads"), DataSize.ofMegabytes(20));
     private final FileServiceImpl service = new FileServiceImpl(files, users, members, storage, properties);
 
     @Test
@@ -64,7 +64,7 @@ class FileServiceTests {
     }
 
     @Test
-    void uploadRejectsEmptyOversizedAndUnsupportedFiles() {
+    void uploadRejectsEmptyAndOversizedFiles() {
         assertStatus(() -> service.upload(UUID.randomUUID(),
                 new MockMultipartFile("file", "empty.txt", "text/plain", new byte[0])), HttpStatus.BAD_REQUEST);
 
@@ -73,11 +73,23 @@ class FileServiceTests {
         when(oversized.getSize()).thenReturn(DataSize.ofMegabytes(20).toBytes() + 1);
         assertStatus(() -> service.upload(UUID.randomUUID(), oversized), HttpStatus.PAYLOAD_TOO_LARGE);
 
-        assertStatus(() -> service.upload(UUID.randomUUID(),
-                new MockMultipartFile("file", "program.exe", "application/x-msdownload", new byte[]{1})),
-                HttpStatus.UNSUPPORTED_MEDIA_TYPE);
         verifyNoInteractions(storage);
         verify(files, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void uploadAcceptsAnyFileTypeAndFallsBackForInvalidContentType() {
+        when(files.saveAndFlush(any(FileEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var executable = service.upload(UUID.randomUUID(),
+                new MockMultipartFile(
+                        "file", "program.exe", "application/x-msdownload", new byte[]{1}));
+        var unknown = service.upload(UUID.randomUUID(),
+                new MockMultipartFile(
+                        "file", "unknown.bin", "not-a-media-type", new byte[]{2}));
+
+        assertThat(executable.contentType()).isEqualTo("application/x-msdownload");
+        assertThat(unknown.contentType()).isEqualTo(MediaType.APPLICATION_OCTET_STREAM_VALUE);
     }
 
     @Test

@@ -41,7 +41,6 @@ riêng trong container; migration không thay đổi cấu hình global của My
 | `FILE_STORAGE_ROOT` | Thư mục lưu payload file, mặc định `./uploads` |
 | `FILE_MAX_SIZE` | Dung lượng tối đa mỗi file, mặc định `20MB` |
 | `FILE_MAX_REQUEST_SIZE` | Dung lượng tối đa multipart request, mặc định `21MB` |
-| `FILE_ALLOWED_CONTENT_TYPES` | Danh sách MIME cho phép, phân tách bằng dấu phẩy; hỗ trợ dạng `image/*` |
 
 URL mẫu dùng `connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=UTF-8`.
 Không tắt TLS mặc định trong cấu hình chung; TLS/certificate cấu hình theo môi trường.

@@ -91,15 +91,17 @@ Ví dụ `GET /api/users?keyword=an&page=0&size=20`:
 ## File
 
 - `POST /api/files`: yêu cầu cookie session hợp lệ, nhận `multipart/form-data` với part
-  tên `file`, tối đa 20 MiB mặc định. MIME phải thuộc danh sách cấu hình cho phép.
-  Payload được lưu tại storage, database chỉ lưu metadata. Response 201 là
+  tên `file`, tối đa 20 MiB mặc định và chấp nhận mọi loại file. Content-Type hợp lệ
+  được chuẩn hóa và lưu làm metadata; nếu thiếu hoặc không hợp lệ thì lưu
+  `application/octet-stream`. Payload được lưu tại storage, database chỉ lưu metadata. Response 201 là
   `BaseResponse<File>`; không trả `storageKey` hoặc đường dẫn filesystem.
 - `GET /api/files/{id}`: yêu cầu cookie session hợp lệ và trả binary với
   `Content-Disposition: attachment`, `Cache-Control: private, no-store` và
   `X-Content-Type-Options: nosniff`. Được tải khi user là người upload, file đang là
   avatar user, hoặc user là thành viên hiện tại của hội thoại chứa file/nhóm có avatar đó.
 - File không tồn tại trả 404; không có quyền trả 403; file rỗng/tên sai trả 400;
-  quá dung lượng trả 413; MIME không hỗ trợ trả 415.
+  quá dung lượng trả 413. API upload không kiểm tra whitelist MIME hoặc phần mở rộng.
+  Quy tắc dùng file làm avatar vẫn chỉ chấp nhận `image/*`.
 
 Ví dụ response upload:
 

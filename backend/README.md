@@ -71,8 +71,9 @@ CORS mặc định chỉ cho `http://localhost:3001` và bật credentials để
 cookie session. Cấu hình nhiều origin bằng `CORS_ALLOWED_ORIGINS` phân tách bởi dấu phẩy;
 không dùng wildcard `*`.
 File được lưu ngoài database tại `FILE_STORAGE_ROOT` (mặc định `./uploads`), còn bảng
-`files` chỉ lưu metadata. Giới hạn mặc định là 20 MiB/file; có thể cấu hình bằng
-`FILE_MAX_SIZE`, `FILE_MAX_REQUEST_SIZE` và `FILE_ALLOWED_CONTENT_TYPES`.
+`files` chỉ lưu metadata. Upload chấp nhận mọi loại file; Content-Type thiếu hoặc sai
+được lưu là `application/octet-stream`. Giới hạn mặc định là 20 MiB/file và có thể
+cấu hình bằng `FILE_MAX_SIZE`, `FILE_MAX_REQUEST_SIZE`.
 Chưa dùng để triển khai production.
 
 ## Build và kiểm tra
@@ -100,7 +101,7 @@ Test auth kiểm tra BCrypt, session hạn 365 ngày, cookie, xác thực `/api/
 và không serialize token thô. Test hồ sơ kiểm tra request đầy đủ, trim tên,
 xóa avatar và quyền sử dụng file ảnh. Test tìm kiếm user kiểm tra username/fullName,
 loại người đang đăng nhập, phân trang và validation query.
-Test file kiểm tra giới hạn dung lượng/MIME, metadata an toàn và quyền tải của uploader,
+Test file kiểm tra mọi loại MIME, giới hạn dung lượng, metadata an toàn và quyền tải của uploader,
 avatar công khai cho user đã đăng nhập, thành viên hội thoại và người không có quyền.
 Test HTTP-08 kiểm tra lookup hai chiều luôn trả 200 với peer, conversation có thể null,
 recipient sai và bảo đảm không tạo hội thoại rỗng.

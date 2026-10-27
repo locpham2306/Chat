@@ -298,6 +298,22 @@ class ChatApplicationTests {
         var metadata = entityManager.find(FileEntity.class, fileId);
         assertThat(metadata.getStorageKey()).doesNotContain("avatar.png");
 
+        var arbitraryMultipart = new LinkedMultiValueMap<String, Object>();
+        var arbitraryPart = new ByteArrayResource(new byte[]{1, 2, 3}) {
+            @Override
+            public String getFilename() {
+                return "program.exe";
+            }
+        };
+        var arbitraryHeaders = new HttpHeaders();
+        arbitraryHeaders.setContentType(MediaType.parseMediaType("application/x-msdownload"));
+        arbitraryMultipart.add("file", new HttpEntity<>(arbitraryPart, arbitraryHeaders));
+        var arbitraryUpload = restTemplate.exchange("/api/files", HttpMethod.POST,
+                new HttpEntity<>(arbitraryMultipart, uploadHeaders), String.class);
+        assertThat(arbitraryUpload.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(objectMapper.readTree(arbitraryUpload.getBody()).path("content").path("contentType").asText())
+                .isEqualTo("application/x-msdownload");
+
         var ownerDownload = restTemplate.exchange("/api/files/" + fileId, HttpMethod.GET,
                 new HttpEntity<>(sessionHeaders(ownerSession.getRawToken())), byte[].class);
         assertThat(ownerDownload.getStatusCode()).isEqualTo(HttpStatus.OK);
