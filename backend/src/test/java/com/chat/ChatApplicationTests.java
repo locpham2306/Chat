@@ -1020,6 +1020,114 @@ class ChatApplicationTests {
     }
 
     @Test
+    void removeConversationMemberSupportsLeaveOwnerRemovalAndIdempotency() {
+        var fixture = new TransactionTemplate(transactionManager).execute(status -> {
+            var owner = users.saveAndFlush(
+                    new UserEntity("RemoveMemberOwner", "hash-fixture", "Remove Member Owner"));
+            var leavingMember = users.saveAndFlush(
+                    new UserEntity("RemoveMemberLeaving", "hash-fixture", "Remove Member Leaving"));
+            var removableMember = users.saveAndFlush(
+                    new UserEntity("RemoveMemberTarget", "hash-fixture", "Remove Member Target"));
+            var formerMember = users.saveAndFlush(
+                    new UserEntity("RemoveMemberFormer", "hash-fixture", "Remove Member Former"));
+            var outsider = users.saveAndFlush(
+                    new UserEntity("RemoveMemberOutsider", "hash-fixture", "Remove Member Outsider"));
+            var group = persist(ConversationEntity.group(owner.getId(), "Nhóm xóa thành viên", null));
+            var direct = persist(ConversationEntity.direct(owner.getId(), outsider.getId()));
+            var now = Instant.now();
+            persist(new ConversationMemberEntity(
+                    group.getId(), owner.getId(), MemberRoleEnum.OWNER, now));
+            persist(new ConversationMemberEntity(
+                    group.getId(), leavingMember.getId(), MemberRoleEnum.MEMBER, now));
+            persist(new ConversationMemberEntity(
+                    group.getId(), removableMember.getId(), MemberRoleEnum.MEMBER, now));
+            var formerMembership = new ConversationMemberEntity(
+                    group.getId(), formerMember.getId(), MemberRoleEnum.MEMBER, now.minusSeconds(120));
+            ReflectionTestUtils.setField(
+                    formerMembership, "leftAt", now.minusSeconds(60).truncatedTo(ChronoUnit.MICROS));
+            persist(formerMembership);
+            return new RemoveMemberFixture(
+                    owner.getId(), leavingMember.getId(), removableMember.getId(), formerMember.getId(),
+                    outsider.getId(), group.getId(), direct.getId(), formerMembership.getLeftAt());
+        });
+
+        var memberSession = sessionService.create(fixture.leavingMemberId());
+        var memberHeaders = sessionHeaders(memberSession.getRawToken());
+        var forbiddenRemoval = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId() + "/members/" + fixture.removableMemberId(),
+                HttpMethod.DELETE, new HttpEntity<>(memberHeaders), String.class);
+        assertThat(forbiddenRemoval.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        var leave = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId() + "/members/" + fixture.leavingMemberId(),
+                HttpMethod.DELETE, new HttpEntity<>(memberHeaders), String.class);
+        assertThat(leave.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(leave.getBody()).isNull();
+        assertThat(conversationMembers.findByConversationIdAndUserId(
+                fixture.groupId(), fixture.leavingMemberId())).get().extracting(
+                        ConversationMemberEntity::getLeftAt).isNotNull();
+
+        var repeatedLeave = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId() + "/members/" + fixture.leavingMemberId(),
+                HttpMethod.DELETE, new HttpEntity<>(memberHeaders), String.class);
+        assertThat(repeatedLeave.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        var ownerSession = sessionService.create(fixture.ownerId());
+        var ownerHeaders = sessionHeaders(ownerSession.getRawToken());
+        var remove = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId() + "/members/" + fixture.removableMemberId(),
+                HttpMethod.DELETE, new HttpEntity<>(ownerHeaders), String.class);
+        assertThat(remove.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        var removedAt = conversationMembers.findByConversationIdAndUserId(
+                fixture.groupId(), fixture.removableMemberId()).orElseThrow().getLeftAt();
+        assertThat(removedAt).isNotNull();
+
+        var repeatedRemoval = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId() + "/members/" + fixture.removableMemberId(),
+                HttpMethod.DELETE, new HttpEntity<>(ownerHeaders), String.class);
+        assertThat(repeatedRemoval.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(conversationMembers.findByConversationIdAndUserId(
+                fixture.groupId(), fixture.removableMemberId()).orElseThrow().getLeftAt())
+                .isEqualTo(removedAt);
+
+        var formerRemoval = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId() + "/members/" + fixture.formerMemberId(),
+                HttpMethod.DELETE, new HttpEntity<>(ownerHeaders), String.class);
+        assertThat(formerRemoval.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(conversationMembers.findByConversationIdAndUserId(
+                fixture.groupId(), fixture.formerMemberId()).orElseThrow().getLeftAt())
+                .isEqualTo(fixture.formerLeftAt());
+
+        var neverJoinedRemoval = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId() + "/members/" + fixture.outsiderId(),
+                HttpMethod.DELETE, new HttpEntity<>(ownerHeaders), String.class);
+        assertThat(neverJoinedRemoval.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        var ownerCannotLeave = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId() + "/members/" + fixture.ownerId(),
+                HttpMethod.DELETE, new HttpEntity<>(ownerHeaders), String.class);
+        assertThat(ownerCannotLeave.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+
+        var direct = restTemplate.exchange(
+                "/api/conversations/" + fixture.directId() + "/members/" + fixture.outsiderId(),
+                HttpMethod.DELETE, new HttpEntity<>(ownerHeaders), String.class);
+        assertThat(direct.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+
+        var outsiderSession = sessionService.create(fixture.outsiderId());
+        var outsider = restTemplate.exchange(
+                "/api/conversations/" + fixture.groupId() + "/members/" + fixture.removableMemberId(),
+                HttpMethod.DELETE,
+                new HttpEntity<>(sessionHeaders(outsiderSession.getRawToken())),
+                String.class);
+        assertThat(outsider.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        var missing = restTemplate.exchange(
+                "/api/conversations/" + UUID.randomUUID() + "/members/" + fixture.removableMemberId(),
+                HttpMethod.DELETE, new HttpEntity<>(ownerHeaders), String.class);
+        assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
     void migrationsAreAppliedAndNotRepeated() {
         assertThat(flyway.info().applied()).hasSize(5);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
@@ -1301,5 +1409,16 @@ class ChatApplicationTests {
             UUID rollbackCandidateId,
             UUID groupId,
             UUID directId) {
+    }
+
+    private record RemoveMemberFixture(
+            UUID ownerId,
+            UUID leavingMemberId,
+            UUID removableMemberId,
+            UUID formerMemberId,
+            UUID outsiderId,
+            UUID groupId,
+            UUID directId,
+            Instant formerLeftAt) {
     }
 }

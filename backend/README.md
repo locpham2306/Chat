@@ -8,6 +8,7 @@ API tạo nhóm tạo OWNER/MEMBER trong cùng transaction. Danh sách hội tho
 membership đang hoạt động, sắp xếp theo hoạt động mới nhất và kèm tin cuối/số chưa đọc.
 API chi tiết hội thoại chỉ cho thành viên đang hoạt động truy cập; OWNER có thể cập nhật
 tên và avatar của GROUP. Danh sách thành viên có phân trang và không trả người đã rời.
+MEMBER có thể rời nhóm, còn OWNER có thể xóa MEMBER nhưng không thể tự rời nhóm.
 Xem [session và cookie](docs/07-session-base.md).
 Xem [schema và quan hệ DB](docs/06-database-schema.md).
 Java 21, Spring Boot 3.5.16, Maven Wrapper 3.9.5; root package `com.chat`.
@@ -117,6 +118,8 @@ Test HTTP-13 kiểm tra phân trang thành viên, public profile, role, thứ t�
 loại người đã rời và chặn người ngoài hội thoại.
 Test HTTP-14 kiểm tra OWNER thêm thành viên, deduplicate ID, bỏ qua thành viên hiện tại,
 kích hoạt lại người đã rời, rollback khi có user sai và từ chối MEMBER/DIRECT.
+Test HTTP-15 kiểm tra MEMBER tự rời, OWNER xóa MEMBER, xóa idempotent, giữ membership
+để có thể thêm lại và từ chối OWNER rời nhóm, MEMBER xóa người khác hoặc thao tác trên DIRECT.
 Test HTTP-20 kiểm tra tìm ứng viên thêm vào nhóm, loại OWNER/thành viên hiện tại,
 cho phép thêm lại người đã rời, phân trang và chỉ OWNER được gọi.
 
@@ -153,7 +156,7 @@ Các endpoint `/test/...` chỉ nằm trong test, không được thêm vào ứ
 
 ## Các bước review tiếp theo
 
-1. Xóa thành viên hoặc rời nhóm (`HTTP-15`).
+1. Lấy lịch sử tin nhắn theo cursor (`HTTP-16`).
 2. Tiếp tục lần lượt các API HTTP trong hợp đồng, sau đó tới WebSocket.
 
 Mỗi bước dừng để review; chỉ commit/push khi được yêu cầu.

@@ -53,4 +53,8 @@ public class ConversationMemberEntity extends BaseEntity {
         this.joinedAt = Objects.requireNonNull(joinedAt);
         this.leftAt = null;
     }
+
+    public void leave(Instant leftAt) {
+        this.leftAt = Objects.requireNonNull(leftAt);
+    }
 }

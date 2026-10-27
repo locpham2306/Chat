@@ -21,6 +21,7 @@ import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -78,6 +79,15 @@ public class ConversationController {
             @Valid @RequestBody AddConversationMembersRequest request) {
         return BaseResponse.success(
                 conversations.addConversationMembers(session.userId(), id, request));
+    }
+
+    @DeleteMapping("/{id}/members/{userId}")
+    public ResponseEntity<Void> removeConversationMember(
+            @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
+            @PathVariable UUID id,
+            @PathVariable UUID userId) {
+        conversations.removeConversationMember(session.userId(), id, userId);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}/available-members")

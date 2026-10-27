@@ -318,6 +318,50 @@ public class ConversationServiceImpl implements ConversationService {
                 List.copyOf(addedUserIds), List.copyOf(existingUserIds));
     }
 
+    @Override
+    @Transactional
+    public void removeConversationMember(
+            UUID currentUserId,
+            UUID conversationId,
+            UUID userId) {
+        var conversation = conversations.findByIdForUpdate(conversationId)
+                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+        if (conversation.getType() != ConversationTypeEnum.GROUP) {
+            throw new ConflictException("conversation.membersGroupOnly");
+        }
+
+        var currentMembership = members.findByConversationIdAndUserIdAndLeftAtIsNull(
+                        conversationId, currentUserId)
+                .orElseThrow(() -> new NoPermissionException(ErrorConstants.FORBIDDEN));
+        boolean isOwner = currentMembership.getRole() == MemberRoleEnum.OWNER
+                && currentUserId.equals(conversation.getOwnerId());
+        if (currentUserId.equals(conversation.getOwnerId()) && !isOwner) {
+            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+        }
+
+        if (currentUserId.equals(userId)) {
+            if (isOwner) {
+                throw new ConflictException("conversation.ownerCannotLeave");
+            }
+            currentMembership.leave(clock.instant());
+            members.saveAndFlush(currentMembership);
+            return;
+        }
+        if (!isOwner) {
+            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+        }
+
+        var targetMembership = members.findByConversationIdAndUserId(conversationId, userId);
+        if (targetMembership.isEmpty() || targetMembership.get().getLeftAt() != null) {
+            return;
+        }
+        if (targetMembership.get().getRole() != MemberRoleEnum.MEMBER) {
+            throw new ConflictException("conversation.ownerCannotLeave");
+        }
+        targetMembership.get().leave(clock.instant());
+        members.saveAndFlush(targetMembership.get());
+    }
+
     private Map<UUID, MessageResponse> mapMessagesWithAttachments(Collection<MessageEntity> messageEntities) {
         if (messageEntities.isEmpty()) {
             return Map.of();

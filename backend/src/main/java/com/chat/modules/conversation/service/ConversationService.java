@@ -36,4 +36,6 @@ public interface ConversationService {
 
     AddConversationMembersResponse addConversationMembers(
             UUID currentUserId, UUID conversationId, AddConversationMembersRequest request);
+
+    void removeConversationMember(UUID currentUserId, UUID conversationId, UUID userId);
 }

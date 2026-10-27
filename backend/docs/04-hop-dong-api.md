@@ -4,7 +4,8 @@ Tóm tắt các quyết định đã thống nhất ngày 20/10/2026.
 HTTP-01 đăng ký, HTTP-02 đăng nhập, HTTP-04 đăng xuất,
 HTTP-05 xem hồ sơ, HTTP-06 cập nhật hồ sơ, HTTP-07 tìm kiếm user, HTTP-08 lookup DIRECT,
 HTTP-09 tạo GROUP, HTTP-10 danh sách, HTTP-11 chi tiết, HTTP-12 cập nhật hội thoại,
-HTTP-13 danh sách thành viên, HTTP-14 thêm thành viên, HTTP-20 tìm ứng viên thêm vào nhóm,
+HTTP-13 danh sách thành viên, HTTP-14 thêm thành viên, HTTP-15 xóa thành viên/rời nhóm,
+HTTP-20 tìm ứng viên thêm vào nhóm,
 HTTP-18 upload file và HTTP-19 download file đã được triển khai.
 Các API còn lại vẫn là thiết kế.
 
@@ -253,6 +254,21 @@ tạo membership trùng.
   }
 }
 ```
+
+HTTP-15 đã triển khai tại `DELETE /api/conversations/{id}/members/{userId}` và trả
+`204 No Content`, không có response body. API chỉ áp dụng cho GROUP và khóa dòng hội
+thoại trong transaction để tuần tự hóa với thao tác thêm thành viên.
+
+MEMBER chỉ được truyền chính `userId` của mình để rời nhóm. OWNER có membership đang
+hoạt động được xóa MEMBER khác; OWNER không thể rời hoặc bị xóa và trường hợp này trả
+409. Người gọi không có membership đang hoạt động hoặc MEMBER cố xóa người khác trả
+403. Hội thoại không tồn tại trả 404; DIRECT trả 409; UUID sai trả 400.
+
+Khi OWNER xóa một user đã rời hoặc chưa từng tham gia nhóm, API vẫn trả 204 và không
+thay đổi dữ liệu. Điều này giúp thao tác xóa có tính idempotent khi người gọi vẫn còn
+quyền. MEMBER đã rời không còn quyền gọi lại nên lần gọi tiếp theo trả 403. Membership
+không bị xóa vật lý; backend đặt `leftAt` theo thời gian hiện tại để HTTP-14 có thể kích
+hoạt lại đúng dòng membership cũ.
 
 HTTP-20 đã triển khai tại `GET /api/conversations/{id}/available-members` để FE lấy
 danh sách user có thể thêm vào một GROUP đã tồn tại. Chỉ OWNER có membership đang hoạt
