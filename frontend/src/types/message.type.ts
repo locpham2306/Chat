@@ -17,3 +17,9 @@ export interface Message {
   attachments: File[]
   createdAt: string
 }
+
+export interface MessageHistoryPage {
+  data: Message[]
+  nextCursor: string | null
+  hasMore: boolean
+}

@@ -72,7 +72,13 @@ export const ChatLayout = ({ conversationId, onBack, onSendMessage, onAttachFile
       />
 
       {/* 2. Messages Area */}
-      <ChatMessagesArea conversationId={conversationId} title={title} isGroup={isGroup} isLoading={isLoading} />
+      <ChatMessagesArea
+        key={conversationId}
+        conversationId={conversationId}
+        title={title}
+        isGroup={isGroup}
+        isLoading={isLoading}
+      />
 
       {/* 3. Chat Composer */}
       <ChatComposer
