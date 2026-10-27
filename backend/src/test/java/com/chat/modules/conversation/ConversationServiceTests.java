@@ -59,7 +59,7 @@ class ConversationServiceTests {
     private final ConversationServiceImpl service = new ConversationServiceImpl(
             conversations, members, users, files, messages, attachments,
             new ConversationMapper(), new ConversationMemberMapper(new UserMapper()),
-            new MessageMapper(), clock);
+            new MessageMapper(), new UserMapper(), clock);
 
     @Test
     void directLookupReturnsExistingConversationWithoutCreatingData() {
@@ -469,6 +469,61 @@ class ConversationServiceTests {
                 HttpStatus.FORBIDDEN);
         verify(members, never()).findByConversationIdAndLeftAtIsNull(eq(conversationId), any());
         verifyNoInteractions(users);
+    }
+
+    @Test
+    void getAvailableGroupMembersReturnsOnlyRepositoryCandidates() {
+        var ownerId = UUID.randomUUID();
+        var conversationId = UUID.randomUUID();
+        var candidateId = UUID.randomUUID();
+        var conversation = ConversationEntity.group(ownerId, "Nhóm", null);
+        ReflectionTestUtils.setField(conversation, "id", conversationId);
+        var ownerMembership = new ConversationMemberEntity(
+                conversationId, ownerId, MemberRoleEnum.OWNER, clock.instant());
+        var candidate = new UserEntity("candidate", "hash", "Ứng viên");
+        ReflectionTestUtils.setField(candidate, "id", candidateId);
+        when(conversations.findById(conversationId)).thenReturn(Optional.of(conversation));
+        when(members.findByConversationIdAndUserIdAndLeftAtIsNull(conversationId, ownerId))
+                .thenReturn(Optional.of(ownerMembership));
+        when(users.searchAvailableGroupMembers(eq(ownerId), eq(conversationId), eq("ứng"), any()))
+                .thenReturn(new PageImpl<>(List.of(candidate)));
+
+        var result = service.getAvailableGroupMembers(ownerId, conversationId, "  ứng  ", 0, 20);
+
+        assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.data()).singleElement().satisfies(user -> {
+            assertThat(user.id()).isEqualTo(candidateId);
+            assertThat(user.username()).isEqualTo("candidate");
+            assertThat(user.fullName()).isEqualTo("Ứng viên");
+            assertThat(user.status()).isEqualTo(UserStatusEnum.OFFLINE);
+        });
+    }
+
+    @Test
+    void getAvailableGroupMembersRequiresGroupOwner() {
+        var currentUserId = UUID.randomUUID();
+        var conversationId = UUID.randomUUID();
+        when(conversations.findById(conversationId)).thenReturn(Optional.empty());
+        assertStatus(() -> service.getAvailableGroupMembers(
+                currentUserId, conversationId, "", 0, 20), HttpStatus.NOT_FOUND);
+
+        var direct = ConversationEntity.direct(currentUserId, UUID.randomUUID());
+        ReflectionTestUtils.setField(direct, "id", conversationId);
+        when(conversations.findById(conversationId)).thenReturn(Optional.of(direct));
+        assertStatus(() -> service.getAvailableGroupMembers(
+                currentUserId, conversationId, "", 0, 20), HttpStatus.CONFLICT);
+
+        var ownerId = UUID.randomUUID();
+        var group = ConversationEntity.group(ownerId, "Nhóm", null);
+        ReflectionTestUtils.setField(group, "id", conversationId);
+        var member = new ConversationMemberEntity(
+                conversationId, currentUserId, MemberRoleEnum.MEMBER, clock.instant());
+        when(conversations.findById(conversationId)).thenReturn(Optional.of(group));
+        when(members.findByConversationIdAndUserIdAndLeftAtIsNull(conversationId, currentUserId))
+                .thenReturn(Optional.of(member));
+        assertStatus(() -> service.getAvailableGroupMembers(
+                currentUserId, conversationId, "", 0, 20), HttpStatus.FORBIDDEN);
+        verify(users, never()).searchAvailableGroupMembers(any(), any(), any(), any());
     }
 
     private ConversationCountProjection count(UUID conversationId, long total) {

@@ -842,6 +842,68 @@ class ChatApplicationTests {
     }
 
     @Test
+    void availableGroupMembersExcludesCurrentActiveMembers() throws Exception {
+        var fixture = new TransactionTemplate(transactionManager).execute(status -> {
+            var owner = users.saveAndFlush(
+                    new UserEntity("AvailableApiOwner", "hash-fixture", "Available Owner"));
+            var active = users.saveAndFlush(
+                    new UserEntity("AvailableApiActive", "hash-fixture", "Available Active"));
+            var former = users.saveAndFlush(
+                    new UserEntity("AvailableApiFormer", "hash-fixture", "Available Former"));
+            var candidate = users.saveAndFlush(
+                    new UserEntity("AvailableApiCandidate", "hash-fixture", "Available Candidate"));
+            var conversation = persist(ConversationEntity.group(
+                    owner.getId(), "Nhóm tuyển thành viên", null));
+            var now = Instant.now();
+            persist(new ConversationMemberEntity(
+                    conversation.getId(), owner.getId(), MemberRoleEnum.OWNER, now));
+            persist(new ConversationMemberEntity(
+                    conversation.getId(), active.getId(), MemberRoleEnum.MEMBER, now));
+            var formerMembership = new ConversationMemberEntity(
+                    conversation.getId(), former.getId(), MemberRoleEnum.MEMBER, now.minusSeconds(60));
+            ReflectionTestUtils.setField(formerMembership, "leftAt", now);
+            persist(formerMembership);
+            return new AvailableMembersFixture(
+                    owner.getId(), active.getId(), former.getId(), candidate.getId(), conversation.getId());
+        });
+
+        var ownerSession = sessionService.create(fixture.ownerId());
+        var response = restTemplate.exchange(
+                "/api/conversations/" + fixture.conversationId()
+                        + "/available-members?keyword=AvailableApi&page=0&size=20",
+                HttpMethod.GET,
+                new HttpEntity<>(sessionHeaders(ownerSession.getRawToken())),
+                String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var content = objectMapper.readTree(response.getBody()).path("content");
+        assertThat(content.path("totalElements").asLong()).isEqualTo(2);
+        assertThat(content.path("data")).hasSize(2);
+        assertThat(content.path("data").toString())
+                .contains(fixture.candidateId().toString(), fixture.formerId().toString())
+                .doesNotContain(fixture.ownerId().toString(), fixture.activeMemberId().toString());
+        assertThat(content.path("data").get(0).path("username").asText())
+                .isEqualTo("AvailableApiCandidate");
+        assertThat(content.path("data").get(0).path("status").asText()).isEqualTo("OFFLINE");
+
+        var memberSession = sessionService.create(fixture.activeMemberId());
+        var forbidden = restTemplate.exchange(
+                "/api/conversations/" + fixture.conversationId() + "/available-members",
+                HttpMethod.GET,
+                new HttpEntity<>(sessionHeaders(memberSession.getRawToken())),
+                String.class);
+        assertThat(forbidden.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        var invalidPagination = restTemplate.exchange(
+                "/api/conversations/" + fixture.conversationId()
+                        + "/available-members?page=-1&size=101",
+                HttpMethod.GET,
+                new HttpEntity<>(sessionHeaders(ownerSession.getRawToken())),
+                String.class);
+        assertThat(invalidPagination.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void migrationsAreAppliedAndNotRepeated() {
         assertThat(flyway.info().applied()).hasSize(5);
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
@@ -1104,6 +1166,14 @@ class ChatApplicationTests {
             UUID otherUserId,
             UUID formerUserId,
             UUID outsiderId,
+            UUID conversationId) {
+    }
+
+    private record AvailableMembersFixture(
+            UUID ownerId,
+            UUID activeMemberId,
+            UUID formerId,
+            UUID candidateId,
             UUID conversationId) {
     }
 }

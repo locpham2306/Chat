@@ -12,6 +12,7 @@ import com.chat.modules.conversation.dto.response.ConversationMemberResponse;
 import com.chat.modules.conversation.dto.response.DirectConversationLookupResponse;
 import com.chat.modules.conversation.dto.response.GroupConversationResponse;
 import com.chat.modules.conversation.service.ConversationService;
+import com.chat.modules.user.dto.response.UserResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -66,6 +67,20 @@ public class ConversationController {
             @Max(value = 100, message = "{validation.max}") Integer size) {
         return BaseResponse.success(
                 conversations.getConversationMembers(session.userId(), id, page, size));
+    }
+
+    @GetMapping("/{id}/available-members")
+    public BaseResponse<PageResponse<List<UserResponse>>> getAvailableGroupMembers(
+            @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "") String keyword,
+            @RequestParam(defaultValue = "0")
+            @Min(value = 0, message = "{validation.min}") Integer page,
+            @RequestParam(defaultValue = "20")
+            @Min(value = 1, message = "{validation.min}")
+            @Max(value = 100, message = "{validation.max}") Integer size) {
+        return BaseResponse.success(
+                conversations.getAvailableGroupMembers(session.userId(), id, keyword, page, size));
     }
 
     @PutMapping("/{id}")

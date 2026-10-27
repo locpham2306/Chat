@@ -26,4 +26,11 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
             @Param("currentUserId") UUID currentUserId,
             @Param("keyword") String keyword,
             Pageable pageable);
+
+    @Query(UserQueries.SEARCH_AVAILABLE_GROUP_MEMBERS)
+    Page<UserEntity> searchAvailableGroupMembers(
+            @Param("currentUserId") UUID currentUserId,
+            @Param("conversationId") UUID conversationId,
+            @Param("keyword") String keyword,
+            Pageable pageable);
 }

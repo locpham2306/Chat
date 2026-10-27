@@ -8,6 +8,7 @@ import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
 import com.chat.modules.conversation.dto.response.ConversationMemberResponse;
 import com.chat.modules.conversation.dto.response.DirectConversationLookupResponse;
 import com.chat.modules.conversation.dto.response.GroupConversationResponse;
+import com.chat.modules.user.dto.response.UserResponse;
 
 import java.util.List;
 import java.util.UUID;
@@ -27,4 +28,7 @@ public interface ConversationService {
 
     PageResponse<List<ConversationMemberResponse>> getConversationMembers(
             UUID currentUserId, UUID conversationId, Integer page, Integer size);
+
+    PageResponse<List<UserResponse>> getAvailableGroupMembers(
+            UUID currentUserId, UUID conversationId, String keyword, Integer page, Integer size);
 }

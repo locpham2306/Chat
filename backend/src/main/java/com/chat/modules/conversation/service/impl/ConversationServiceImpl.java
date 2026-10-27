@@ -30,7 +30,10 @@ import com.chat.modules.message.entity.MessageEntity;
 import com.chat.modules.message.mapper.MessageMapper;
 import com.chat.modules.message.repository.MessageAttachmentRepository;
 import com.chat.modules.message.repository.MessageRepository;
+import com.chat.modules.user.dto.response.UserResponse;
 import com.chat.modules.user.entity.UserEntity;
+import com.chat.modules.user.enums.UserStatusEnum;
+import com.chat.modules.user.mapper.UserMapper;
 import com.chat.modules.user.repository.UserRepository;
 import com.chat.utils.PageableUtils;
 import com.chat.utils.StringUtils;
@@ -63,6 +66,7 @@ public class ConversationServiceImpl implements ConversationService {
     private final ConversationMapper conversationMapper;
     private final ConversationMemberMapper conversationMemberMapper;
     private final MessageMapper messageMapper;
+    private final UserMapper userMapper;
     private final Clock clock;
 
     @Override
@@ -220,6 +224,41 @@ public class ConversationServiceImpl implements ConversationService {
                 .toList();
         return PageResponse.of(
                 data, membershipsPage.getTotalPages(), membershipsPage.getTotalElements());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<List<UserResponse>> getAvailableGroupMembers(
+            UUID currentUserId,
+            UUID conversationId,
+            String keyword,
+            Integer page,
+            Integer size) {
+        var conversation = conversations.findById(conversationId)
+                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+        if (conversation.getType() != ConversationTypeEnum.GROUP) {
+            throw new ConflictException("conversation.availableMembersGroupOnly");
+        }
+        var membership = members.findByConversationIdAndUserIdAndLeftAtIsNull(
+                        conversationId, currentUserId)
+                .orElseThrow(() -> new NoPermissionException(ErrorConstants.FORBIDDEN));
+        if (membership.getRole() != MemberRoleEnum.OWNER
+                || !currentUserId.equals(conversation.getOwnerId())) {
+            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+        }
+
+        String resolvedKeyword = StringUtils.trim(keyword);
+        if (resolvedKeyword == null) {
+            resolvedKeyword = "";
+        }
+        var sort = Sort.by(Sort.Order.asc("username"), Sort.Order.asc("id"));
+        var usersPage = users.searchAvailableGroupMembers(
+                currentUserId,
+                conversationId,
+                resolvedKeyword,
+                PageableUtils.of(page, size, sort));
+        return PageableUtils.toResponse(
+                usersPage, user -> userMapper.toResponse(user, UserStatusEnum.OFFLINE));
     }
 
     private Map<UUID, MessageResponse> mapMessagesWithAttachments(Collection<MessageEntity> messageEntities) {

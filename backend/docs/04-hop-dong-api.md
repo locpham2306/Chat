@@ -4,7 +4,7 @@ Tóm tắt các quyết định đã thống nhất ngày 20/10/2026.
 HTTP-01 đăng ký, HTTP-02 đăng nhập, HTTP-04 đăng xuất,
 HTTP-05 xem hồ sơ, HTTP-06 cập nhật hồ sơ, HTTP-07 tìm kiếm user, HTTP-08 lookup DIRECT,
 HTTP-09 tạo GROUP, HTTP-10 danh sách, HTTP-11 chi tiết, HTTP-12 cập nhật hội thoại,
-HTTP-13 danh sách thành viên,
+HTTP-13 danh sách thành viên, HTTP-20 tìm ứng viên thêm vào nhóm,
 HTTP-18 upload file và HTTP-19 download file đã được triển khai.
 Các API còn lại vẫn là thiết kế.
 
@@ -222,6 +222,44 @@ Response 200 là `BaseResponse<PageResponse<List<Member>>>`; `content` có `data
 `status: 'ONLINE' | 'OFFLINE'`, `role: 'OWNER' | 'MEMBER'` và `joinedAt`.
 Status hiện trả `OFFLINE` cho tới khi presence WebSocket được triển khai. Query phân
 trang sai trả 400; thiếu hoặc sai session trả 401.
+
+HTTP-20 đã triển khai tại `GET /api/conversations/{id}/available-members` để FE lấy
+danh sách user có thể thêm vào một GROUP đã tồn tại. Chỉ OWNER có membership đang hoạt
+động được gọi API. `keyword` tùy chọn, tìm không phân biệt hoa thường theo `username`
+hoặc `fullName`; `page` mặc định 0 và `size` mặc định 20, tối đa 100. Kết quả sắp xếp
+theo `username` rồi `id` và dùng `BaseResponse<PageResponse<List<User>>>`.
+
+API loại người gọi và tất cả user có membership đang hoạt động (`leftAt: null`) trong
+nhóm. User từng rời nhóm (`leftAt` khác null) được trả lại để OWNER có thể thêm lại.
+Hội thoại không tồn tại trả 404; DIRECT trả 409; người không phải OWNER trả 403; query
+phân trang sai trả 400. Status hiện trả `OFFLINE` cho tới khi presence WebSocket được
+triển khai.
+
+```json
+{
+  "code": "0",
+  "strCode": "success",
+  "message": "SUCCESSFUL",
+  "content": {
+    "data": [
+      {
+        "id": "00000000-0000-0000-0000-000000000104",
+        "username": "linh",
+        "fullName": "Nguyễn Mỹ Linh",
+        "avatarFileId": null,
+        "status": "OFFLINE",
+        "lastSeen": null
+      }
+    ],
+    "totalPages": 1,
+    "totalElements": 1
+  }
+}
+```
+
+Khi đang tạo GROUP và chưa có conversation id, FE tiếp tục dùng `GET /api/users` rồi
+loại các user đã chọn ở state phía client. Sau khi GROUP đã được tạo, màn hình thêm
+thành viên dùng HTTP-20 để server loại thành viên hiện tại.
 
 ```json
 {

@@ -114,6 +114,8 @@ Test HTTP-12 kiểm tra quyền OWNER, trim tên, đặt/xóa avatar, file sai q
 body thiếu/sai và từ chối cập nhật DIRECT.
 Test HTTP-13 kiểm tra phân trang thành viên, public profile, role, thứ tự ổn định,
 loại người đã rời và chặn người ngoài hội thoại.
+Test HTTP-20 kiểm tra tìm ứng viên thêm vào nhóm, loại OWNER/thành viên hiện tại,
+cho phép thêm lại người đã rời, phân trang và chỉ OWNER được gọi.
 
 ## Xử lý lỗi và validation
 
