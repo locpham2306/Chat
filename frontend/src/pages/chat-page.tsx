@@ -6,6 +6,7 @@ import { ConversationList } from '~/components/conversation-list/conversation-li
 import { DirectConversationDraft } from '~/components/direct-conversation'
 import { UserSearchDialog } from '~/components/user-search'
 import { useDirectConversationLookupQuery, useDirectConversationMutation } from '~/hooks/use-conversation'
+import { useRealtimeMessageSync } from '~/hooks/use-realtime-message-sync'
 import { getApiErrorMessage } from '~/lib/api-error'
 import { cn } from '~/lib/utils'
 import type { User } from '~/types/user.type'
@@ -29,6 +30,15 @@ export const ChatPage = () => {
   const chatNotFound = Boolean(locationState?.chatNotFound)
 
   const { data: lookupData, isLoading: isLookingUp, error: lookupError } = useDirectConversationLookupQuery(recipientId)
+
+  useRealtimeMessageSync({
+    activeConversationId: conversationId,
+    onMessageAck: (payload) => {
+      if (!conversationId && recipientId && payload.conversationId) {
+        navigate(`/chat/${payload.conversationId}`, { replace: true })
+      }
+    }
+  })
 
   useEffect(() => {
     if (!recipientId) return

@@ -48,6 +48,9 @@ export interface DirectConversationLookupResult {
 }
 
 export type ConversationSummary = Conversation & {
+  name?: string | null
+  avatarFileId?: string | null
+  peer?: ConversationPeer | null
   lastMessage: Message | null
   unreadCount: number
 }
