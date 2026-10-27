@@ -11,7 +11,8 @@ import com.chat.modules.conversation.dto.request.UpdateConversationRequest;
 import com.chat.modules.conversation.dto.response.ConversationDetailResponse;
 import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
 import com.chat.modules.conversation.dto.response.ConversationMemberResponse;
-import com.chat.modules.conversation.dto.response.DirectConversationResponse;
+import com.chat.modules.conversation.dto.response.ConversationPeerResponse;
+import com.chat.modules.conversation.dto.response.DirectConversationLookupResponse;
 import com.chat.modules.conversation.dto.response.GroupConversationResponse;
 import com.chat.modules.conversation.entity.ConversationEntity;
 import com.chat.modules.conversation.entity.ConversationMemberEntity;
@@ -29,6 +30,7 @@ import com.chat.modules.message.entity.MessageEntity;
 import com.chat.modules.message.mapper.MessageMapper;
 import com.chat.modules.message.repository.MessageAttachmentRepository;
 import com.chat.modules.message.repository.MessageRepository;
+import com.chat.modules.user.entity.UserEntity;
 import com.chat.modules.user.repository.UserRepository;
 import com.chat.utils.PageableUtils;
 import com.chat.utils.StringUtils;
@@ -65,16 +67,18 @@ public class ConversationServiceImpl implements ConversationService {
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<DirectConversationResponse> findDirectConversation(UUID currentUserId, UUID recipientId) {
+    public DirectConversationLookupResponse findDirectConversation(UUID currentUserId, UUID recipientId) {
         if (currentUserId.equals(recipientId)) {
             throw new BadRequestException("conversation.recipientIsCurrentUser");
         }
-        if (!users.existsById(recipientId)) {
-            throw new NotFoundException(ErrorConstants.NOT_FOUND);
-        }
-        return conversations.findDirectBetweenUsers(
+        var recipient = users.findById(recipientId)
+                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+        var conversation = conversations.findDirectBetweenUsers(
                         ConversationTypeEnum.DIRECT, currentUserId, recipientId)
-                .map(conversationMapper::toDirectResponse);
+                .map(conversationMapper::toDirectResponse)
+                .orElse(null);
+        return new DirectConversationLookupResponse(
+                conversation, conversationMapper.toPeerResponse(recipient));
     }
 
     @Override
@@ -116,6 +120,7 @@ public class ConversationServiceImpl implements ConversationService {
         var conversationIds = conversationsPage.getContent().stream()
                 .map(ConversationEntity::getId)
                 .toList();
+        var peersById = loadDirectPeers(conversationsPage.getContent(), currentUserId);
         Map<UUID, Long> memberCounts = members.countActiveMembersByConversationIds(conversationIds).stream()
                 .collect(Collectors.toMap(
                         projection -> projection.getConversationId(),
@@ -135,6 +140,7 @@ public class ConversationServiceImpl implements ConversationService {
                 .map(conversation -> conversationMapper.toListItemResponse(
                         conversation,
                         memberCounts.getOrDefault(conversation.getId(), 0L),
+                        peerFor(conversation, currentUserId, peersById),
                         Optional.ofNullable(latestMessages.get(conversation.getId()))
                                 .map(message -> lastMessageResponses.get(message.getId()))
                                 .orElse(null),
@@ -152,7 +158,11 @@ public class ConversationServiceImpl implements ConversationService {
             throw new NoPermissionException(ErrorConstants.FORBIDDEN);
         }
         var memberCount = members.countByConversationIdAndLeftAtIsNull(conversationId);
-        return conversationMapper.toDetailResponse(conversation, memberCount);
+        var peer = conversation.getType() == ConversationTypeEnum.DIRECT
+                ? conversationMapper.toPeerResponse(users.findById(directPeerId(conversation, currentUserId))
+                        .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND)))
+                : null;
+        return conversationMapper.toDetailResponse(conversation, memberCount, peer);
     }
 
     @Override
@@ -175,7 +185,7 @@ public class ConversationServiceImpl implements ConversationService {
 
         conversation.updateGroup(StringUtils.trim(request.name()), request.avatarFileId());
         var memberCount = members.countByConversationIdAndLeftAtIsNull(conversationId);
-        return conversationMapper.toDetailResponse(conversation, memberCount);
+        return conversationMapper.toDetailResponse(conversation, memberCount, null);
     }
 
     @Override
@@ -240,6 +250,42 @@ public class ConversationServiceImpl implements ConversationService {
                         Optional.ofNullable(sendersById.get(message.getSenderId()))
                                 .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND)),
                         filesByMessageId.getOrDefault(message.getId(), List.of()))));
+    }
+
+    private Map<UUID, UserEntity> loadDirectPeers(
+            List<ConversationEntity> conversationEntities, UUID currentUserId) {
+        var peerIds = conversationEntities.stream()
+                .filter(conversation -> conversation.getType() == ConversationTypeEnum.DIRECT)
+                .map(conversation -> directPeerId(conversation, currentUserId))
+                .distinct()
+                .toList();
+        if (peerIds.isEmpty()) {
+            return Map.of();
+        }
+        return users.findAllById(peerIds).stream()
+                .collect(Collectors.toMap(user -> user.getId(), Function.identity()));
+    }
+
+    private ConversationPeerResponse peerFor(
+            ConversationEntity conversation,
+            UUID currentUserId,
+            Map<UUID, UserEntity> peersById) {
+        if (conversation.getType() != ConversationTypeEnum.DIRECT) {
+            return null;
+        }
+        var peerId = directPeerId(conversation, currentUserId);
+        return conversationMapper.toPeerResponse(Optional.ofNullable(peersById.get(peerId))
+                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND)));
+    }
+
+    private UUID directPeerId(ConversationEntity conversation, UUID currentUserId) {
+        if (currentUserId.equals(conversation.getDirectUserLowId())) {
+            return conversation.getDirectUserHighId();
+        }
+        if (currentUserId.equals(conversation.getDirectUserHighId())) {
+            return conversation.getDirectUserLowId();
+        }
+        throw new NoPermissionException(ErrorConstants.FORBIDDEN);
     }
 
     private void validateGroupAvatar(UUID currentUserId, UUID avatarFileId) {

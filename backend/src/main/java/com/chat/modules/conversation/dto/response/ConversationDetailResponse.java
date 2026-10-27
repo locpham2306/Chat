@@ -12,5 +12,6 @@ public record ConversationDetailResponse(
         UUID avatarFileId,
         UUID ownerId,
         long memberCount,
-        Instant createdAt) {
+        Instant createdAt,
+        ConversationPeerResponse peer) {
 }

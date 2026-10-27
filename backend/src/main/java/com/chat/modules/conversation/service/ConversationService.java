@@ -6,15 +6,14 @@ import com.chat.modules.conversation.dto.request.UpdateConversationRequest;
 import com.chat.modules.conversation.dto.response.ConversationDetailResponse;
 import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
 import com.chat.modules.conversation.dto.response.ConversationMemberResponse;
-import com.chat.modules.conversation.dto.response.DirectConversationResponse;
+import com.chat.modules.conversation.dto.response.DirectConversationLookupResponse;
 import com.chat.modules.conversation.dto.response.GroupConversationResponse;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 public interface ConversationService {
-    Optional<DirectConversationResponse> findDirectConversation(UUID currentUserId, UUID recipientId);
+    DirectConversationLookupResponse findDirectConversation(UUID currentUserId, UUID recipientId);
 
     GroupConversationResponse createGroup(UUID currentUserId, CreateGroupRequest request);
 

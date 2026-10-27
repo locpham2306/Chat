@@ -14,6 +14,7 @@ public record ConversationListItemResponse(
         UUID ownerId,
         long memberCount,
         Instant createdAt,
+        ConversationPeerResponse peer,
         MessageResponse lastMessage,
         long unreadCount) {
 }

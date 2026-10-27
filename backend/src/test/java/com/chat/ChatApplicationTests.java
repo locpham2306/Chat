@@ -337,8 +337,16 @@ class ChatApplicationTests {
                 "/api/conversations/direct?recipientId=" + recipient.getId(),
                 HttpMethod.GET, new HttpEntity<>(headers), String.class);
 
-        assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-        assertThat(missing.getBody()).isNull();
+        assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var missingContent = objectMapper.readTree(missing.getBody()).path("content");
+        assertThat(missingContent.path("conversation").isNull()).isTrue();
+        assertThat(missingContent.path("peer").path("id").asText())
+                .isEqualTo(recipient.getId().toString());
+        assertThat(missingContent.path("peer").path("username").asText())
+                .isEqualTo("DirectLookupRecipient");
+        assertThat(missingContent.path("peer").path("fullName").asText())
+                .isEqualTo("Direct Recipient");
+        assertThat(missingContent.path("peer").path("status").asText()).isEqualTo("OFFLINE");
         assertThat(conversations.count()).isEqualTo(conversationCount);
 
         var conversation = conversations.saveAndFlush(
@@ -349,12 +357,12 @@ class ChatApplicationTests {
 
         assertThat(found.getStatusCode()).isEqualTo(HttpStatus.OK);
         var content = objectMapper.readTree(found.getBody()).path("content");
-        assertThat(content.path("id").asText()).isEqualTo(conversation.getId().toString());
-        assertThat(content.path("type").asText()).isEqualTo("DIRECT");
-        assertThat(content.path("memberIds")).hasSize(2);
-        assertThat(content.path("memberIds").toString())
-                .contains(current.getId().toString(), recipient.getId().toString());
-        assertThat(content.path("createdAt").asText()).isNotBlank();
+        assertThat(content.path("conversation").path("id").asText())
+                .isEqualTo(conversation.getId().toString());
+        assertThat(content.path("conversation").path("type").asText()).isEqualTo("DIRECT");
+        assertThat(content.path("conversation").path("createdAt").asText()).isNotBlank();
+        assertThat(content.path("peer").path("id").asText())
+                .isEqualTo(recipient.getId().toString());
 
         var self = restTemplate.exchange(
                 "/api/conversations/direct?recipientId=" + current.getId(),
@@ -544,6 +552,50 @@ class ChatApplicationTests {
                 "/api/conversations?page=-1&size=101", HttpMethod.GET,
                 new HttpEntity<>(headers), String.class);
         assertThat(invalidPage.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void directConversationListAndDetailIncludePeer() throws Exception {
+        var fixture = new TransactionTemplate(transactionManager).execute(status -> {
+            var current = users.saveAndFlush(
+                    new UserEntity("DirectPeerCurrent", "hash-fixture", "Direct Current"));
+            var peer = users.saveAndFlush(
+                    new UserEntity("DirectPeerOther", "hash-fixture", "Direct Other"));
+            var conversation = persist(ConversationEntity.direct(current.getId(), peer.getId()));
+            var joinedAt = Instant.now();
+            persist(new ConversationMemberEntity(
+                    conversation.getId(), current.getId(), MemberRoleEnum.MEMBER, joinedAt));
+            persist(new ConversationMemberEntity(
+                    conversation.getId(), peer.getId(), MemberRoleEnum.MEMBER, joinedAt));
+            return new DirectPeerFixture(current.getId(), peer.getId(), conversation.getId());
+        });
+
+        var session = sessionService.create(fixture.currentUserId());
+        var headers = sessionHeaders(session.getRawToken());
+        var list = restTemplate.exchange(
+                "/api/conversations", HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
+        assertThat(list.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var listItem = objectMapper.readTree(list.getBody())
+                .path("content").path("data").get(0);
+        assertThat(listItem.path("id").asText()).isEqualTo(fixture.conversationId().toString());
+        assertThat(listItem.path("type").asText()).isEqualTo("DIRECT");
+        assertThat(listItem.path("peer").path("id").asText()).isEqualTo(fixture.peerId().toString());
+        assertThat(listItem.path("peer").path("username").asText()).isEqualTo("DirectPeerOther");
+        assertThat(listItem.path("peer").path("fullName").asText()).isEqualTo("Direct Other");
+        assertThat(listItem.path("peer").path("status").asText()).isEqualTo("OFFLINE");
+
+        var detail = restTemplate.exchange(
+                "/api/conversations/" + fixture.conversationId(), HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
+
+        assertThat(detail.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var detailContent = objectMapper.readTree(detail.getBody()).path("content");
+        assertThat(detailContent.path("type").asText()).isEqualTo("DIRECT");
+        assertThat(detailContent.path("peer").path("id").asText())
+                .isEqualTo(fixture.peerId().toString());
+        assertThat(detailContent.path("peer").path("username").asText())
+                .isEqualTo("DirectPeerOther");
     }
 
     @Test
@@ -1021,6 +1073,12 @@ class ChatApplicationTests {
             UUID senderId,
             UUID latestMessageId,
             UUID fileId) {
+    }
+
+    private record DirectPeerFixture(
+            UUID currentUserId,
+            UUID peerId,
+            UUID conversationId) {
     }
 
     private record ConversationDetailFixture(

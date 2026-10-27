@@ -65,22 +65,27 @@ class ConversationServiceTests {
     void directLookupReturnsExistingConversationWithoutCreatingData() {
         var currentUserId = UUID.randomUUID();
         var recipientId = UUID.randomUUID();
+        var recipient = new UserEntity("recipient", "hash", "Người nhận");
+        ReflectionTestUtils.setField(recipient, "id", recipientId);
         var conversation = ConversationEntity.direct(currentUserId, recipientId);
         var conversationId = UUID.randomUUID();
         var createdAt = Instant.parse("2026-10-20T08:00:00Z");
         ReflectionTestUtils.setField(conversation, "id", conversationId);
         ReflectionTestUtils.setField(conversation, "createdAt", createdAt);
-        when(users.existsById(recipientId)).thenReturn(true);
+        when(users.findById(recipientId)).thenReturn(Optional.of(recipient));
         when(conversations.findDirectBetweenUsers(
                 ConversationTypeEnum.DIRECT, currentUserId, recipientId))
                 .thenReturn(Optional.of(conversation));
 
-        var result = service.findDirectConversation(currentUserId, recipientId).orElseThrow();
+        var result = service.findDirectConversation(currentUserId, recipientId);
 
-        assertThat(result.id()).isEqualTo(conversationId);
-        assertThat(result.type()).isEqualTo(ConversationTypeEnum.DIRECT);
-        assertThat(result.memberIds()).containsExactlyInAnyOrder(currentUserId, recipientId);
-        assertThat(result.createdAt()).isEqualTo(createdAt);
+        assertThat(result.conversation().id()).isEqualTo(conversationId);
+        assertThat(result.conversation().type()).isEqualTo(ConversationTypeEnum.DIRECT);
+        assertThat(result.conversation().createdAt()).isEqualTo(createdAt);
+        assertThat(result.peer().id()).isEqualTo(recipientId);
+        assertThat(result.peer().username()).isEqualTo("recipient");
+        assertThat(result.peer().fullName()).isEqualTo("Người nhận");
+        assertThat(result.peer().status()).isEqualTo(UserStatusEnum.OFFLINE);
         verify(conversations, never()).save(org.mockito.ArgumentMatchers.any());
     }
 
@@ -88,12 +93,18 @@ class ConversationServiceTests {
     void directLookupReturnsEmptyWithoutCreatingConversation() {
         var currentUserId = UUID.randomUUID();
         var recipientId = UUID.randomUUID();
-        when(users.existsById(recipientId)).thenReturn(true);
+        var recipient = new UserEntity("recipient", "hash", "Người nhận");
+        ReflectionTestUtils.setField(recipient, "id", recipientId);
+        when(users.findById(recipientId)).thenReturn(Optional.of(recipient));
         when(conversations.findDirectBetweenUsers(
                 ConversationTypeEnum.DIRECT, currentUserId, recipientId))
                 .thenReturn(Optional.empty());
 
-        assertThat(service.findDirectConversation(currentUserId, recipientId)).isEmpty();
+        var result = service.findDirectConversation(currentUserId, recipientId);
+
+        assertThat(result.conversation()).isNull();
+        assertThat(result.peer().id()).isEqualTo(recipientId);
+        assertThat(result.peer().username()).isEqualTo("recipient");
 
         verify(conversations, never()).save(org.mockito.ArgumentMatchers.any());
     }
@@ -105,7 +116,7 @@ class ConversationServiceTests {
         verifyNoInteractions(conversations, users);
 
         var recipientId = UUID.randomUUID();
-        when(users.existsById(recipientId)).thenReturn(false);
+        when(users.findById(recipientId)).thenReturn(Optional.empty());
         assertStatus(() -> service.findDirectConversation(currentUserId, recipientId), HttpStatus.NOT_FOUND);
         verifyNoInteractions(conversations);
     }
@@ -237,6 +248,7 @@ class ConversationServiceTests {
         var groupResult = result.data().getFirst();
         assertThat(groupResult.id()).isEqualTo(groupId);
         assertThat(groupResult.type()).isEqualTo(ConversationTypeEnum.GROUP);
+        assertThat(groupResult.peer()).isNull();
         assertThat(groupResult.memberCount()).isEqualTo(3);
         assertThat(groupResult.unreadCount()).isEqualTo(1);
         assertThat(groupResult.lastMessage().id()).isEqualTo(messageId);
@@ -248,6 +260,10 @@ class ConversationServiceTests {
         });
         var directResult = result.data().get(1);
         assertThat(directResult.type()).isEqualTo(ConversationTypeEnum.DIRECT);
+        assertThat(directResult.peer().id()).isEqualTo(otherUserId);
+        assertThat(directResult.peer().username()).isEqualTo("sender");
+        assertThat(directResult.peer().fullName()).isEqualTo("Người gửi");
+        assertThat(directResult.peer().status()).isEqualTo(UserStatusEnum.OFFLINE);
         assertThat(directResult.memberCount()).isEqualTo(2);
         assertThat(directResult.lastMessage()).isNull();
         assertThat(directResult.unreadCount()).isZero();
@@ -273,6 +289,32 @@ class ConversationServiceTests {
         assertThat(result.ownerId()).isEqualTo(currentUserId);
         assertThat(result.memberCount()).isEqualTo(3);
         assertThat(result.createdAt()).isEqualTo(clock.instant());
+        assertThat(result.peer()).isNull();
+    }
+
+    @Test
+    void getDirectConversationDetailIncludesPeer() {
+        var currentUserId = UUID.randomUUID();
+        var peerId = UUID.randomUUID();
+        var conversationId = UUID.randomUUID();
+        var conversation = ConversationEntity.direct(currentUserId, peerId);
+        ReflectionTestUtils.setField(conversation, "id", conversationId);
+        ReflectionTestUtils.setField(conversation, "createdAt", clock.instant());
+        var peer = new UserEntity("peer", "hash", "Người đối thoại");
+        ReflectionTestUtils.setField(peer, "id", peerId);
+        when(conversations.findById(conversationId)).thenReturn(Optional.of(conversation));
+        when(members.existsByConversationIdAndUserIdAndLeftAtIsNull(conversationId, currentUserId))
+                .thenReturn(true);
+        when(members.countByConversationIdAndLeftAtIsNull(conversationId)).thenReturn(2L);
+        when(users.findById(peerId)).thenReturn(Optional.of(peer));
+
+        var result = service.getConversation(currentUserId, conversationId);
+
+        assertThat(result.type()).isEqualTo(ConversationTypeEnum.DIRECT);
+        assertThat(result.peer().id()).isEqualTo(peerId);
+        assertThat(result.peer().username()).isEqualTo("peer");
+        assertThat(result.peer().fullName()).isEqualTo("Người đối thoại");
+        assertThat(result.peer().status()).isEqualTo(UserStatusEnum.OFFLINE);
     }
 
     @Test

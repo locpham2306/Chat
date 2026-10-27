@@ -9,7 +9,7 @@ import com.chat.modules.conversation.dto.request.UpdateConversationRequest;
 import com.chat.modules.conversation.dto.response.ConversationDetailResponse;
 import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
 import com.chat.modules.conversation.dto.response.ConversationMemberResponse;
-import com.chat.modules.conversation.dto.response.DirectConversationResponse;
+import com.chat.modules.conversation.dto.response.DirectConversationLookupResponse;
 import com.chat.modules.conversation.dto.response.GroupConversationResponse;
 import com.chat.modules.conversation.service.ConversationService;
 import jakarta.validation.Valid;
@@ -77,13 +77,10 @@ public class ConversationController {
     }
 
     @GetMapping("/direct")
-    public ResponseEntity<BaseResponse<DirectConversationResponse>> findDirectConversation(
+    public BaseResponse<DirectConversationLookupResponse> findDirectConversation(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @RequestParam UUID recipientId) {
-        var conversation = conversations.findDirectConversation(session.userId(), recipientId);
-        return conversation
-                .map(value -> ResponseEntity.ok(BaseResponse.success(value)))
-                .orElseGet(() -> ResponseEntity.noContent().build());
+        return BaseResponse.success(conversations.findDirectConversation(session.userId(), recipientId));
     }
 
     @PostMapping("/group")

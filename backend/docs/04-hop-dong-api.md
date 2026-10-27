@@ -121,8 +121,8 @@ Ví dụ response upload:
 ## Hội thoại DIRECT và tin đầu
 
 1. FE gọi `GET /api/conversations/direct?recipientId=u2`.
-2. Đã tồn tại: 200 + Conversation; chưa có: 204 không body.
-   API này tuyệt đối không tạo hội thoại.
+2. API luôn trả 200 nếu recipient tồn tại. `peer` luôn có; `conversation` là thông tin
+   DIRECT đã tồn tại hoặc `null`. API này tuyệt đối không tạo hội thoại.
 3. Chưa có hội thoại: gửi `SEND_MESSAGE` với recipientId.
 4. Server tìm hoặc tạo DIRECT, thêm thành viên và lưu tin trong cùng transaction.
    Constraint cặp user không phân biệt thứ tự ngăn hai hội thoại khi gửi đồng thời.
@@ -130,8 +130,28 @@ Ví dụ response upload:
 6. Đã có hội thoại: gửi `SEND_MESSAGE` bằng conversationId.
 
 HTTP-08 đã triển khai với `recipientId` là UUID bắt buộc. Thiếu/sai UUID hoặc chọn
-chính mình trả 400; recipient không tồn tại trả 404. Response 200 dùng `BaseResponse`
-và có `type: 'DIRECT'`; response 204 không có body.
+chính mình trả 400; recipient không tồn tại trả 404. Response 200 dùng `BaseResponse`;
+`content.peer` luôn có để FE hiển thị người đang nhắn, kể cả khi hai người chưa từng
+chat. `content.conversation` là `null` khi chưa có DIRECT, ngược lại gồm `id`,
+`type: 'DIRECT'` và `createdAt`.
+
+```json
+{
+  "code": "0",
+  "strCode": "success",
+  "message": "SUCCESSFUL",
+  "content": {
+    "conversation": null,
+    "peer": {
+      "id": "00000000-0000-0000-0000-000000000103",
+      "username": "vana",
+      "fullName": "Nguyễn Văn A",
+      "avatarFileId": null,
+      "status": "OFFLINE"
+    }
+  }
+}
+```
 
 HTTP-09 đã triển khai tại `POST /api/conversations/group`. `name` bắt buộc, tối đa
 100 ký tự; `memberIds` phải chứa ít nhất một user khác người tạo. ID trùng và ID của
@@ -148,8 +168,10 @@ hoạt động, sắp xếp theo hoạt động mới nhất rồi theo id để
 kèm `totalPages` và `totalElements`.
 
 Mỗi phần tử có `id`, `type: 'DIRECT' | 'GROUP'`, `name`, `avatarFileId`, `ownerId`,
-`memberCount`, `createdAt`, `lastMessage` và `unreadCount`. GROUP chưa có tin vẫn xuất
-hiện với `lastMessage: null`. Nếu có tin cuối, `lastMessage` gồm `id`, `conversationId`,
+`memberCount`, `createdAt`, `peer`, `lastMessage` và `unreadCount`. Với DIRECT, `peer`
+là người còn lại trong hội thoại; với GROUP, `peer: null`. Peer gồm `id`, `username`,
+`fullName`, `avatarFileId`, `status`. GROUP chưa có tin vẫn xuất hiện với
+`lastMessage: null`. Nếu có tin cuối, `lastMessage` gồm `id`, `conversationId`,
 `sender`, `clientMessageId`, `content`, `attachments`, `createdAt`; `sender` gồm `id` và
 `fullName` để FE hiển thị người gửi tin cuối, không trả riêng `senderId`. Mỗi attachment
 dùng model File của API upload/download. `unreadCount` được tính sau mốc đọc theo cặp
@@ -176,9 +198,9 @@ không hợp lệ trả 400, thiếu hoặc sai session trả 401.
 HTTP-11 đã triển khai tại `GET /api/conversations/{id}`. `id` phải là UUID hợp lệ;
 hội thoại không tồn tại trả 404. Chỉ membership có `leftAt: null` được xem; người ngoài
 hoặc thành viên đã rời trả 403. Response 200 gồm `id`, `type: 'DIRECT' | 'GROUP'`,
-`name`, `avatarFileId`, `ownerId`, `memberCount`, `createdAt`; `memberCount` chỉ đếm
-thành viên đang hoạt động. Với DIRECT, các trường riêng của GROUP là null theo schema.
-Thiếu hoặc sai session trả 401.
+`name`, `avatarFileId`, `ownerId`, `memberCount`, `createdAt`, `peer`; `memberCount` chỉ
+đếm thành viên đang hoạt động. Với DIRECT, `peer` là người còn lại và các trường riêng
+của GROUP là null. Với GROUP, `peer: null`. Thiếu hoặc sai session trả 401.
 
 HTTP-12 đã triển khai tại `PUT /api/conversations/{id}`. Body phải có đủ `name` và
 `avatarFileId`; `name` bắt buộc, được trim và tối đa 100 ký tự; `avatarFileId: null`

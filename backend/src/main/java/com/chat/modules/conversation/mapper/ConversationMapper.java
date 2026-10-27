@@ -2,13 +2,14 @@ package com.chat.modules.conversation.mapper;
 
 import com.chat.modules.conversation.dto.response.ConversationDetailResponse;
 import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
+import com.chat.modules.conversation.dto.response.ConversationPeerResponse;
 import com.chat.modules.conversation.dto.response.DirectConversationResponse;
 import com.chat.modules.conversation.dto.response.GroupConversationResponse;
 import com.chat.modules.conversation.entity.ConversationEntity;
 import com.chat.modules.message.dto.response.MessageResponse;
+import com.chat.modules.user.entity.UserEntity;
+import com.chat.modules.user.enums.UserStatusEnum;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 @Component
 public class ConversationMapper {
@@ -17,8 +18,16 @@ public class ConversationMapper {
         return new DirectConversationResponse(
                 conversation.getId(),
                 conversation.getType(),
-                List.of(conversation.getDirectUserLowId(), conversation.getDirectUserHighId()),
                 conversation.getCreatedAt());
+    }
+
+    public ConversationPeerResponse toPeerResponse(UserEntity user) {
+        return new ConversationPeerResponse(
+                user.getId(),
+                user.getUsername(),
+                user.getFullName(),
+                user.getAvatarFileId(),
+                UserStatusEnum.OFFLINE);
     }
 
     public GroupConversationResponse toGroupResponse(ConversationEntity conversation, int memberCount) {
@@ -35,6 +44,7 @@ public class ConversationMapper {
     public ConversationListItemResponse toListItemResponse(
             ConversationEntity conversation,
             long memberCount,
+            ConversationPeerResponse peer,
             MessageResponse lastMessage,
             long unreadCount) {
         return new ConversationListItemResponse(
@@ -45,11 +55,13 @@ public class ConversationMapper {
                 conversation.getOwnerId(),
                 memberCount,
                 conversation.getCreatedAt(),
+                peer,
                 lastMessage,
                 unreadCount);
     }
 
-    public ConversationDetailResponse toDetailResponse(ConversationEntity conversation, long memberCount) {
+    public ConversationDetailResponse toDetailResponse(
+            ConversationEntity conversation, long memberCount, ConversationPeerResponse peer) {
         return new ConversationDetailResponse(
                 conversation.getId(),
                 conversation.getType(),
@@ -57,6 +69,7 @@ public class ConversationMapper {
                 conversation.getAvatarFileId(),
                 conversation.getOwnerId(),
                 memberCount,
-                conversation.getCreatedAt());
+                conversation.getCreatedAt(),
+                peer);
     }
 }
