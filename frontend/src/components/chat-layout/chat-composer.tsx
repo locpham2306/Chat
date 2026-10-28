@@ -6,7 +6,7 @@ import { Textarea } from '~/components/ui/textarea'
 interface ChatComposerProps {
   disabled?: boolean
   placeholder?: string
-  onSendMessage?: (content: string) => void
+  onSendMessage?: (content: string) => boolean | void
   onAttachFile?: () => void
 }
 
@@ -42,7 +42,8 @@ export const ChatComposer = ({
   const handleSend = () => {
     const trimmed = content.trim()
     if (!trimmed || disabled) return
-    onSendMessage?.(trimmed)
+    const sent = onSendMessage?.(trimmed)
+    if (sent === false) return
     setContent('')
     if (textareaRef.current) {
       textareaRef.current.style.height = `${MIN_HEIGHT}px`

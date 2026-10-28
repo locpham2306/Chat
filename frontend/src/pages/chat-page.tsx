@@ -7,6 +7,7 @@ import { DirectConversationDraft } from '~/components/direct-conversation'
 import { CreateGroupDialog } from '~/components/group-create'
 import { UserSearchDialog } from '~/components/user-search'
 import { useDirectConversationLookupQuery, useDirectConversationMutation } from '~/hooks/use-conversation'
+import { useMessageSend } from '~/hooks/use-message-send'
 import { useRealtimeMessageSync } from '~/hooks/use-realtime-message-sync'
 import { getApiErrorMessage } from '~/lib/api-error'
 import { cn } from '~/lib/utils'
@@ -30,13 +31,22 @@ export const ChatPage = () => {
   const locationState = location.state as DirectConversationLocationState | null
   const recipient = locationState?.recipient
   const chatNotFound = Boolean(locationState?.chatNotFound)
+  const { optimisticMessages, failedClientMessageIds, send, hasLocallySentMessage, retry } = useMessageSend({
+    conversationId,
+    recipientId
+  })
 
   const { data: lookupData, isLoading: isLookingUp, error: lookupError } = useDirectConversationLookupQuery(recipientId)
 
   useRealtimeMessageSync({
     activeConversationId: conversationId,
     onMessageAck: (payload) => {
-      if (!conversationId && recipientId && payload.conversationId) {
+      if (!conversationId && recipientId && hasLocallySentMessage(payload.clientMessageId) && payload.conversationId) {
+        navigate(`/chat/${payload.conversationId}`, { replace: true })
+      }
+    },
+    onNewMessage: (payload) => {
+      if (!conversationId && recipientId && hasLocallySentMessage(payload.clientMessageId)) {
         navigate(`/chat/${payload.conversationId}`, { replace: true })
       }
     }
@@ -73,6 +83,9 @@ export const ChatPage = () => {
     : recipient
 
   const hasOpenChat = Boolean(conversationId || recipientId)
+  const visibleOptimisticMessages = optimisticMessages.filter(
+    (message) => message.conversationId === (conversationId ?? `draft:${recipientId}`)
+  )
 
   const handleSelectConversation = (id: string) => {
     selectionVersion.current += 1
@@ -141,7 +154,14 @@ export const ChatPage = () => {
         )}
       >
         {conversationId ? (
-          <ChatLayout conversationId={conversationId} onBack={handleBackToList} />
+          <ChatLayout
+            conversationId={conversationId}
+            onBack={handleBackToList}
+            onSendMessage={send}
+            optimisticMessages={visibleOptimisticMessages}
+            failedClientMessageIds={failedClientMessageIds}
+            onRetryMessage={retry}
+          />
         ) : recipientId ? (
           isLookingUp ? (
             <div className='flex flex-1 h-full items-center justify-center bg-background'>
@@ -151,7 +171,15 @@ export const ChatPage = () => {
               </div>
             </div>
           ) : (
-            <DirectConversationDraft recipientId={recipientId} recipient={draftRecipient} onBack={handleBackToList} />
+            <DirectConversationDraft
+              recipientId={recipientId}
+              recipient={draftRecipient}
+              onBack={handleBackToList}
+              onSendMessage={send}
+              optimisticMessages={visibleOptimisticMessages}
+              failedClientMessageIds={failedClientMessageIds}
+              onRetryMessage={retry}
+            />
           )
         ) : (
           <ChatEmptyState notice={chatNotFound ? 'Không tìm thấy người dùng hoặc cuộc hội thoại.' : undefined} />

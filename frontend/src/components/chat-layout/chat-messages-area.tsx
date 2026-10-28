@@ -12,6 +12,10 @@ interface ChatMessagesAreaProps {
   title: string
   isGroup?: boolean
   isLoading?: boolean
+  optimisticMessages?: Message[]
+  loadHistory?: boolean
+  failedClientMessageIds?: string[]
+  onRetryMessage?: (clientMessageId: string) => void
 }
 
 interface ScrollSnapshot {
@@ -24,19 +28,24 @@ export const ChatMessagesArea = ({
   conversationId,
   title,
   isGroup = false,
-  isLoading = false
+  isLoading = false,
+  optimisticMessages = [],
+  loadHistory = true,
+  failedClientMessageIds = [],
+  onRetryMessage
 }: ChatMessagesAreaProps) => {
   const currentUserId = useAuthStore((state) => state.user?.id)
-  const history = useMessageHistoryQuery(conversationId, !isLoading)
+  const history = useMessageHistoryQuery(conversationId, loadHistory && !isLoading)
   const [earlyMessages, setEarlyMessages] = useState<Message[]>([])
   const hasHistory = Boolean(history.data)
   const messages = useMemo(
     () =>
       mergeChronologicalMessages([
+        { data: optimisticMessages, nextCursor: null, hasMore: false },
         { data: earlyMessages, nextCursor: null, hasMore: false },
         ...(history.data?.pages ?? [])
       ]),
-    [earlyMessages, history.data]
+    [earlyMessages, history.data, optimisticMessages]
   )
   const scrollRef = useRef<HTMLDivElement>(null)
   const initializedRef = useRef(false)
@@ -57,7 +66,7 @@ export const ChatMessagesArea = ({
 
   useLayoutEffect(() => {
     const viewport = scrollRef.current
-    if (!viewport || !history.isSuccess) return
+    if (!viewport || (loadHistory && !history.isSuccess)) return
 
     const snapshot = snapshotRef.current
     if (snapshot && pageCount > snapshot.pageCount) {
@@ -76,11 +85,11 @@ export const ChatMessagesArea = ({
       viewport.scrollTop = viewport.scrollHeight
       initializedRef.current = true
     }
-  }, [history.isSuccess, pageCount, newestMessageId])
+  }, [history.isSuccess, loadHistory, pageCount, newestMessageId])
 
   const loadOlder = () => {
     const viewport = scrollRef.current
-    if (!viewport || !history.hasNextPage || history.isFetchingNextPage) return
+    if (!loadHistory || !viewport || !history.hasNextPage || history.isFetchingNextPage) return
 
     snapshotRef.current = {
       height: viewport.scrollHeight,
@@ -102,7 +111,7 @@ export const ChatMessagesArea = ({
     loadOlder()
   }
 
-  const showEmpty = history.isSuccess && messages.length === 0
+  const showEmpty = (history.isSuccess || !loadHistory) && messages.length === 0
 
   return (
     <div className='relative min-h-0 flex-1 bg-muted/10'>
@@ -150,6 +159,7 @@ export const ChatMessagesArea = ({
             const isOwn = Boolean(
               currentUserId && (message.senderId === currentUserId || message.sender?.id === currentUserId)
             )
+            const isFailed = failedClientMessageIds.includes(message.clientMessageId)
             return (
               <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
                 <div
@@ -174,18 +184,32 @@ export const ChatMessagesArea = ({
                   >
                     {new Date(message.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                   </time>
+                  {isFailed && (
+                    <div className='mt-1 flex items-center justify-end gap-2 text-[10px] text-destructive'>
+                      <span>Không gửi được</span>
+                      <Button
+                        type='button'
+                        variant='ghost'
+                        size='sm'
+                        className='h-auto px-1 py-0 text-[10px] text-inherit hover:text-inherit'
+                        onClick={() => onRetryMessage?.(message.clientMessageId)}
+                      >
+                        Thử lại
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             )
           })}
 
-          {(isLoading || history.isPending) && (
+          {(isLoading || (loadHistory && history.isPending)) && (
             <p className='py-4 text-center text-xs text-muted-foreground' role='status'>
               Đang tải tin nhắn...
             </p>
           )}
 
-          {history.isError && !history.isFetchNextPageError && (
+          {loadHistory && history.isError && !history.isFetchNextPageError && (
             <div className='flex flex-col items-center gap-2 py-4 text-xs text-destructive' role='alert'>
               <span>{getApiErrorMessage(history.error)}</span>
               <Button variant='outline' size='sm' onClick={() => void history.refetch()}>

@@ -5,6 +5,7 @@ import { ChatHeader } from './chat-header'
 import { ChatMessagesArea } from './chat-messages-area'
 import { Button } from '~/components/ui/button'
 import { useConversationDetailQuery } from '~/hooks/use-conversation'
+import type { Message } from '~/types/message.type'
 
 interface ChatLayoutProps {
   conversationId: string
@@ -12,9 +13,21 @@ interface ChatLayoutProps {
   onSendMessage?: (content: string) => void
   onAttachFile?: () => void
   onOpenInfo?: () => void
+  optimisticMessages?: Message[]
+  failedClientMessageIds?: string[]
+  onRetryMessage?: (clientMessageId: string) => void
 }
 
-export const ChatLayout = ({ conversationId, onBack, onSendMessage, onAttachFile, onOpenInfo }: ChatLayoutProps) => {
+export const ChatLayout = ({
+  conversationId,
+  onBack,
+  onSendMessage,
+  onAttachFile,
+  onOpenInfo,
+  optimisticMessages,
+  failedClientMessageIds,
+  onRetryMessage
+}: ChatLayoutProps) => {
   const { data: conversation, isLoading, isError, error } = useConversationDetailQuery(conversationId)
 
   if (isError) {
@@ -78,6 +91,9 @@ export const ChatLayout = ({ conversationId, onBack, onSendMessage, onAttachFile
         title={title}
         isGroup={isGroup}
         isLoading={isLoading}
+        optimisticMessages={optimisticMessages}
+        failedClientMessageIds={failedClientMessageIds}
+        onRetryMessage={onRetryMessage}
       />
 
       {/* 3. Chat Composer */}
