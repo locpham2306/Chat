@@ -1,7 +1,13 @@
-import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import conversationApi, { type GetConversationsParams } from '~/apis/conversation.api'
 import type { ApiPage } from '~/types/api-response.type'
-import type { ConversationDetail, ConversationPeer, ConversationSummary } from '~/types/conversation.type'
+import type {
+  ConversationDetail,
+  ConversationPeer,
+  ConversationSummary,
+  CreateGroupBody,
+  GroupConversation
+} from '~/types/conversation.type'
 
 export const conversationKeys = {
   all: ['conversations'] as const,
@@ -92,5 +98,18 @@ export const useDirectConversationLookupQuery = (recipientId?: string | null) =>
     enabled: Boolean(recipientId),
     staleTime: 10_000,
     retry: false
+  })
+}
+
+export const useCreateGroupMutation = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: CreateGroupBody): Promise<GroupConversation> => {
+      const response = await conversationApi.createGroup(body)
+      return response.data.content
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] })
+    }
   })
 }
