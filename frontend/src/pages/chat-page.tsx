@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { ChatEmptyState, ChatLayout } from '~/components/chat-layout'
 import { ConversationList } from '~/components/conversation-list/conversation-list'
 import { DirectConversationDraft } from '~/components/direct-conversation'
+import { CreateGroupDialog } from '~/components/group-create'
 import { UserSearchDialog } from '~/components/user-search'
 import { useDirectConversationLookupQuery, useDirectConversationMutation } from '~/hooks/use-conversation'
 import { useRealtimeMessageSync } from '~/hooks/use-realtime-message-sync'
@@ -22,6 +23,7 @@ export const ChatPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const [isUserSearchOpen, setIsUserSearchOpen] = useState(false)
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
   const selectionVersion = useRef(0)
   const directConversationMutation = useDirectConversationMutation()
   const recipientId = searchParams.get('recipientId')
@@ -127,6 +129,7 @@ export const ChatPage = () => {
           activeId={conversationId}
           onSelectConversation={handleSelectConversation}
           onOpenUserSearch={() => setIsUserSearchOpen(true)}
+          onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
         />
       </aside>
 
@@ -161,6 +164,14 @@ export const ChatPage = () => {
         onSelectUser={handleSelectUser}
         selectingUserId={directConversationMutation.isPending ? directConversationMutation.variables : undefined}
         selectionError={getApiErrorMessage(directConversationMutation.error)}
+      />
+
+      <CreateGroupDialog
+        open={isCreateGroupOpen}
+        onOpenChange={setIsCreateGroupOpen}
+        onSuccess={(newGroup) => {
+          navigate(`/chat/${newGroup.id}`)
+        }}
       />
     </div>
   )

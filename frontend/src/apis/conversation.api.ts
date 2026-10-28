@@ -3,8 +3,10 @@ import type { ApiPage, ApiResponse } from '~/types/api-response.type'
 import type {
   ConversationDetail,
   ConversationSummary,
+  CreateGroupBody,
   DirectConversation,
-  DirectConversationLookupResult
+  DirectConversationLookupResult,
+  GroupConversation
 } from '~/types/conversation.type'
 
 export interface GetConversationsParams {
@@ -22,7 +24,8 @@ const conversationApi = {
       {
         params: { recipientId }
       }
-    )
+    ),
+  createGroup: (body: CreateGroupBody) => http.post<ApiResponse<GroupConversation>>('/api/conversations/group', body)
 }
 
 export default conversationApi

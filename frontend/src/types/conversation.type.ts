@@ -54,3 +54,9 @@ export type ConversationSummary = Conversation & {
   lastMessage: Message | null
   unreadCount: number
 }
+
+export interface CreateGroupBody {
+  name: string
+  memberIds: string[]
+  avatarFileId?: string | null
+}
