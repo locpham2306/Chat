@@ -16,7 +16,8 @@ Backend có khung Java 21 / Spring Boot 3.5.16 / Maven và health check.
 Cấu trúc common theo QLCC có `BaseResponse`, `PageResponse`, package exception và utils.
 Cấu hình persistence dùng MySQL, JPA và Flyway; có schema/entity chat, repository user/session,
 API register/login/logout, xem/cập nhật `/api/users/me` và session cookie hạn 365 ngày.
-Đã có API hội thoại/thành viên/file và raw WebSocket `/ws` để gửi tin, typing và presence.
+Đã có API hội thoại/thành viên/file, lịch sử/mốc đọc và raw WebSocket `/ws` để gửi tin,
+typing, read receipt và presence.
 Lịch sử tin nhắn theo cursor và cập nhật mốc đọc vẫn chưa triển khai.
 Framework frontend chưa chốt.
 

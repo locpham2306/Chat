@@ -2,9 +2,11 @@ package com.chat.modules.conversation.repository;
 
 import com.chat.modules.conversation.entity.ConversationMemberEntity;
 import com.chat.modules.conversation.repository.projection.ConversationCountProjection;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -22,6 +24,12 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
 
     Optional<ConversationMemberEntity> findByConversationIdAndUserIdAndLeftAtIsNull(
             UUID conversationId, UUID userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(ConversationMemberQueries.FIND_ACTIVE_BY_CONVERSATION_AND_USER_FOR_UPDATE)
+    Optional<ConversationMemberEntity> findActiveForUpdate(
+            @Param("conversationId") UUID conversationId,
+            @Param("userId") UUID userId);
 
     List<ConversationMemberEntity> findByConversationIdAndUserIdIn(
             UUID conversationId, Collection<UUID> userIds);

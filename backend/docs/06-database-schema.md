@@ -3,8 +3,8 @@
 Schema cho phạm vi API đã thống nhất; entity chỉ mô hình hóa dữ liệu.
 Auth/session, hồ sơ, tìm kiếm user, lookup DIRECT, tạo GROUP, danh sách/chi tiết/cập nhật
 hội thoại, danh sách/thêm/xóa thành viên và upload/download file có phân quyền đã được triển khai;
-gửi tin qua WebSocket, typing và presence đã được triển khai. Lịch sử cursor và mốc đọc HTTP
-chưa được triển khai; READ_RECEIPT chờ API mốc đọc.
+gửi tin qua WebSocket, typing và presence đã được triển khai. Lịch sử cursor, mốc đọc HTTP
+chỉ tiến và READ_RECEIPT sau commit cũng đã được triển khai.
 
 | Bảng | Entity | Nội dung |
 | --- | --- | --- |

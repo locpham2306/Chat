@@ -35,6 +35,14 @@ public final class ConversationMemberQueries {
               AND other.userId <> :userId
             """;
 
+    public static final String FIND_ACTIVE_BY_CONVERSATION_AND_USER_FOR_UPDATE = """
+            SELECT member
+            FROM ConversationMemberEntity member
+            WHERE member.conversationId = :conversationId
+              AND member.userId = :userId
+              AND member.leftAt IS NULL
+            """;
+
     private ConversationMemberQueries() {
     }
 }

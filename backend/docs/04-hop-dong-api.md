@@ -308,6 +308,61 @@ Khi đang tạo GROUP và chưa có conversation id, FE tiếp tục dùng `GET 
 loại các user đã chọn ở state phía client. Sau khi GROUP đã được tạo, màn hình thêm
 thành viên dùng HTTP-20 để server loại thành viên hiện tại.
 
+HTTP-16 đã triển khai tại `GET /api/conversations/{id}/messages`. Query `before` là
+message UUID tùy chọn và `limit` mặc định 30, hợp lệ từ 1 đến 100. Kết quả sắp xếp từ
+mới đến cũ theo `createdAt`, sau đó `id`; cursor là mốc loại trừ và phải thuộc đúng hội
+thoại. Backend lấy thêm một dòng để tính `hasMore`, nên khi hết dữ liệu `nextCursor` là
+`null` và `hasMore` là `false`. Hội thoại không tồn tại trả 404, người không còn là thành
+viên trả 403, cursor/limit sai trả 400.
+
+```json
+{
+  "code": "0",
+  "strCode": "success",
+  "message": "SUCCESSFUL",
+  "content": {
+    "data": [
+      {
+        "id": "770e8400-e29b-41d4-a716-446655440001",
+        "conversationId": "660e8400-e29b-41d4-a716-446655440001",
+        "sender": {
+          "id": "550e8400-e29b-41d4-a716-446655440001",
+          "fullName": "Nguyễn Văn An"
+        },
+        "clientMessageId": "client-001",
+        "content": "Xin chào",
+        "attachments": [],
+        "createdAt": "2026-10-26T08:05:00Z"
+      }
+    ],
+    "nextCursor": "770e8400-e29b-41d4-a716-446655440001",
+    "hasMore": true
+  }
+}
+```
+
+HTTP-17 đã triển khai tại `PUT /api/conversations/{id}/read` với body bắt buộc
+`lastReadMessageId`. Tin phải tồn tại và thuộc đúng hội thoại. Backend khóa membership
+của người gọi và chỉ cho mốc tiến theo `createdAt`, sau đó `id`; request cũ không làm
+lùi mốc. Response luôn trả mốc thực tế cùng unreadCount hiện tại. Sau khi transaction
+commit thành công, server phát READ_RECEIPT với đúng mốc thực tế cho các thành viên đang
+hoạt động. Hội thoại/tin không tồn tại trả 404, người ngoài trả 403, tin thuộc hội thoại
+khác hoặc body sai trả 400.
+
+```json
+{
+  "code": "0",
+  "strCode": "success",
+  "message": "SUCCESSFUL",
+  "content": {
+    "conversationId": "660e8400-e29b-41d4-a716-446655440001",
+    "userId": "550e8400-e29b-41d4-a716-446655440001",
+    "lastReadMessageId": "770e8400-e29b-41d4-a716-446655440001",
+    "unreadCount": 0
+  }
+}
+```
+
 ```json
 {
   "event": "SEND_MESSAGE",
@@ -360,5 +415,5 @@ Tin đầu DIRECT khóa cặp user theo thứ tự ổn định, tạo conversat
 trong cùng transaction; retry cùng senderId/clientMessageId và payload trả ACK cũ, payload
 khác trả CONFLICT. File chỉ được gắn bởi uploader và không chuyển sang hội thoại khác.
 ACK/broadcast chỉ chạy sau khi transaction lưu tin thành công. Presence chỉ chuyển OFFLINE
-khi user không còn kết nối; server heartbeat bằng ping/pong. READ_RECEIPT đã có model/event
-đầu ra nhưng chỉ được phát sau khi HTTP-17 lưu mốc đọc được triển khai.
+khi user không còn kết nối; server heartbeat bằng ping/pong. READ_RECEIPT được phát sau
+khi HTTP-17 commit mốc đọc và luôn phản ánh mốc thực tế không bị lùi.

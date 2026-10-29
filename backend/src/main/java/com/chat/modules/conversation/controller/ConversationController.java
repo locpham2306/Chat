@@ -14,6 +14,10 @@ import com.chat.modules.conversation.dto.response.ConversationMemberResponse;
 import com.chat.modules.conversation.dto.response.DirectConversationLookupResponse;
 import com.chat.modules.conversation.dto.response.GroupConversationResponse;
 import com.chat.modules.conversation.service.ConversationService;
+import com.chat.modules.message.dto.request.MarkConversationReadRequest;
+import com.chat.modules.message.dto.response.ConversationReadResponse;
+import com.chat.modules.message.dto.response.MessageHistoryResponse;
+import com.chat.modules.message.service.ConversationMessageService;
 import com.chat.modules.user.dto.response.UserResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -40,6 +44,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ConversationController {
     private final ConversationService conversations;
+    private final ConversationMessageService conversationMessages;
 
     @GetMapping
     public BaseResponse<PageResponse<List<ConversationListItemResponse>>> getConversations(
@@ -70,6 +75,27 @@ public class ConversationController {
             @Max(value = 100, message = "{validation.max}") Integer size) {
         return BaseResponse.success(
                 conversations.getConversationMembers(session.userId(), id, page, size));
+    }
+
+    @GetMapping("/{id}/messages")
+    public BaseResponse<MessageHistoryResponse> getMessages(
+            @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
+            @PathVariable UUID id,
+            @RequestParam(required = false) UUID before,
+            @RequestParam(defaultValue = "30")
+            @Min(value = 1, message = "{validation.min}")
+            @Max(value = 100, message = "{validation.max}") Integer limit) {
+        return BaseResponse.success(
+                conversationMessages.getHistory(session.userId(), id, before, limit));
+    }
+
+    @PutMapping("/{id}/read")
+    public BaseResponse<ConversationReadResponse> markRead(
+            @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
+            @PathVariable UUID id,
+            @Valid @RequestBody MarkConversationReadRequest request) {
+        return BaseResponse.success(conversationMessages.markRead(
+                session.userId(), id, request.lastReadMessageId()));
     }
 
     @PostMapping("/{id}/members")

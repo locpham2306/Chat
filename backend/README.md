@@ -3,7 +3,8 @@
 Thư mục dành cho toàn bộ source, build, cấu hình và test của backend Spring Boot.
 Đã dựng entity/schema, API register/login/logout, filter session, xem/cập nhật `/api/users/me`,
 tìm kiếm user và upload/download file có phân quyền. Raw WebSocket `/ws` dùng cookie session
-đã hỗ trợ gửi tin, retry idempotent, typing, presence và lỗi frame; chưa có HTTP lịch sử/mốc đọc.
+đã hỗ trợ gửi tin, retry idempotent, typing, read receipt, presence và lỗi frame.
+HTTP lịch sử tin nhắn dùng cursor; HTTP mốc đọc chỉ tiến và phát receipt sau commit.
 Lookup hội thoại DIRECT đã có và không tạo dữ liệu khi hai user chưa từng nhắn tin;
 API tạo nhóm tạo OWNER/MEMBER trong cùng transaction. Danh sách hội thoại chỉ trả
 membership đang hoạt động, sắp xếp theo hoạt động mới nhất và kèm tin cuối/số chưa đọc.
@@ -128,6 +129,8 @@ Test HTTP-15 kiểm tra MEMBER tự rời, OWNER xóa MEMBER, xóa idempotent, g
 để có thể thêm lại và từ chối OWNER rời nhóm, MEMBER xóa người khác hoặc thao tác trên DIRECT.
 Test HTTP-20 kiểm tra tìm ứng viên thêm vào nhóm, loại OWNER/thành viên hiện tại,
 cho phép thêm lại người đã rời, phân trang và chỉ OWNER được gọi.
+Test HTTP-16 kiểm tra cursor loại trừ, thứ tự mới đến cũ, attachment và phân quyền.
+Test HTTP-17 kiểm tra mốc đọc chỉ tiến, unreadCount và READ_RECEIPT dùng mốc thực tế.
 Test WebSocket kiểm tra cookie/Origin handshake, SEND_MESSAGE tạo dữ liệu trước ACK/broadcast,
 retry không tạo trùng, attachment, TYPING, lỗi frame và presence theo số kết nối.
 
@@ -164,9 +167,8 @@ Các endpoint `/test/...` chỉ nằm trong test, không được thêm vào ứ
 
 ## Các bước review tiếp theo
 
-1. Lấy lịch sử tin nhắn theo cursor (`HTTP-16`).
-2. Cập nhật mốc đọc (`HTTP-17`) và nối phát `READ_RECEIPT` vào WebSocket đã có.
-3. Tiếp tục các API/event còn lại theo hợp đồng.
+1. Review HTTP-16/HTTP-17 và READ_RECEIPT.
+2. Tiếp tục các API/event còn lại theo hợp đồng.
 
 Mỗi bước dừng để review; chỉ commit/push khi được yêu cầu.
 

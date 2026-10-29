@@ -31,6 +31,15 @@ public final class MessageQueries {
             GROUP BY message.conversationId
             """;
 
+    public static final String FIND_HISTORY_BEFORE = """
+            SELECT message
+            FROM MessageEntity message
+            WHERE message.conversationId = :conversationId
+              AND (message.createdAt < :beforeCreatedAt
+                   OR (message.createdAt = :beforeCreatedAt AND message.id < :beforeId))
+            ORDER BY message.createdAt DESC, message.id DESC
+            """;
+
     private MessageQueries() {
     }
 }

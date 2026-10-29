@@ -24,4 +24,8 @@ public class ConversationReadStateEntity extends BaseEntity {
         this.memberId = memberId;
         this.lastReadMessageId = lastReadMessageId;
     }
+
+    public void advanceTo(UUID lastReadMessageId) {
+        this.lastReadMessageId = lastReadMessageId;
+    }
 }
