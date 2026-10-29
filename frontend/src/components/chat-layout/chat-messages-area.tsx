@@ -172,9 +172,14 @@ export const ChatMessagesArea = ({
                   {message.attachments.length > 0 && (
                     <div className='mt-1 space-y-1 text-xs'>
                       {message.attachments.map((file) => (
-                        <p key={file.id} className='truncate'>
+                        <a
+                          key={file.id}
+                          href={file.downloadUrl}
+                          download
+                          className='block truncate underline-offset-2 hover:underline'
+                        >
                           📎 {file.name}
-                        </p>
+                        </a>
                       ))}
                     </div>
                   )}

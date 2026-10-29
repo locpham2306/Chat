@@ -8,11 +8,12 @@ import { GroupSettingsDialog } from '~/components/group-settings'
 import { Button } from '~/components/ui/button'
 import { useConversationDetailQuery } from '~/hooks/use-conversation'
 import type { Message } from '~/types/message.type'
+import type { MessageSendDraft } from '~/lib/message-send'
 
 interface ChatLayoutProps {
   conversationId: string
   onBack?: () => void
-  onSendMessage?: (content: string) => void
+  onSendMessage?: (draft: MessageSendDraft) => boolean | void
   onAttachFile?: () => void
   onOpenInfo?: () => void
   optimisticMessages?: Message[]
