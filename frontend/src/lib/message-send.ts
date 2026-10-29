@@ -1,4 +1,5 @@
 import type { Message, MessageSender } from '~/types/message.type'
+import type { File } from '~/types/file.type'
 import type { MessageAckPayload, SendMessagePayload } from '~/types/websocket.type'
 
 type SendFrame = (event: 'SEND_MESSAGE', payload: SendMessagePayload) => boolean
@@ -7,9 +8,15 @@ interface SendMessageInput {
   conversationId?: string
   recipientId?: string
   content: string
+  attachments?: File[]
   currentUser?: MessageSender
   clientMessageId: string
   createdAt: string
+}
+
+export interface MessageSendDraft {
+  content: string
+  attachments: File[]
 }
 
 type SendMessageResult = { sent: true; message: Message } | { sent: false }
@@ -52,10 +59,18 @@ export class MessageSendQueue {
     return true
   }
 
-  public findFailed(conversationId: string, content: string): string | undefined {
+  public findFailed(conversationId: string, content: string, attachmentIds: string[]): string | undefined {
     for (const clientMessageId of this.failed) {
       const outgoing = this.pending.get(clientMessageId)
-      if (outgoing?.message.conversationId === conversationId && outgoing.message.content === content) {
+      const outgoingAttachmentIds = outgoing?.payload.attachmentIds ?? []
+      const hasSameAttachments =
+        outgoingAttachmentIds.length === attachmentIds.length &&
+        outgoingAttachmentIds.every((id, index) => id === attachmentIds[index])
+      if (
+        outgoing?.message.conversationId === conversationId &&
+        outgoing.message.content === (content.trim() || null) &&
+        hasSameAttachments
+      ) {
         return clientMessageId
       }
     }
@@ -80,16 +95,19 @@ export const createClientMessageId = () => crypto.randomUUID()
 
 export const createOutgoingMessage = (input: SendMessageInput): OutgoingMessage | null => {
   const content = input.content.trim()
+  const attachments = input.attachments ?? []
+  const attachmentIds = attachments.map((file) => file.id)
   const conversationId = input.conversationId
   const recipientId = conversationId ? undefined : input.recipientId
 
-  if (!content || (!conversationId && !recipientId)) return null
+  if ((!content && attachmentIds.length === 0) || (!conversationId && !recipientId)) return null
 
   return {
     payload: {
       ...(conversationId ? { conversationId } : { recipientId }),
       clientMessageId: input.clientMessageId,
-      content
+      content: content || null,
+      ...(attachmentIds.length > 0 ? { attachmentIds } : {})
     },
     message: {
       id: `pending:${input.clientMessageId}`,
@@ -101,8 +119,8 @@ export const createOutgoingMessage = (input: SendMessageInput): OutgoingMessage 
           }
         : {}),
       clientMessageId: input.clientMessageId,
-      content,
-      attachments: [],
+      content: content || null,
+      attachments,
       createdAt: input.createdAt
     }
   }

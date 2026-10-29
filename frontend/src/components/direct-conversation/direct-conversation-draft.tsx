@@ -1,13 +1,14 @@
 import { MessageSquarePlus } from 'lucide-react'
 import { ChatComposer, ChatHeader, ChatMessagesArea } from '~/components/chat-layout'
 import type { Message } from '~/types/message.type'
+import type { MessageSendDraft } from '~/lib/message-send'
 import type { User } from '~/types/user.type'
 
 interface DirectConversationDraftProps {
   recipientId: string
   recipient?: User
   onBack?: () => void
-  onSendMessage?: (content: string) => void
+  onSendMessage?: (draft: MessageSendDraft) => boolean | void
   optimisticMessages?: Message[]
   failedClientMessageIds?: string[]
   onRetryMessage?: (clientMessageId: string) => void

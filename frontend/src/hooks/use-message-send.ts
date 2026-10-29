@@ -1,5 +1,11 @@
 import { useCallback, useRef, useState } from 'react'
-import { MessageSendQueue, applyMessageAck, createClientMessageId, createOutgoingMessage } from '~/lib/message-send'
+import {
+  MessageSendQueue,
+  applyMessageAck,
+  createClientMessageId,
+  createOutgoingMessage,
+  type MessageSendDraft
+} from '~/lib/message-send'
 import { wsClient } from '~/lib/websocket-client'
 import { useAuthStore } from '~/stores/use-auth-store'
 import type { Message } from '~/types/message.type'
@@ -23,10 +29,14 @@ export const useMessageSend = ({ conversationId, recipientId }: UseMessageSendOp
   }, [])
 
   const send = useCallback(
-    (content: string): boolean => {
+    ({ content, attachments }: MessageSendDraft): boolean => {
       const targetConversationId = conversationId ?? (recipientId ? `draft:${recipientId}` : undefined)
       const existingFailedMessageId = targetConversationId
-        ? queue.current.findFailed(targetConversationId, content.trim())
+        ? queue.current.findFailed(
+            targetConversationId,
+            content,
+            attachments.map((attachment) => attachment.id)
+          )
         : undefined
       if (existingFailedMessageId) return attempt(existingFailedMessageId)
 
@@ -35,6 +45,7 @@ export const useMessageSend = ({ conversationId, recipientId }: UseMessageSendOp
         conversationId,
         recipientId: recipientId ?? undefined,
         content,
+        attachments,
         currentUser: currentUser ?? undefined,
         clientMessageId,
         createdAt: new Date().toISOString()
