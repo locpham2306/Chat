@@ -60,3 +60,8 @@ export interface CreateGroupBody {
   memberIds: string[]
   avatarFileId?: string | null
 }
+
+export interface UpdateConversationBody {
+  name: string
+  avatarFileId: string | null
+}
