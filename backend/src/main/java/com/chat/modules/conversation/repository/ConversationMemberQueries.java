@@ -18,6 +18,23 @@ public final class ConversationMemberQueries {
             GROUP BY member.conversationId
             """;
 
+    public static final String FIND_ACTIVE_USER_IDS = """
+            SELECT member.userId
+            FROM ConversationMemberEntity member
+            WHERE member.conversationId = :conversationId
+              AND member.leftAt IS NULL
+            """;
+
+    public static final String FIND_ACTIVE_SHARED_CONVERSATION_USER_IDS = """
+            SELECT DISTINCT other.userId
+            FROM ConversationMemberEntity mine, ConversationMemberEntity other
+            WHERE mine.userId = :userId
+              AND mine.leftAt IS NULL
+              AND other.conversationId = mine.conversationId
+              AND other.leftAt IS NULL
+              AND other.userId <> :userId
+            """;
+
     private ConversationMemberQueries() {
     }
 }

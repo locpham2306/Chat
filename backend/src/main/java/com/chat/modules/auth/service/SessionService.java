@@ -9,6 +9,8 @@ public interface SessionService {
 
     Optional<SessionIdentity> findActive(String rawToken);
 
+    boolean isActive(UUID sessionId);
+
     /** Idempotent: missing, expired or already revoked sessions need no special handling. */
     void revoke(String rawToken);
 }

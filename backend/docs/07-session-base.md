@@ -42,8 +42,11 @@ và `revoked_at`. Không lưu token thô trong database hoặc log.
 Đã có register, login, logout, filter xác thực session và API xem/cập nhật hồ sơ,
 tìm kiếm user, upload/download file có phân quyền.
 CORS cho HTTP API dùng danh sách origin cụ thể từ cấu hình, cho phép credentials và
-chạy trước filter session để xử lý preflight. CSRF và WebSocket được làm ở các bước tiếp theo.
+chạy trước filter session để xử lý preflight. Raw WebSocket `/ws` dùng cùng cookie, kiểm tra
+Origin + session khi handshake, ping heartbeat, đóng theo hạn phiên và đóng ngay khi logout.
+CSRF cho các request HTTP thay đổi dữ liệu vẫn là bước tiếp theo.
 
 Test kiểm tra BCrypt, session hạn 365 ngày, hash token trong DB, cookie HttpOnly,
 401 cho session thiếu/sai/đã thu hồi, `GET/PUT /api/users/me`, logout idempotent,
 phân quyền file avatar và không lộ token trong JSON.
+Test WebSocket kiểm tra handshake cookie/Origin và session được dùng để lưu tin trước ACK.

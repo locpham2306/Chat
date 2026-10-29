@@ -47,10 +47,11 @@ Khi lỗi, `strCode` là một `HttpErrorCode`; `content` chứa
 - `POST /api/auth/logout`: lấy session token trong cookie hoặc body `{ "token": "..." }`.
   Thiếu cả hai hoặc hai giá trị khác nhau trả 400.
   Thu hồi phiên, xóa cookie; token đã hết hạn/thu hồi vẫn trả 204.
-  Phần đóng WS sẽ nối vào logout khi module WebSocket được triển khai.
+  Các kết nối WebSocket thuộc đúng session bị thu hồi được đóng ngay; session khác của cùng
+  user vẫn hoạt động.
 - `GET /api/users/me`: yêu cầu cookie session hợp lệ, trả User của người đang đăng nhập.
   Thiếu/sai/hết hạn/đã thu hồi session trả 401 với `strCode: 'UNAUTHENTICATED'`.
-  Status hiện là `'OFFLINE'` cho tới khi có presence WebSocket.
+  Status phản ánh presence WebSocket runtime; không có kết nối thì `'OFFLINE'`.
 - `PUT /api/users/me`: yêu cầu cookie session hợp lệ và nhận đầy đủ hai trường
   `{ "fullName": "Nguyễn Văn An", "avatarFileId": null }`.
   `fullName` không được rỗng, tối đa 100 ký tự và được trim trước khi lưu.
@@ -63,7 +64,7 @@ Khi lỗi, `strCode` là một `HttpErrorCode`; `content` chứa
   Tìm không phân biệt hoa/thường theo username hoặc fullName, không trả chính người
   đang đăng nhập và sắp xếp ổn định theo username rồi id. Query sai trả 400.
   Response 200 là `BaseResponse<PageResponse<List<User>>>`; `content` có `data`,
-  `totalPages`, `totalElements`. Status hiện là `'OFFLINE'` tới khi có presence WebSocket.
+  `totalPages`, `totalElements`. Status phản ánh presence WebSocket runtime.
 
 Ví dụ `GET /api/users?keyword=an&page=0&size=20`:
 
@@ -223,7 +224,7 @@ người gọi không có membership đang hoạt động trả 403. Chỉ trả
 Response 200 là `BaseResponse<PageResponse<List<Member>>>`; `content` có `data`,
 `totalPages`, `totalElements`. Mỗi phần tử gồm public `user` với
 `status: 'ONLINE' | 'OFFLINE'`, `role: 'OWNER' | 'MEMBER'` và `joinedAt`.
-Status hiện trả `OFFLINE` cho tới khi presence WebSocket được triển khai. Query phân
+Status phản ánh presence WebSocket runtime. Query phân
 trang sai trả 400; thiếu hoặc sai session trả 401.
 
 HTTP-14 đã triển khai tại `POST /api/conversations/{id}/members`. Body có `memberIds`
@@ -279,8 +280,7 @@ theo `username` rồi `id` và dùng `BaseResponse<PageResponse<List<User>>>`.
 API loại người gọi và tất cả user có membership đang hoạt động (`leftAt: null`) trong
 nhóm. User từng rời nhóm (`leftAt` khác null) được trả lại để OWNER có thể thêm lại.
 Hội thoại không tồn tại trả 404; DIRECT trả 409; người không phải OWNER trả 403; query
-phân trang sai trả 400. Status hiện trả `OFFLINE` cho tới khi presence WebSocket được
-triển khai.
+phân trang sai trả 400. Status phản ánh presence WebSocket runtime.
 
 ```json
 {
@@ -354,3 +354,11 @@ Kiểm tra phiên và Origin khi handshake; đóng kết nối khi phiên hết 
 Không truyền token trong query/frame.
 NEW_MESSAGE mang conversationId; nếu FE chưa biết hội thoại, tải chi tiết hoặc danh sách.
 Chỉ thành viên hiện tại được truy cập hội thoại.
+
+Đã triển khai SEND_MESSAGE, MESSAGE_ACK, NEW_MESSAGE, TYPING, PRESENCE_CHANGED và ERROR.
+Tin đầu DIRECT khóa cặp user theo thứ tự ổn định, tạo conversation + membership + message
+trong cùng transaction; retry cùng senderId/clientMessageId và payload trả ACK cũ, payload
+khác trả CONFLICT. File chỉ được gắn bởi uploader và không chuyển sang hội thoại khác.
+ACK/broadcast chỉ chạy sau khi transaction lưu tin thành công. Presence chỉ chuyển OFFLINE
+khi user không còn kết nối; server heartbeat bằng ping/pong. READ_RECEIPT đã có model/event
+đầu ra nhưng chỉ được phát sau khi HTTP-17 lưu mốc đọc được triển khai.

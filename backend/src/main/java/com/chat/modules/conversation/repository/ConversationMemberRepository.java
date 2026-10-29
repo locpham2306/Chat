@@ -37,4 +37,10 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
     @Query(ConversationMemberQueries.COUNT_ACTIVE_MEMBERS_BY_CONVERSATIONS)
     List<ConversationCountProjection> countActiveMembersByConversationIds(
             @Param("conversationIds") Collection<UUID> conversationIds);
+
+    @Query(ConversationMemberQueries.FIND_ACTIVE_USER_IDS)
+    List<UUID> findActiveUserIds(@Param("conversationId") UUID conversationId);
+
+    @Query(ConversationMemberQueries.FIND_ACTIVE_SHARED_CONVERSATION_USER_IDS)
+    List<UUID> findActiveSharedConversationUserIds(@Param("userId") UUID userId);
 }

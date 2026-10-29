@@ -10,7 +10,8 @@
 - HTTP-08 lookup DIRECT, HTTP-09 tạo GROUP, HTTP-10 danh sách, HTTP-11 chi tiết, HTTP-12
   cập nhật hội thoại, HTTP-13 danh sách thành viên, HTTP-14 thêm thành viên,
   HTTP-15 xóa thành viên/rời nhóm, HTTP-20 tìm ứng viên thêm vào nhóm
-  và HTTP-18/HTTP-19 file đã triển khai;
+  và HTTP-18/HTTP-19 file đã triển khai. Raw WebSocket `/ws` đã có SEND_MESSAGE,
+  MESSAGE_ACK, NEW_MESSAGE, TYPING, PRESENCE_CHANGED và ERROR; READ_RECEIPT chờ HTTP-17;
   bước tiếp theo theo thứ tự trong hợp đồng là HTTP-16 lấy lịch sử tin nhắn. Làm từng bước;
   chỉ commit/push khi người dùng yêu cầu.
 - MySQL 8.4; schema thay đổi qua Flyway, Hibernate chỉ validate. Không chạy migration lên database ngoài dự án.

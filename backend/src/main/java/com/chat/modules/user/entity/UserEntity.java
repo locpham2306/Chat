@@ -56,4 +56,8 @@ public class UserEntity extends BaseEntity {
         this.fullName = fullName;
         this.avatarFileId = avatarFileId;
     }
+
+    public void markLastSeen(Instant lastSeen) {
+        this.lastSeen = java.util.Objects.requireNonNull(lastSeen);
+    }
 }

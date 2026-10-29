@@ -9,8 +9,10 @@ filter xác thực session và UserController cho xem/cập nhật hồ sơ, tì
 FileController/Service xử lý upload, download và phân quyền; local storage nằm sau
 adapter `integration.storage` để có thể thay implementation mà không đổi nghiệp vụ.
 ConversationController/Service hiện có lookup DIRECT chỉ đọc, tạo GROUP kèm membership
-trong một transaction, danh sách, chi tiết, cập nhật GROUP và danh sách thành viên cho
-HTTP-08 đến HTTP-13.
+trong một transaction, danh sách, chi tiết, cập nhật GROUP và quản lý thành viên.
+Module websocket cung cấp raw endpoint `/ws`; MessageService lưu tin đầu DIRECT hoặc tin
+trong hội thoại hiện có trước khi handler ACK/broadcast. Registry kết nối quản lý heartbeat,
+phiên, fan-out và presence runtime.
 Tham khảo cách tổ chức của QLCC; không mang nghiệp vụ chung cư, Core/CMS,
 sync offline hoặc cấu hình nội bộ sang Chat.
 
@@ -44,8 +46,8 @@ integration/
   <technology>/
 ```
 
-Feature có thể là auth, user, conversation, message, file; chỉ tạo package khi có code.
-WebSocket handler đặt trong module sở hữu nghiệp vụ và gọi service chung với HTTP.
+Feature hiện có auth, user, conversation, message, file và websocket; chỉ tạo package khi có code.
+WebSocket handler chỉ xử lý frame/kết nối và gọi service nghiệp vụ ở module message/conversation.
 
 ## Tên và trách nhiệm
 

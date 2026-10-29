@@ -20,7 +20,7 @@ public class SessionFilterConfig {
             @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
         var registration = new FilterRegistrationBean<>(
                 new SessionAuthenticationFilter(cookies, sessions, exceptionResolver));
-        registration.addUrlPatterns("/api/*");
+        registration.addUrlPatterns("/api/*", "/ws");
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
         return registration;
     }

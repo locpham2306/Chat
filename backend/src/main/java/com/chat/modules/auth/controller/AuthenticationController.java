@@ -9,6 +9,7 @@ import com.chat.modules.auth.service.AuthenticationService;
 import com.chat.modules.auth.service.SessionCookieService;
 import com.chat.modules.auth.service.SessionService;
 import com.chat.modules.user.dto.response.UserResponse;
+import com.chat.modules.websocket.service.WebSocketSessionRegistry;
 import com.chat.utils.MessageUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -26,6 +27,7 @@ public class AuthenticationController {
     private final SessionService sessions;
     private final SessionCookieService cookies;
     private final MessageUtils messages;
+    private final WebSocketSessionRegistry webSockets;
 
     @PostMapping("/register")
     public ResponseEntity<BaseResponse<UserResponse>> register(@Valid @RequestBody RegisterRequest request) {
@@ -46,7 +48,9 @@ public class AuthenticationController {
             HttpServletRequest request,
             HttpServletResponse response) {
         var token = cookies.resolveLogoutToken(request, body == null ? null : body.token());
+        var activeSession = sessions.findActive(token);
         sessions.revoke(token);
+        activeSession.ifPresent(identity -> webSockets.closeAppSession(identity.sessionId()));
         cookies.clear(response);
         return ResponseEntity.noContent().build();
     }

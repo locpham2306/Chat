@@ -8,9 +8,12 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface MessageRepository extends JpaRepository<MessageEntity, UUID> {
+
+    Optional<MessageEntity> findBySenderIdAndClientMessageId(UUID senderId, String clientMessageId);
 
     @Query(MessageQueries.FIND_LATEST_BY_CONVERSATION_IDS)
     List<MessageEntity> findLatestByConversationIds(

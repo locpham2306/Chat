@@ -15,6 +15,8 @@ public interface SessionRepository extends JpaRepository<SessionEntity, UUID> {
 
     Optional<SessionEntity> findByTokenHashAndRevokedAtIsNullAndExpiresAtAfter(String tokenHash, Instant now);
 
+    boolean existsByIdAndRevokedAtIsNullAndExpiresAtAfter(UUID id, Instant now);
+
     @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update SessionEntity s set s.revokedAt = :now where s.tokenHash = :hash and s.revokedAt is null")

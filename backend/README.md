@@ -2,13 +2,16 @@
 
 Thư mục dành cho toàn bộ source, build, cấu hình và test của backend Spring Boot.
 Đã dựng entity/schema, API register/login/logout, filter session, xem/cập nhật `/api/users/me`,
-tìm kiếm user và upload/download file có phân quyền; chưa có API gửi tin nhắn.
+tìm kiếm user và upload/download file có phân quyền. Raw WebSocket `/ws` dùng cookie session
+đã hỗ trợ gửi tin, retry idempotent, typing, presence và lỗi frame; chưa có HTTP lịch sử/mốc đọc.
 Lookup hội thoại DIRECT đã có và không tạo dữ liệu khi hai user chưa từng nhắn tin;
 API tạo nhóm tạo OWNER/MEMBER trong cùng transaction. Danh sách hội thoại chỉ trả
 membership đang hoạt động, sắp xếp theo hoạt động mới nhất và kèm tin cuối/số chưa đọc.
 API chi tiết hội thoại chỉ cho thành viên đang hoạt động truy cập; OWNER có thể cập nhật
 tên và avatar của GROUP. Danh sách thành viên có phân trang và không trả người đã rời.
 MEMBER có thể rời nhóm, còn OWNER có thể xóa MEMBER nhưng không thể tự rời nhóm.
+Tin đầu DIRECT tạo conversation + hai membership + message trong cùng transaction; ACK và
+NEW_MESSAGE chỉ phát sau commit. Logout/phiên hết hạn đóng đúng kết nối của phiên đó.
 Xem [session và cookie](docs/07-session-base.md).
 Xem [schema và quan hệ DB](docs/06-database-schema.md).
 Java 21, Spring Boot 3.5.16, Maven Wrapper 3.9.5; root package `com.chat`.
@@ -71,6 +74,9 @@ Cookie mặc định Secure=true; khi chạy HTTP local dùng `SESSION_COOKIE_SE
 CORS mặc định chỉ cho `http://localhost:3001` và bật credentials để trình duyệt gửi
 cookie session. Cấu hình nhiều origin bằng `CORS_ALLOWED_ORIGINS` phân tách bởi dấu phẩy;
 không dùng wildcard `*`.
+WebSocket dùng `ws://localhost:8086/ws` khi chạy local HTTP, raw JSON và không dùng STOMP.
+Handshake bắt buộc cookie `token` hợp lệ và Origin nằm trong `CORS_ALLOWED_ORIGINS`; không
+truyền token trong URL/frame. Server ping mỗi 30 giây, đổi bằng `WEBSOCKET_HEARTBEAT_INTERVAL`.
 File được lưu ngoài database tại `FILE_STORAGE_ROOT` (mặc định `./uploads`), còn bảng
 `files` chỉ lưu metadata. Upload chấp nhận mọi loại file; Content-Type thiếu hoặc sai
 được lưu là `application/octet-stream`. Giới hạn mặc định là 20 MiB/file và có thể
@@ -122,6 +128,8 @@ Test HTTP-15 kiểm tra MEMBER tự rời, OWNER xóa MEMBER, xóa idempotent, g
 để có thể thêm lại và từ chối OWNER rời nhóm, MEMBER xóa người khác hoặc thao tác trên DIRECT.
 Test HTTP-20 kiểm tra tìm ứng viên thêm vào nhóm, loại OWNER/thành viên hiện tại,
 cho phép thêm lại người đã rời, phân trang và chỉ OWNER được gọi.
+Test WebSocket kiểm tra cookie/Origin handshake, SEND_MESSAGE tạo dữ liệu trước ACK/broadcast,
+retry không tạo trùng, attachment, TYPING, lỗi frame và presence theo số kết nối.
 
 ## Xử lý lỗi và validation
 
@@ -157,7 +165,8 @@ Các endpoint `/test/...` chỉ nằm trong test, không được thêm vào ứ
 ## Các bước review tiếp theo
 
 1. Lấy lịch sử tin nhắn theo cursor (`HTTP-16`).
-2. Tiếp tục lần lượt các API HTTP trong hợp đồng, sau đó tới WebSocket.
+2. Cập nhật mốc đọc (`HTTP-17`) và nối phát `READ_RECEIPT` vào WebSocket đã có.
+3. Tiếp tục các API/event còn lại theo hợp đồng.
 
 Mỗi bước dừng để review; chỉ commit/push khi được yêu cầu.
 

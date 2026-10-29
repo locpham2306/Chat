@@ -15,8 +15,13 @@ public class ConversationMemberMapper {
 
     public ConversationMemberResponse toResponse(
             ConversationMemberEntity membership, UserEntity user) {
+        return toResponse(membership, user, UserStatusEnum.OFFLINE);
+    }
+
+    public ConversationMemberResponse toResponse(
+            ConversationMemberEntity membership, UserEntity user, UserStatusEnum status) {
         return new ConversationMemberResponse(
-                userMapper.toResponse(user, UserStatusEnum.OFFLINE),
+                userMapper.toResponse(user, status),
                 membership.getRole(),
                 membership.getJoinedAt());
     }

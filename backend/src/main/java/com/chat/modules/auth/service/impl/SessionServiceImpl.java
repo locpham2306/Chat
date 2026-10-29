@@ -52,6 +52,13 @@ public class SessionServiceImpl implements SessionService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public boolean isActive(UUID sessionId) {
+        return sessionId != null
+                && sessions.existsByIdAndRevokedAtIsNullAndExpiresAtAfter(sessionId, clock.instant());
+    }
+
+    @Override
     @Transactional
     public void revoke(String rawToken) {
         if (tokens.isValidFormat(rawToken)) {

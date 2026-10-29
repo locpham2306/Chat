@@ -37,9 +37,10 @@ import com.chat.modules.user.entity.UserEntity;
 import com.chat.modules.user.enums.UserStatusEnum;
 import com.chat.modules.user.mapper.UserMapper;
 import com.chat.modules.user.repository.UserRepository;
+import com.chat.modules.user.service.UserPresence;
 import com.chat.utils.PageableUtils;
 import com.chat.utils.StringUtils;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,7 +58,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class ConversationServiceImpl implements ConversationService {
     private final ConversationRepository conversations;
     private final ConversationMemberRepository members;
@@ -69,7 +69,53 @@ public class ConversationServiceImpl implements ConversationService {
     private final ConversationMemberMapper conversationMemberMapper;
     private final MessageMapper messageMapper;
     private final UserMapper userMapper;
+    private final UserPresence presence;
     private final Clock clock;
+
+    @Autowired
+    public ConversationServiceImpl(
+            ConversationRepository conversations,
+            ConversationMemberRepository members,
+            UserRepository users,
+            FileRepository files,
+            MessageRepository messages,
+            MessageAttachmentRepository attachments,
+            ConversationMapper conversationMapper,
+            ConversationMemberMapper conversationMemberMapper,
+            MessageMapper messageMapper,
+            UserMapper userMapper,
+            UserPresence presence,
+            Clock clock) {
+        this.conversations = conversations;
+        this.members = members;
+        this.users = users;
+        this.files = files;
+        this.messages = messages;
+        this.attachments = attachments;
+        this.conversationMapper = conversationMapper;
+        this.conversationMemberMapper = conversationMemberMapper;
+        this.messageMapper = messageMapper;
+        this.userMapper = userMapper;
+        this.presence = presence;
+        this.clock = clock;
+    }
+
+    public ConversationServiceImpl(
+            ConversationRepository conversations,
+            ConversationMemberRepository members,
+            UserRepository users,
+            FileRepository files,
+            MessageRepository messages,
+            MessageAttachmentRepository attachments,
+            ConversationMapper conversationMapper,
+            ConversationMemberMapper conversationMemberMapper,
+            MessageMapper messageMapper,
+            UserMapper userMapper,
+            Clock clock) {
+        this(conversations, members, users, files, messages, attachments,
+                conversationMapper, conversationMemberMapper, messageMapper, userMapper,
+                ignored -> UserStatusEnum.OFFLINE, clock);
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -84,7 +130,7 @@ public class ConversationServiceImpl implements ConversationService {
                 .map(conversationMapper::toDirectResponse)
                 .orElse(null);
         return new DirectConversationLookupResponse(
-                conversation, conversationMapper.toPeerResponse(recipient));
+                conversation, conversationMapper.toPeerResponse(recipient, presence.status(recipientId)));
     }
 
     @Override
@@ -165,7 +211,7 @@ public class ConversationServiceImpl implements ConversationService {
         }
         var memberCount = members.countByConversationIdAndLeftAtIsNull(conversationId);
         var peer = conversation.getType() == ConversationTypeEnum.DIRECT
-                ? conversationMapper.toPeerResponse(users.findById(directPeerId(conversation, currentUserId))
+                ? mapPeer(users.findById(directPeerId(conversation, currentUserId))
                         .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND)))
                 : null;
         return conversationMapper.toDetailResponse(conversation, memberCount, peer);
@@ -222,7 +268,8 @@ public class ConversationServiceImpl implements ConversationService {
                 .map(membership -> conversationMemberMapper.toResponse(
                         membership,
                         Optional.ofNullable(usersById.get(membership.getUserId()))
-                                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND))))
+                                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND)),
+                        presence.status(membership.getUserId())))
                 .toList();
         return PageResponse.of(
                 data, membershipsPage.getTotalPages(), membershipsPage.getTotalElements());
@@ -260,7 +307,7 @@ public class ConversationServiceImpl implements ConversationService {
                 resolvedKeyword,
                 PageableUtils.of(page, size, sort));
         return PageableUtils.toResponse(
-                usersPage, user -> userMapper.toResponse(user, UserStatusEnum.OFFLINE));
+                usersPage, user -> userMapper.toResponse(user, presence.status(user.getId())));
     }
 
     @Override
@@ -414,8 +461,12 @@ public class ConversationServiceImpl implements ConversationService {
             return null;
         }
         var peerId = directPeerId(conversation, currentUserId);
-        return conversationMapper.toPeerResponse(Optional.ofNullable(peersById.get(peerId))
+        return mapPeer(Optional.ofNullable(peersById.get(peerId))
                 .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND)));
+    }
+
+    private ConversationPeerResponse mapPeer(UserEntity user) {
+        return conversationMapper.toPeerResponse(user, presence.status(user.getId()));
     }
 
     private UUID directPeerId(ConversationEntity conversation, UUID currentUserId) {

@@ -22,12 +22,16 @@ public class ConversationMapper {
     }
 
     public ConversationPeerResponse toPeerResponse(UserEntity user) {
+        return toPeerResponse(user, UserStatusEnum.OFFLINE);
+    }
+
+    public ConversationPeerResponse toPeerResponse(UserEntity user, UserStatusEnum status) {
         return new ConversationPeerResponse(
                 user.getId(),
                 user.getUsername(),
                 user.getFullName(),
                 user.getAvatarFileId(),
-                UserStatusEnum.OFFLINE);
+                status);
     }
 
     public GroupConversationResponse toGroupResponse(ConversationEntity conversation, int memberCount) {
