@@ -6,7 +6,8 @@ import type {
   ConversationPeer,
   ConversationSummary,
   CreateGroupBody,
-  GroupConversation
+  GroupConversation,
+  UpdateConversationBody
 } from '~/types/conversation.type'
 
 export const conversationKeys = {
@@ -109,6 +110,20 @@ export const useCreateGroupMutation = () => {
       return response.data.content
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] })
+    }
+  })
+}
+
+export const useUpdateConversationMutation = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, body }: { id: string; body: UpdateConversationBody }): Promise<ConversationDetail> => {
+      const response = await conversationApi.updateConversation(id, body)
+      return response.data.content
+    },
+    onSuccess: (updatedDetail, variables) => {
+      queryClient.setQueryData(conversationKeys.detail(variables.id), updatedDetail)
       queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] })
     }
   })

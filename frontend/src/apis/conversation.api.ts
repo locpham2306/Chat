@@ -6,7 +6,8 @@ import type {
   CreateGroupBody,
   DirectConversation,
   DirectConversationLookupResult,
-  GroupConversation
+  GroupConversation,
+  UpdateConversationBody
 } from '~/types/conversation.type'
 
 export interface GetConversationsParams {
@@ -25,7 +26,9 @@ const conversationApi = {
         params: { recipientId }
       }
     ),
-  createGroup: (body: CreateGroupBody) => http.post<ApiResponse<GroupConversation>>('/api/conversations/group', body)
+  createGroup: (body: CreateGroupBody) => http.post<ApiResponse<GroupConversation>>('/api/conversations/group', body),
+  updateConversation: (id: string, body: UpdateConversationBody) =>
+    http.put<ApiResponse<ConversationDetail>>(`/api/conversations/${id}`, body)
 }
 
 export default conversationApi

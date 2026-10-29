@@ -1,8 +1,10 @@
 import axios from 'axios'
+import { useState } from 'react'
 import { ShieldAlert } from 'lucide-react'
 import { ChatComposer } from './chat-composer'
 import { ChatHeader } from './chat-header'
 import { ChatMessagesArea } from './chat-messages-area'
+import { GroupSettingsDialog } from '~/components/group-settings'
 import { Button } from '~/components/ui/button'
 import { useConversationDetailQuery } from '~/hooks/use-conversation'
 import type { Message } from '~/types/message.type'
@@ -29,6 +31,7 @@ export const ChatLayout = ({
   onRetryMessage
 }: ChatLayoutProps) => {
   const { data: conversation, isLoading, isError, error } = useConversationDetailQuery(conversationId)
+  const [isGroupSettingsOpen, setIsGroupSettingsOpen] = useState(false)
 
   if (isError) {
     const isForbiddenOrNotFound =
@@ -72,6 +75,14 @@ export const ChatLayout = ({
   const avatarFileId = isGroup ? conversation?.avatarFileId : conversation?.peer?.avatarFileId
   const avatarUrl = avatarFileId ? `/api/files/${avatarFileId}` : null
 
+  const handleOpenInfo = () => {
+    if (onOpenInfo) {
+      onOpenInfo()
+    } else if (isGroup) {
+      setIsGroupSettingsOpen(true)
+    }
+  }
+
   return (
     <div className='flex flex-col h-full w-full bg-background overflow-hidden'>
       {/* 1. Chat Header */}
@@ -81,7 +92,7 @@ export const ChatLayout = ({
         subtitle={subtitle}
         avatarUrl={avatarUrl}
         onBack={onBack}
-        onOpenInfo={onOpenInfo}
+        onOpenInfo={isGroup || onOpenInfo ? handleOpenInfo : undefined}
       />
 
       {/* 2. Messages Area */}
@@ -102,6 +113,15 @@ export const ChatLayout = ({
         onAttachFile={onAttachFile}
         placeholder={`Nhắn tin tới ${title}...`}
       />
+
+      {/* 4. Dialog cài đặt nhóm */}
+      {isGroup && conversation && (
+        <GroupSettingsDialog
+          open={isGroupSettingsOpen}
+          onOpenChange={setIsGroupSettingsOpen}
+          conversation={conversation}
+        />
+      )}
     </div>
   )
 }
