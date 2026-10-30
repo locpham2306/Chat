@@ -6,6 +6,7 @@ import com.chat.exception.BusinessException;
 import com.chat.exception.UnauthenticatedException;
 import com.chat.modules.auth.service.SessionIdentity;
 import com.chat.modules.auth.service.SessionService;
+import com.chat.modules.message.dto.response.MessageSenderResponse;
 import com.chat.modules.message.service.MessageSendCommand;
 import com.chat.modules.message.service.MessageService;
 import com.chat.modules.websocket.config.WebSocketHandshakeInterceptor;
@@ -160,6 +161,9 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         if (delivery.newlyCreated()) {
             registry.broadcast(delivery.activeMemberIds(), NEW_MESSAGE, new NewMessageData(
                     delivery.id(), delivery.conversationId(), delivery.senderId(),
+                    new MessageSenderResponse(
+                            delivery.senderId(), delivery.senderFullName(),
+                            delivery.senderAvatarFileId()),
                     delivery.clientMessageId(), delivery.content(), delivery.attachments(),
                     delivery.createdAt()));
         }

@@ -10,6 +10,8 @@ public record MessageDelivery(
         UUID id,
         UUID conversationId,
         UUID senderId,
+        String senderFullName,
+        UUID senderAvatarFileId,
         String clientMessageId,
         String content,
         List<FileResponse> attachments,

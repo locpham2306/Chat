@@ -414,6 +414,8 @@ Raw WebSocket JSON tại `/ws`, dùng chung cookie session với HTTP; không d�
 Kiểm tra phiên và Origin khi handshake; đóng kết nối khi phiên hết hạn/thu hồi.
 Không truyền token trong query/frame.
 NEW_MESSAGE mang conversationId; nếu FE chưa biết hội thoại, tải chi tiết hoặc danh sách.
+Payload giữ `senderId` để tương thích và có thêm `sender` gồm `id`, `fullName`,
+`avatarFileId`, cùng cấu trúc sender của HTTP-16.
 Chỉ thành viên hiện tại được truy cập hội thoại.
 
 Đã triển khai SEND_MESSAGE, MESSAGE_ACK, NEW_MESSAGE, TYPING, PRESENCE_CHANGED và ERROR.

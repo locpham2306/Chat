@@ -21,6 +21,7 @@ import com.chat.modules.message.repository.MessageRepository;
 import com.chat.modules.message.service.MessageDelivery;
 import com.chat.modules.message.service.MessageSendCommand;
 import com.chat.modules.message.service.MessageService;
+import com.chat.modules.user.entity.UserEntity;
 import com.chat.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -54,9 +55,10 @@ public class MessageServiceImpl implements MessageService {
         var command = validate(rawCommand);
         ConversationEntity conversation;
         MessageEntity existing;
+        UserEntity sender;
 
         if (command.recipientId() != null) {
-            lockDirectUsers(command.senderId(), command.recipientId());
+            sender = lockDirectUsers(command.senderId(), command.recipientId());
             conversation = conversations.findDirectBetweenUsers(
                     ConversationTypeEnum.DIRECT, command.senderId(), command.recipientId()).orElse(null);
             existing = messages.findBySenderIdAndClientMessageId(
@@ -65,7 +67,7 @@ public class MessageServiceImpl implements MessageService {
                 if (conversation == null || !conversation.getId().equals(existing.getConversationId())) {
                     throw conflict();
                 }
-                return retry(existing, command);
+                return retry(existing, command, sender);
             }
             if (conversation == null) {
                 conversation = createDirect(command.senderId(), command.recipientId());
@@ -73,14 +75,14 @@ public class MessageServiceImpl implements MessageService {
                 requireActiveMember(conversation.getId(), command.senderId());
             }
         } else {
-            lockUser(command.senderId());
+            sender = lockUser(command.senderId());
             existing = messages.findBySenderIdAndClientMessageId(
                     command.senderId(), command.clientMessageId()).orElse(null);
             if (existing != null) {
                 if (!command.conversationId().equals(existing.getConversationId())) {
                     throw conflict();
                 }
-                return retry(existing, command);
+                return retry(existing, command, sender);
             }
             conversation = conversations.findByIdForUpdate(command.conversationId())
                     .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
@@ -98,7 +100,9 @@ public class MessageServiceImpl implements MessageService {
             }
             attachments.saveAllAndFlush(links);
         }
-        return delivery(message, orderedFiles, members.findActiveUserIds(conversation.getId()), true);
+        return delivery(
+                message, sender, orderedFiles,
+                members.findActiveUserIds(conversation.getId()), true);
     }
 
     private MessageSendCommand validate(MessageSendCommand command) {
@@ -135,14 +139,15 @@ public class MessageServiceImpl implements MessageService {
                 clientMessageId, content, attachmentIds);
     }
 
-    private void lockDirectUsers(UUID firstUserId, UUID secondUserId) {
+    private UserEntity lockDirectUsers(UUID firstUserId, UUID secondUserId) {
         boolean firstIsLow = firstUserId.toString().compareTo(secondUserId.toString()) < 0;
-        lockUser(firstIsLow ? firstUserId : secondUserId);
-        lockUser(firstIsLow ? secondUserId : firstUserId);
+        var lowUser = lockUser(firstIsLow ? firstUserId : secondUserId);
+        var highUser = lockUser(firstIsLow ? secondUserId : firstUserId);
+        return firstIsLow ? lowUser : highUser;
     }
 
-    private void lockUser(UUID userId) {
-        users.findByIdForUpdate(userId)
+    private UserEntity lockUser(UUID userId) {
+        return users.findByIdForUpdate(userId)
                 .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
     }
 
@@ -184,7 +189,8 @@ public class MessageServiceImpl implements MessageService {
         return orderedFiles;
     }
 
-    private MessageDelivery retry(MessageEntity existing, MessageSendCommand command) {
+    private MessageDelivery retry(
+            MessageEntity existing, MessageSendCommand command, UserEntity sender) {
         var links = attachments.findByMessageIdOrderByPositionAsc(existing.getId());
         var storedAttachmentIds = links.stream().map(MessageAttachmentEntity::getFileId).toList();
         if (!Objects.equals(existing.getContent(), command.content())
@@ -200,11 +206,12 @@ public class MessageServiceImpl implements MessageService {
         if (orderedFiles.size() != storedAttachmentIds.size()) {
             throw new NotFoundException(ErrorConstants.NOT_FOUND);
         }
-        return delivery(existing, orderedFiles, List.of(), false);
+        return delivery(existing, sender, orderedFiles, List.of(), false);
     }
 
     private MessageDelivery delivery(
             MessageEntity message,
+            UserEntity sender,
             Collection<FileEntity> attachedFiles,
             List<UUID> activeMemberIds,
             boolean newlyCreated) {
@@ -215,6 +222,7 @@ public class MessageServiceImpl implements MessageService {
                 .toList();
         return new MessageDelivery(
                 message.getId(), message.getConversationId(), message.getSenderId(),
+                sender.getFullName(), sender.getAvatarFileId(),
                 message.getClientMessageId(), message.getContent(), fileResponses,
                 message.getCreatedAt(), List.copyOf(activeMemberIds), newlyCreated);
     }
