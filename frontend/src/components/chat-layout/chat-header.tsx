@@ -1,4 +1,4 @@
-import { ArrowLeft, MoreVertical, Users, User as UserIcon } from 'lucide-react'
+import { ArrowLeft, MoreVertical, Users } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import { Button } from '~/components/ui/button'
 
@@ -12,6 +12,8 @@ interface ChatHeaderProps {
 }
 
 export const ChatHeader = ({ title, isGroup = false, subtitle, avatarUrl, onBack, onOpenInfo }: ChatHeaderProps) => {
+  const initials = (title.trim().slice(0, 1) || 'U').toUpperCase()
+
   return (
     <div className='h-14 border-b px-4 flex items-center justify-between bg-card/50 backdrop-blur shrink-0'>
       <div className='flex items-center gap-3 min-w-0'>
@@ -29,8 +31,10 @@ export const ChatHeader = ({ title, isGroup = false, subtitle, avatarUrl, onBack
 
         <Avatar className='h-9 w-9 shrink-0'>
           {avatarUrl && <AvatarImage src={avatarUrl} alt={title} />}
-          <AvatarFallback className={isGroup ? 'bg-primary/10 text-primary' : undefined}>
-            {isGroup ? <Users className='h-4 w-4' /> : <UserIcon className='h-4 w-4' />}
+          <AvatarFallback
+            className={isGroup ? 'bg-primary/10 text-primary' : 'bg-primary/10 text-primary font-semibold text-xs'}
+          >
+            {isGroup ? <Users className='h-4 w-4' /> : initials}
           </AvatarFallback>
         </Avatar>
 
@@ -48,7 +52,6 @@ export const ChatHeader = ({ title, isGroup = false, subtitle, avatarUrl, onBack
             onClick={onOpenInfo}
             className='h-8 w-8 text-muted-foreground hover:text-foreground'
             aria-label='Tùy chọn hội thoại'
-            title='Tùy chọn hội thoại'
           >
             <MoreVertical className='h-4 w-4' />
           </Button>

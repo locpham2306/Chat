@@ -8,6 +8,41 @@ import { wsClient } from '~/lib/websocket-client'
 import { useAuthStore } from '~/stores/use-auth-store'
 import type { Message } from '~/types/message.type'
 
+const TIME_GAP_THRESHOLD_MS = 5 * 60 * 1000 // 5 phút gom cụm tin nhắn
+
+const isDifferentDay = (d1: string | Date, d2: string | Date) => {
+  const date1 = new Date(d1)
+  const date2 = new Date(d2)
+  return (
+    date1.getFullYear() !== date2.getFullYear() ||
+    date1.getMonth() !== date2.getMonth() ||
+    date1.getDate() !== date2.getDate()
+  )
+}
+
+const formatDateDivider = (dateString: string) => {
+  const date = new Date(dateString)
+  const now = new Date()
+  const isToday =
+    date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
+
+  const yesterday = new Date()
+  yesterday.setDate(now.getDate() - 1)
+  const isYesterday =
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear()
+
+  if (isToday) return 'Hôm nay'
+  if (isYesterday) return 'Hôm qua'
+
+  return date.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })
+}
+
 interface ChatMessagesAreaProps {
   conversationId: string
   title: string
@@ -124,9 +159,9 @@ export const ChatMessagesArea = ({
         aria-label='Tin nhắn'
         tabIndex={0}
       >
-        <div className='flex min-h-full flex-col justify-end gap-3'>
+        <div className='flex min-h-full flex-col justify-end'>
           {history.hasNextPage && (
-            <div className='flex justify-center'>
+            <div className='mb-3 flex justify-center'>
               <Button variant='ghost' size='sm' onClick={loadOlder} disabled={history.isFetchingNextPage}>
                 {history.isFetchingNextPage ? 'Đang tải tin cũ...' : 'Tải tin cũ hơn'}
               </Button>
@@ -134,7 +169,7 @@ export const ChatMessagesArea = ({
           )}
 
           {history.isFetchNextPageError && (
-            <div className='flex flex-col items-center gap-2 text-xs text-destructive' role='alert'>
+            <div className='mb-3 flex flex-col items-center gap-2 text-xs text-destructive' role='alert'>
               <span>{getApiErrorMessage(history.error)}</span>
               <Button variant='outline' size='sm' onClick={retryOlder}>
                 Thử lại
@@ -156,10 +191,31 @@ export const ChatMessagesArea = ({
             </div>
           )}
 
-          {messages.map((message) => {
+          {messages.map((message, index) => {
+            const prevMessage = messages[index - 1]
+            const isNewDay = !prevMessage || isDifferentDay(prevMessage.createdAt, message.createdAt)
+
             const isOwn = Boolean(
               currentUserId && (message.senderId === currentUserId || message.sender?.id === currentUserId)
             )
+            const isPrevOwn = Boolean(
+              prevMessage &&
+              currentUserId &&
+              (prevMessage.senderId === currentUserId || prevMessage.sender?.id === currentUserId)
+            )
+            const getSenderId = (m?: Message) => m?.senderId || m?.sender?.id || ''
+            const isSameSender = Boolean(prevMessage && getSenderId(prevMessage) === getSenderId(message))
+            const isWithin5Minutes = Boolean(
+              prevMessage &&
+              Math.abs(new Date(message.createdAt).getTime() - new Date(prevMessage.createdAt).getTime()) <=
+                TIME_GAP_THRESHOLD_MS
+            )
+            // 1. Cùng người gửi <= 5 phút -> gom nhóm
+            // 2. > 5 phút -> tách nhóm
+            // 3. Người gửi đổi -> tách nhóm
+            // 4. Sang ngày mới -> tách nhóm
+            const isGroupedWithPrev = isSameSender && isOwn === isPrevOwn && isWithin5Minutes && !isNewDay
+
             const isFailed = failedClientMessageIds.includes(message.clientMessageId)
             const sender = message.sender
             const senderName = sender?.fullName || sender?.username || (isGroup ? 'Thành viên' : title)
@@ -167,59 +223,80 @@ export const ChatMessagesArea = ({
             const initials = (senderName.trim().slice(0, 1) || 'U').toUpperCase()
 
             return (
-              <div key={message.id} className={`flex items-start gap-2.5 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                {!isOwn && (
-                  <Avatar className='mt-0.5 h-8 w-8 shrink-0 border border-border/40 shadow-xs'>
-                    {avatarUrl && <AvatarImage src={avatarUrl} alt={senderName} />}
-                    <AvatarFallback className='bg-muted text-[11px] font-medium text-muted-foreground'>
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
+              <div key={message.id}>
+                {isNewDay && (
+                  <div className='my-3.5 flex justify-center'>
+                    <span className='rounded-full bg-muted/80 px-3 py-1 text-[11px] font-medium text-muted-foreground shadow-xs'>
+                      {formatDateDivider(message.createdAt)}
+                    </span>
+                  </div>
                 )}
-                <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-[70%]`}>
-                  {!isOwn && <span className='mb-1 px-1 text-xs font-medium text-muted-foreground'>{senderName}</span>}
-                  <div
-                    className={`rounded-2xl px-3 py-2 text-sm shadow-sm ${
-                      isOwn ? 'bg-primary text-primary-foreground' : 'bg-card text-card-foreground'
-                    }`}
-                  >
-                    {message.content && <p className='whitespace-pre-wrap break-words'>{message.content}</p>}
-                    {message.attachments.length > 0 && (
-                      <div className='mt-1 space-y-1 text-xs'>
-                        {message.attachments.map((file) => (
-                          <a
-                            key={file.id}
-                            href={file.downloadUrl}
-                            download
-                            className='block truncate underline-offset-2 hover:underline'
-                          >
-                            📎 {file.name}
-                          </a>
-                        ))}
-                      </div>
+                <div
+                  className={`flex items-start gap-2.5 ${isOwn ? 'justify-end' : 'justify-start'} ${
+                    isGroupedWithPrev ? 'mt-1' : isNewDay ? 'mt-1' : index === 0 ? 'mt-0' : 'mt-3.5'
+                  }`}
+                >
+                  {!isOwn &&
+                    (!isGroupedWithPrev ? (
+                      <Avatar className='mt-0.5 h-8 w-8 shrink-0 border border-border/40 shadow-xs'>
+                        {avatarUrl && <AvatarImage src={avatarUrl} alt={senderName} />}
+                        <AvatarFallback className='bg-muted text-[11px] font-medium text-muted-foreground'>
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                    ) : (
+                      <div className='w-8 shrink-0' aria-hidden='true' />
+                    ))}
+                  <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-[70%]`}>
+                    {!isOwn && !isGroupedWithPrev && (
+                      <span className='mb-1 px-1 text-xs font-medium text-muted-foreground'>{senderName}</span>
                     )}
-                    <time
-                      className={`mt-1 block text-right text-[10px] ${
-                        isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                    <div
+                      className={`rounded-2xl px-3 py-2 text-sm shadow-sm ${
+                        isOwn ? 'bg-primary text-primary-foreground' : 'bg-card text-card-foreground'
                       }`}
-                      dateTime={message.createdAt}
                     >
-                      {new Date(message.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                    </time>
-                    {isFailed && (
-                      <div className='mt-1 flex items-center justify-end gap-2 text-[10px] text-destructive'>
-                        <span>Không gửi được</span>
-                        <Button
-                          type='button'
-                          variant='ghost'
-                          size='sm'
-                          className='h-auto px-1 py-0 text-[10px] text-inherit hover:text-inherit'
-                          onClick={() => onRetryMessage?.(message.clientMessageId)}
-                        >
-                          Thử lại
-                        </Button>
-                      </div>
-                    )}
+                      {message.content && <p className='whitespace-pre-wrap break-words'>{message.content}</p>}
+                      {message.attachments.length > 0 && (
+                        <div className='mt-1 space-y-1 text-xs'>
+                          {message.attachments.map((file) => (
+                            <a
+                              key={file.id}
+                              href={file.downloadUrl}
+                              download
+                              className='block truncate underline-offset-2 hover:underline'
+                            >
+                              📎 {file.name}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                      <time
+                        className={`mt-1 block text-right text-[10px] ${
+                          isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                        }`}
+                        dateTime={message.createdAt}
+                      >
+                        {new Date(message.createdAt).toLocaleTimeString('vi-VN', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </time>
+                      {isFailed && (
+                        <div className='mt-1 flex items-center justify-end gap-2 text-[10px] text-destructive'>
+                          <span>Không gửi được</span>
+                          <Button
+                            type='button'
+                            variant='ghost'
+                            size='sm'
+                            className='h-auto px-1 py-0 text-[10px] text-inherit hover:text-inherit'
+                            onClick={() => onRetryMessage?.(message.clientMessageId)}
+                          >
+                            Thử lại
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
