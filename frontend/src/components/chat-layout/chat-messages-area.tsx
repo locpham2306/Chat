@@ -8,6 +8,8 @@ import { wsClient } from '~/lib/websocket-client'
 import { useAuthStore } from '~/stores/use-auth-store'
 import type { Message } from '~/types/message.type'
 
+const TIME_GAP_THRESHOLD_MS = 5 * 60 * 1000 // 5 phút gom cụm tin nhắn
+
 interface ChatMessagesAreaProps {
   conversationId: string
   title: string
@@ -124,9 +126,9 @@ export const ChatMessagesArea = ({
         aria-label='Tin nhắn'
         tabIndex={0}
       >
-        <div className='flex min-h-full flex-col justify-end gap-3'>
+        <div className='flex min-h-full flex-col justify-end'>
           {history.hasNextPage && (
-            <div className='flex justify-center'>
+            <div className='mb-3 flex justify-center'>
               <Button variant='ghost' size='sm' onClick={loadOlder} disabled={history.isFetchingNextPage}>
                 {history.isFetchingNextPage ? 'Đang tải tin cũ...' : 'Tải tin cũ hơn'}
               </Button>
@@ -134,7 +136,7 @@ export const ChatMessagesArea = ({
           )}
 
           {history.isFetchNextPageError && (
-            <div className='flex flex-col items-center gap-2 text-xs text-destructive' role='alert'>
+            <div className='mb-3 flex flex-col items-center gap-2 text-xs text-destructive' role='alert'>
               <span>{getApiErrorMessage(history.error)}</span>
               <Button variant='outline' size='sm' onClick={retryOlder}>
                 Thử lại
@@ -156,10 +158,25 @@ export const ChatMessagesArea = ({
             </div>
           )}
 
-          {messages.map((message) => {
+          {messages.map((message, index) => {
+            const prevMessage = messages[index - 1]
             const isOwn = Boolean(
               currentUserId && (message.senderId === currentUserId || message.sender?.id === currentUserId)
             )
+            const isPrevOwn = Boolean(
+              prevMessage &&
+              currentUserId &&
+              (prevMessage.senderId === currentUserId || prevMessage.sender?.id === currentUserId)
+            )
+            const getSenderId = (m?: Message) => m?.senderId || m?.sender?.id || ''
+            const isSameSender = Boolean(prevMessage && getSenderId(prevMessage) === getSenderId(message))
+            const isWithinTimeThreshold = Boolean(
+              prevMessage &&
+              Math.abs(new Date(message.createdAt).getTime() - new Date(prevMessage.createdAt).getTime()) <
+                TIME_GAP_THRESHOLD_MS
+            )
+            const isGroupedWithPrev = isSameSender && isOwn === isPrevOwn && isWithinTimeThreshold
+
             const isFailed = failedClientMessageIds.includes(message.clientMessageId)
             const sender = message.sender
             const senderName = sender?.fullName || sender?.username || (isGroup ? 'Thành viên' : title)
@@ -167,17 +184,27 @@ export const ChatMessagesArea = ({
             const initials = (senderName.trim().slice(0, 1) || 'U').toUpperCase()
 
             return (
-              <div key={message.id} className={`flex items-start gap-2.5 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                {!isOwn && (
-                  <Avatar className='mt-0.5 h-8 w-8 shrink-0 border border-border/40 shadow-xs'>
-                    {avatarUrl && <AvatarImage src={avatarUrl} alt={senderName} />}
-                    <AvatarFallback className='bg-muted text-[11px] font-medium text-muted-foreground'>
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
-                )}
+              <div
+                key={message.id}
+                className={`flex items-start gap-2.5 ${isOwn ? 'justify-end' : 'justify-start'} ${
+                  isGroupedWithPrev ? 'mt-1' : index === 0 ? 'mt-0' : 'mt-3.5'
+                }`}
+              >
+                {!isOwn &&
+                  (!isGroupedWithPrev ? (
+                    <Avatar className='mt-0.5 h-8 w-8 shrink-0 border border-border/40 shadow-xs'>
+                      {avatarUrl && <AvatarImage src={avatarUrl} alt={senderName} />}
+                      <AvatarFallback className='bg-muted text-[11px] font-medium text-muted-foreground'>
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                  ) : (
+                    <div className='w-8 shrink-0' aria-hidden='true' />
+                  ))}
                 <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-[70%]`}>
-                  {!isOwn && <span className='mb-1 px-1 text-xs font-medium text-muted-foreground'>{senderName}</span>}
+                  {!isOwn && !isGroupedWithPrev && (
+                    <span className='mb-1 px-1 text-xs font-medium text-muted-foreground'>{senderName}</span>
+                  )}
                   <div
                     className={`rounded-2xl px-3 py-2 text-sm shadow-sm ${
                       isOwn ? 'bg-primary text-primary-foreground' : 'bg-card text-card-foreground'
