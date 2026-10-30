@@ -5,6 +5,7 @@ export interface MessageSender {
   fullName: string
   username?: string
   avatarFileId?: string | null
+  avatarUrl?: string | null
 }
 
 export interface Message {
