@@ -73,7 +73,9 @@ export const ChatLayout = ({
     }
   }
 
-  const avatarFileId = isGroup ? conversation?.avatarFileId : conversation?.peer?.avatarFileId
+  const avatarFileId = isGroup
+    ? conversation?.avatarFileId
+    : conversation?.peer?.avatarFileId || (!isGroup ? conversation?.avatarFileId : null)
   const avatarUrl = avatarFileId ? `/api/files/${avatarFileId}` : null
 
   const handleOpenInfo = () => {

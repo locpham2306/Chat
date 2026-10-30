@@ -1,4 +1,4 @@
-import { Users, User as UserIcon } from 'lucide-react'
+import { Users } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import { Badge } from '~/components/ui/badge'
 import { cn } from '~/lib/utils'
@@ -49,9 +49,15 @@ export const ConversationItem = ({ conversation, isActive = false, onSelect }: C
       otherSenderName ||
       'Hội thoại trực tiếp'
 
-  const avatarFileId = isGroup ? conversation.avatarFileId : peer?.avatarFileId
+  const userAvatarFileId =
+    peer?.avatarFileId ||
+    (!isMe && lastMsg?.sender?.avatarFileId ? lastMsg.sender.avatarFileId : null) ||
+    (!isGroup ? conversation.avatarFileId : null)
+
+  const avatarFileId = isGroup ? conversation.avatarFileId : userAvatarFileId
   const avatarUrl = avatarFileId ? `/api/files/${avatarFileId}` : null
   const isOnline = !isGroup && peer?.status === 'ONLINE'
+  const initials = ((peer?.fullName || title || 'U').trim().slice(0, 1) || 'U').toUpperCase()
 
   const time = formatMessageTime(lastMsg?.createdAt || conversation.createdAt)
 
@@ -86,8 +92,10 @@ export const ConversationItem = ({ conversation, isActive = false, onSelect }: C
       <div className='relative shrink-0'>
         <Avatar className='h-10 w-10'>
           {avatarUrl && <AvatarImage src={avatarUrl} alt={title} />}
-          <AvatarFallback className={isGroup ? 'bg-primary/10 text-primary' : undefined}>
-            {isGroup ? <Users className='h-4 w-4' /> : <UserIcon className='h-4 w-4' />}
+          <AvatarFallback
+            className={isGroup ? 'bg-primary/10 text-primary' : 'bg-primary/10 text-primary font-semibold text-xs'}
+          >
+            {isGroup ? <Users className='h-4 w-4' /> : initials}
           </AvatarFallback>
         </Avatar>
         {isOnline && (
