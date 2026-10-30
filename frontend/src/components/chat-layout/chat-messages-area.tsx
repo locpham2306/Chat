@@ -1,5 +1,6 @@
 import { MessageSquareDashed, Users, User as UserIcon } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type UIEvent } from 'react'
+import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import { Button } from '~/components/ui/button'
 import { mergeChronologicalMessages, useMessageHistoryQuery } from '~/hooks/use-message-history'
 import { getApiErrorMessage } from '~/lib/api-error'
@@ -160,49 +161,66 @@ export const ChatMessagesArea = ({
               currentUserId && (message.senderId === currentUserId || message.sender?.id === currentUserId)
             )
             const isFailed = failedClientMessageIds.includes(message.clientMessageId)
+            const sender = message.sender
+            const senderName = sender?.fullName || sender?.username || (isGroup ? 'Thành viên' : title)
+            const avatarUrl = sender?.avatarUrl || (sender?.avatarFileId ? `/api/files/${sender.avatarFileId}` : null)
+            const initials = (senderName.trim().slice(0, 1) || 'U').toUpperCase()
+
             return (
-              <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                <div
-                  className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm sm:max-w-[70%] ${isOwn ? 'bg-primary text-primary-foreground' : 'bg-card text-card-foreground'}`}
-                >
-                  {isGroup && !isOwn && message.sender?.fullName && (
-                    <p className='mb-1 text-xs font-semibold'>{message.sender.fullName}</p>
-                  )}
-                  {message.content && <p className='whitespace-pre-wrap break-words'>{message.content}</p>}
-                  {message.attachments.length > 0 && (
-                    <div className='mt-1 space-y-1 text-xs'>
-                      {message.attachments.map((file) => (
-                        <a
-                          key={file.id}
-                          href={file.downloadUrl}
-                          download
-                          className='block truncate underline-offset-2 hover:underline'
-                        >
-                          📎 {file.name}
-                        </a>
-                      ))}
-                    </div>
-                  )}
-                  <time
-                    className={`mt-1 block text-right text-[10px] ${isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}
-                    dateTime={message.createdAt}
+              <div key={message.id} className={`flex items-start gap-2.5 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                {!isOwn && (
+                  <Avatar className='mt-0.5 h-8 w-8 shrink-0 border border-border/40 shadow-xs'>
+                    {avatarUrl && <AvatarImage src={avatarUrl} alt={senderName} />}
+                    <AvatarFallback className='bg-muted text-[11px] font-medium text-muted-foreground'>
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
+                <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-[70%]`}>
+                  {!isOwn && <span className='mb-1 px-1 text-xs font-medium text-muted-foreground'>{senderName}</span>}
+                  <div
+                    className={`rounded-2xl px-3 py-2 text-sm shadow-sm ${
+                      isOwn ? 'bg-primary text-primary-foreground' : 'bg-card text-card-foreground'
+                    }`}
                   >
-                    {new Date(message.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                  </time>
-                  {isFailed && (
-                    <div className='mt-1 flex items-center justify-end gap-2 text-[10px] text-destructive'>
-                      <span>Không gửi được</span>
-                      <Button
-                        type='button'
-                        variant='ghost'
-                        size='sm'
-                        className='h-auto px-1 py-0 text-[10px] text-inherit hover:text-inherit'
-                        onClick={() => onRetryMessage?.(message.clientMessageId)}
-                      >
-                        Thử lại
-                      </Button>
-                    </div>
-                  )}
+                    {message.content && <p className='whitespace-pre-wrap break-words'>{message.content}</p>}
+                    {message.attachments.length > 0 && (
+                      <div className='mt-1 space-y-1 text-xs'>
+                        {message.attachments.map((file) => (
+                          <a
+                            key={file.id}
+                            href={file.downloadUrl}
+                            download
+                            className='block truncate underline-offset-2 hover:underline'
+                          >
+                            📎 {file.name}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                    <time
+                      className={`mt-1 block text-right text-[10px] ${
+                        isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                      }`}
+                      dateTime={message.createdAt}
+                    >
+                      {new Date(message.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                    </time>
+                    {isFailed && (
+                      <div className='mt-1 flex items-center justify-end gap-2 text-[10px] text-destructive'>
+                        <span>Không gửi được</span>
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='sm'
+                          className='h-auto px-1 py-0 text-[10px] text-inherit hover:text-inherit'
+                          onClick={() => onRetryMessage?.(message.clientMessageId)}
+                        >
+                          Thử lại
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )
