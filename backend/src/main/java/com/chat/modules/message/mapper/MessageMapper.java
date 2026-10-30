@@ -23,7 +23,8 @@ public class MessageMapper {
         return new MessageResponse(
                 message.getId(),
                 message.getConversationId(),
-                new MessageSenderResponse(sender.getId(), sender.getFullName()),
+                new MessageSenderResponse(
+                        sender.getId(), sender.getFullName(), sender.getAvatarFileId()),
                 message.getClientMessageId(),
                 message.getContent(),
                 files,

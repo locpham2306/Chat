@@ -4,5 +4,6 @@ import java.util.UUID;
 
 public record MessageSenderResponse(
         UUID id,
-        String fullName) {
+        String fullName,
+        UUID avatarFileId) {
 }

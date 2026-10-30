@@ -176,8 +176,9 @@ Mỗi phần tử có `id`, `type: 'DIRECT' | 'GROUP'`, `name`, `avatarFileId`, 
 là người còn lại trong hội thoại; với GROUP, `peer: null`. Peer gồm `id`, `username`,
 `fullName`, `avatarFileId`, `status`. GROUP chưa có tin vẫn xuất hiện với
 `lastMessage: null`. Nếu có tin cuối, `lastMessage` gồm `id`, `conversationId`,
-`sender`, `clientMessageId`, `content`, `attachments`, `createdAt`; `sender` gồm `id` và
-`fullName` để FE hiển thị người gửi tin cuối, không trả riêng `senderId`. Mỗi attachment
+`sender`, `clientMessageId`, `content`, `attachments`, `createdAt`; `sender` gồm `id`,
+`fullName` và `avatarFileId` để FE hiển thị người gửi tin cuối, không trả riêng `senderId`.
+Mỗi attachment
 dùng model File của API upload/download. `unreadCount` được tính sau mốc đọc theo cặp
 `createdAt`/`id`; chưa có mốc đọc thì đếm toàn bộ tin trong hội thoại. Query phân trang
 không hợp lệ trả 400, thiếu hoặc sai session trả 401.
@@ -189,7 +190,8 @@ không hợp lệ trả 400, thiếu hoặc sai session trả 401.
     "conversationId": "00000000-0000-0000-0000-000000000202",
     "sender": {
       "id": "00000000-0000-0000-0000-000000000103",
-      "fullName": "Bùi Huy Hoàng"
+      "fullName": "Bùi Huy Hoàng",
+      "avatarFileId": null
     },
     "clientMessageId": "seed-group-002",
     "content": "Đã xem, response ổn rồi",
@@ -327,7 +329,8 @@ viên trả 403, cursor/limit sai trả 400.
         "conversationId": "660e8400-e29b-41d4-a716-446655440001",
         "sender": {
           "id": "550e8400-e29b-41d4-a716-446655440001",
-          "fullName": "Nguyễn Văn An"
+          "fullName": "Nguyễn Văn An",
+          "avatarFileId": "880e8400-e29b-41d4-a716-446655440002"
         },
         "clientMessageId": "client-001",
         "content": "Xin chào",
