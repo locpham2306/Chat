@@ -43,13 +43,25 @@ public class FileController {
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id) {
         var file = files.download(session.userId(), id);
+        var contentType = MediaType.parseMediaType(file.contentType());
+        var disposition = isInline(contentType)
+                ? ContentDisposition.inline()
+                : ContentDisposition.attachment();
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(file.contentType()))
+                .contentType(contentType)
                 .contentLength(file.size())
                 .cacheControl(CacheControl.noStore().cachePrivate())
-                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
-                        .filename(file.name(), StandardCharsets.UTF_8).build().toString())
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition
+                        .filename(file.name(), StandardCharsets.UTF_8)
+                        .build()
+                        .toString())
                 .header("X-Content-Type-Options", "nosniff")
                 .body(file.resource());
+    }
+
+    private boolean isInline(MediaType contentType) {
+        boolean safeImage = "image".equals(contentType.getType())
+                && !"svg+xml".equals(contentType.getSubtype());
+        return safeImage || MediaType.APPLICATION_PDF.isCompatibleWith(contentType);
     }
 }
