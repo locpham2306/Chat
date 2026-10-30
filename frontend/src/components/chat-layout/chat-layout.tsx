@@ -73,10 +73,12 @@ export const ChatLayout = ({
     }
   }
 
-  const avatarFileId = isGroup
-    ? conversation?.avatarFileId
-    : conversation?.peer?.avatarFileId || (!isGroup ? conversation?.avatarFileId : null)
-  const avatarUrl = avatarFileId ? `/api/files/${avatarFileId}` : null
+  const avatarUrl = isGroup
+    ? conversation?.avatarUrl || (conversation?.avatarFileId ? `/api/files/${conversation.avatarFileId}` : null)
+    : conversation?.peer?.avatarUrl ||
+      (conversation?.peer?.avatarFileId ? `/api/files/${conversation.peer.avatarFileId}` : null) ||
+      conversation?.avatarUrl ||
+      (!isGroup && conversation?.avatarFileId ? `/api/files/${conversation.avatarFileId}` : null)
 
   const handleOpenInfo = () => {
     if (onOpenInfo) {

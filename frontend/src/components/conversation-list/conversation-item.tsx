@@ -49,13 +49,18 @@ export const ConversationItem = ({ conversation, isActive = false, onSelect }: C
       otherSenderName ||
       'Hội thoại trực tiếp'
 
-  const userAvatarFileId =
-    peer?.avatarFileId ||
-    (!isMe && lastMsg?.sender?.avatarFileId ? lastMsg.sender.avatarFileId : null) ||
-    (!isGroup ? conversation.avatarFileId : null)
+  // Avatar URL:
+  // - Nhóm: dùng ảnh nhóm nếu có
+  // - Cá nhân: dùng avatar người dùng (từ peer, lastMessage sender hoặc conversation)
+  const avatarUrl = isGroup
+    ? conversation.avatarUrl || (conversation.avatarFileId ? `/api/files/${conversation.avatarFileId}` : null)
+    : peer?.avatarUrl ||
+      (peer?.avatarFileId ? `/api/files/${peer.avatarFileId}` : null) ||
+      (!isMe && lastMsg?.sender?.avatarUrl ? lastMsg.sender.avatarUrl : null) ||
+      (!isMe && lastMsg?.sender?.avatarFileId ? `/api/files/${lastMsg.sender.avatarFileId}` : null) ||
+      conversation.avatarUrl ||
+      (!isGroup && conversation.avatarFileId ? `/api/files/${conversation.avatarFileId}` : null)
 
-  const avatarFileId = isGroup ? conversation.avatarFileId : userAvatarFileId
-  const avatarUrl = avatarFileId ? `/api/files/${avatarFileId}` : null
   const isOnline = !isGroup && peer?.status === 'ONLINE'
   const initials = ((peer?.fullName || title || 'U').trim().slice(0, 1) || 'U').toUpperCase()
 

@@ -28,6 +28,7 @@ export interface ConversationPeer {
   username: string
   fullName: string
   avatarFileId: string | null
+  avatarUrl?: string | null
   status?: string
 }
 
@@ -36,6 +37,7 @@ export interface ConversationDetail {
   type: ConversationType
   name: string | null
   avatarFileId: string | null
+  avatarUrl?: string | null
   ownerId: string | null
   memberCount: number
   createdAt: string
@@ -50,6 +52,7 @@ export interface DirectConversationLookupResult {
 export type ConversationSummary = Conversation & {
   name?: string | null
   avatarFileId?: string | null
+  avatarUrl?: string | null
   peer?: ConversationPeer | null
   lastMessage: Message | null
   unreadCount: number
