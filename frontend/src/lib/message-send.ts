@@ -1,5 +1,6 @@
-import type { Message, MessageSender } from '~/types/message.type'
+import { v4 as uuidv4 } from 'uuid'
 import type { File } from '~/types/file.type'
+import type { Message, MessageSender } from '~/types/message.type'
 import type { MessageAckPayload, SendMessagePayload } from '~/types/websocket.type'
 
 type SendFrame = (event: 'SEND_MESSAGE', payload: SendMessagePayload) => boolean
@@ -91,7 +92,7 @@ export class MessageSendQueue {
   }
 }
 
-export const createClientMessageId = () => crypto.randomUUID()
+export const createClientMessageId = () => uuidv4()
 
 export const createOutgoingMessage = (input: SendMessageInput): OutgoingMessage | null => {
   const content = input.content.trim()

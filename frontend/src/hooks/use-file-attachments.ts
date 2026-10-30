@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useCallback, useState } from 'react'
+import { v4 as uuidv4 } from 'uuid'
 import fileApi from '~/apis/file.api'
 import { getApiErrorMessage } from '~/lib/api-error'
 import type { File as UploadedFile } from '~/types/file.type'
@@ -65,7 +66,7 @@ export const useFileAttachments = () => {
       const nextItems = files.map((file) => {
         const validationError = getAttachmentValidationError(file)
         return {
-          localId: crypto.randomUUID(),
+          localId: uuidv4(),
           source: file,
           progress: 0,
           status: validationError ? ('failed' as const) : ('uploading' as const),
