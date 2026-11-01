@@ -1,7 +1,10 @@
 import http from '~/lib/http'
 import type { ApiPage, ApiResponse } from '~/types/api-response.type'
 import type {
+  AddConversationMembersBody,
+  AddConversationMembersResponse,
   ConversationDetail,
+  ConversationMember,
   ConversationSummary,
   CreateGroupBody,
   DirectConversation,
@@ -9,8 +12,20 @@ import type {
   GroupConversation,
   UpdateConversationBody
 } from '~/types/conversation.type'
+import type { User } from '~/types/user.type'
 
 export interface GetConversationsParams {
+  page?: number
+  size?: number
+}
+
+export interface GetGroupMembersParams {
+  page?: number
+  size?: number
+}
+
+export interface GetAvailableMembersParams {
+  keyword?: string
   page?: number
   size?: number
 }
@@ -28,7 +43,14 @@ const conversationApi = {
     ),
   createGroup: (body: CreateGroupBody) => http.post<ApiResponse<GroupConversation>>('/api/conversations/group', body),
   updateConversation: (id: string, body: UpdateConversationBody) =>
-    http.put<ApiResponse<ConversationDetail>>(`/api/conversations/${id}`, body)
+    http.put<ApiResponse<ConversationDetail>>(`/api/conversations/${id}`, body),
+  getMembers: (id: string, params?: GetGroupMembersParams) =>
+    http.get<ApiResponse<ApiPage<ConversationMember[]>>>(`/api/conversations/${id}/members`, { params }),
+  addMembers: (id: string, body: AddConversationMembersBody) =>
+    http.post<ApiResponse<AddConversationMembersResponse>>(`/api/conversations/${id}/members`, body),
+  removeMember: (id: string, userId: string) => http.delete<void>(`/api/conversations/${id}/members/${userId}`),
+  getAvailableMembers: (id: string, params?: GetAvailableMembersParams) =>
+    http.get<ApiResponse<ApiPage<User[]>>>(`/api/conversations/${id}/available-members`, { params })
 }
 
 export default conversationApi
