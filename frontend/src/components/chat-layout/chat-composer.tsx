@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type ChangeEvent, type KeyboardEvent, type FormEvent } from 'react'
+import { useState, useRef, useEffect, useMemo, type ChangeEvent, type KeyboardEvent, type FormEvent } from 'react'
 import { AlertCircle, FileIcon, LoaderCircle, Paperclip, RotateCcw, SendHorizontal, X } from 'lucide-react'
 import { Button } from '~/components/ui/button'
 import { Textarea } from '~/components/ui/textarea'
@@ -14,6 +14,34 @@ interface ChatComposerProps {
 
 const MIN_HEIGHT = 38
 const MAX_HEIGHT = 140 // Giới hạn tối đa khoảng 5-6 dòng văn bản
+
+const AttachmentThumbnail = ({ file }: { file: globalThis.File }) => {
+  const isImage = file.type.startsWith('image/')
+  const previewUrl = useMemo(() => {
+    if (!isImage) return null
+    return URL.createObjectURL(file)
+  }, [file, isImage])
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl)
+      }
+    }
+  }, [previewUrl])
+
+  if (isImage && previewUrl) {
+    return (
+      <img
+        src={previewUrl}
+        alt={file.name}
+        className='h-8 w-8 rounded-md object-cover border border-border/60 shrink-0'
+      />
+    )
+  }
+
+  return <FileIcon className='h-3.5 w-3.5 shrink-0 text-muted-foreground' />
+}
 
 export const ChatComposer = ({
   disabled = false,
@@ -86,7 +114,7 @@ export const ChatComposer = ({
               key={attachment.localId}
               className='flex items-center gap-2 rounded-md border bg-background px-2 py-1.5 text-xs'
             >
-              <FileIcon className='h-3.5 w-3.5 shrink-0 text-muted-foreground' />
+              <AttachmentThumbnail file={attachment.source} />
               <span className='min-w-0 flex-1 truncate'>{attachment.source.name}</span>
               {attachment.status === 'uploading' && (
                 <span className='flex items-center gap-1 text-muted-foreground'>

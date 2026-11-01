@@ -2,6 +2,7 @@ import { MessageSquareDashed, Users, User as UserIcon } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type UIEvent } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import { Button } from '~/components/ui/button'
+import { ImageLightbox, type LightboxImage } from '~/components/chat-layout/image-lightbox'
 import { mergeChronologicalMessages, useMessageHistoryQuery } from '~/hooks/use-message-history'
 import { getApiErrorMessage } from '~/lib/api-error'
 import { wsClient } from '~/lib/websocket-client'
@@ -9,6 +10,11 @@ import { useAuthStore } from '~/stores/use-auth-store'
 import type { Message } from '~/types/message.type'
 
 const TIME_GAP_THRESHOLD_MS = 5 * 60 * 1000 // 5 phút gom cụm tin nhắn
+
+const isImageAttachment = (file: { contentType?: string; name: string }) => {
+  if (file.contentType?.startsWith('image/')) return true
+  return /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(file.name)
+}
 
 const isDifferentDay = (d1: string | Date, d2: string | Date) => {
   const date1 = new Date(d1)
@@ -73,6 +79,16 @@ export const ChatMessagesArea = ({
   const currentUserId = useAuthStore((state) => state.user?.id)
   const history = useMessageHistoryQuery(conversationId, loadHistory && !isLoading)
   const [earlyMessages, setEarlyMessages] = useState<Message[]>([])
+  const [lightboxState, setLightboxState] = useState<{
+    isOpen: boolean
+    images: LightboxImage[]
+    initialIndex: number
+  }>({
+    isOpen: false,
+    images: [],
+    initialIndex: 0
+  })
+
   const hasHistory = Boolean(history.data)
   const messages = useMemo(
     () =>
@@ -89,6 +105,18 @@ export const ChatMessagesArea = ({
   const snapshotRef = useRef<ScrollSnapshot | null>(null)
   const pageCount = history.data?.pages.length ?? 0
   const newestMessageId = messages.at(-1)?.id
+
+  const handleOpenLightbox = (images: LightboxImage[], index: number) => {
+    setLightboxState({
+      isOpen: true,
+      images,
+      initialIndex: index
+    })
+  }
+
+  const handleCloseLightbox = () => {
+    setLightboxState((prev) => ({ ...prev, isOpen: false }))
+  }
 
   useEffect(
     () =>
@@ -222,6 +250,14 @@ export const ChatMessagesArea = ({
             const avatarUrl = sender?.avatarUrl || (sender?.avatarFileId ? `/api/files/${sender.avatarFileId}` : null)
             const initials = (senderName.trim().slice(0, 1) || 'U').toUpperCase()
 
+            const imageAttachments = message.attachments.filter(isImageAttachment)
+            const otherAttachments = message.attachments.filter((f) => !isImageAttachment(f))
+            const lightboxImages: LightboxImage[] = imageAttachments.map((img) => ({
+              id: img.id,
+              name: img.name,
+              url: img.downloadUrl
+            }))
+
             return (
               <div key={message.id}>
                 {isNewDay && (
@@ -252,14 +288,66 @@ export const ChatMessagesArea = ({
                       <span className='mb-1 px-1 text-xs font-medium text-muted-foreground'>{senderName}</span>
                     )}
                     <div
-                      className={`rounded-2xl px-3 py-2 text-sm shadow-sm ${
-                        isOwn ? 'bg-primary text-primary-foreground' : 'bg-card text-card-foreground'
-                      }`}
+                      className={`rounded-2xl shadow-sm text-sm ${
+                        imageAttachments.length > 0 && !message.content && otherAttachments.length === 0
+                          ? 'p-1.5'
+                          : 'px-3 py-2'
+                      } ${isOwn ? 'bg-primary text-primary-foreground' : 'bg-card text-card-foreground'}`}
                     >
-                      {message.content && <p className='whitespace-pre-wrap break-words'>{message.content}</p>}
-                      {message.attachments.length > 0 && (
-                        <div className='mt-1 space-y-1 text-xs'>
-                          {message.attachments.map((file) => (
+                      {/* Image attachments rendered on top (Zalo Style) */}
+                      {imageAttachments.length > 0 && (
+                        <div
+                          className={`overflow-hidden ${
+                            imageAttachments.length === 1
+                              ? 'max-w-[320px]'
+                              : imageAttachments.length === 2
+                                ? 'grid grid-cols-2 gap-1.5 max-w-[320px]'
+                                : 'grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-w-[320px]'
+                          }`}
+                        >
+                          {imageAttachments.map((img, imgIdx) => (
+                            <button
+                              key={img.id}
+                              type='button'
+                              onClick={() => handleOpenLightbox(lightboxImages, imgIdx)}
+                              className='relative overflow-hidden rounded-xl border border-border/20 bg-muted/40 transition-opacity hover:opacity-95 focus:outline-hidden focus:ring-2 focus:ring-ring group cursor-pointer'
+                              title={`Xem ảnh ${img.name}`}
+                              aria-label={`Xem ảnh ${img.name}`}
+                            >
+                              <img
+                                src={img.downloadUrl}
+                                alt={img.name}
+                                loading='lazy'
+                                className={`w-full object-cover transition-transform duration-200 group-hover:scale-[1.02] ${
+                                  imageAttachments.length === 1
+                                    ? 'max-h-[340px] rounded-xl'
+                                    : 'aspect-square rounded-lg'
+                                }`}
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Text content rendered right below images in the same bubble */}
+                      {message.content && (
+                        <p
+                          className={`whitespace-pre-wrap break-words ${
+                            imageAttachments.length > 0 ? 'mt-2 px-0.5' : ''
+                          }`}
+                        >
+                          {message.content}
+                        </p>
+                      )}
+
+                      {/* Non-image attachments */}
+                      {otherAttachments.length > 0 && (
+                        <div
+                          className={`space-y-1 text-xs ${
+                            message.content || imageAttachments.length > 0 ? 'mt-2' : ''
+                          }`}
+                        >
+                          {otherAttachments.map((file) => (
                             <a
                               key={file.id}
                               href={file.downloadUrl}
@@ -271,6 +359,7 @@ export const ChatMessagesArea = ({
                           ))}
                         </div>
                       )}
+
                       <time
                         className={`mt-1 block text-right text-[10px] ${
                           isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
@@ -319,6 +408,14 @@ export const ChatMessagesArea = ({
           )}
         </div>
       </div>
+
+      {/* Lightbox for full-screen image preview (Facebook style) */}
+      <ImageLightbox
+        isOpen={lightboxState.isOpen}
+        images={lightboxState.images}
+        initialIndex={lightboxState.initialIndex}
+        onClose={handleCloseLightbox}
+      />
     </div>
   )
 }
