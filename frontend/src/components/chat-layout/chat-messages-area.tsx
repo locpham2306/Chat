@@ -283,7 +283,13 @@ export const ChatMessagesArea = ({
                     ) : (
                       <div className='w-8 shrink-0' aria-hidden='true' />
                     ))}
-                  <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-[70%]`}>
+                  <div
+                    className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} ${
+                      imageAttachments.length > 0
+                        ? 'max-w-[92%] sm:max-w-[85%] md:max-w-[560px]'
+                        : 'max-w-[85%] sm:max-w-[70%]'
+                    }`}
+                  >
                     {!isOwn && !isGroupedWithPrev && (
                       <span className='mb-1 px-1 text-xs font-medium text-muted-foreground'>{senderName}</span>
                     )}
@@ -299,10 +305,10 @@ export const ChatMessagesArea = ({
                         <div
                           className={`overflow-hidden ${
                             imageAttachments.length === 1
-                              ? 'max-w-[320px]'
+                              ? 'max-w-full sm:max-w-[520px]'
                               : imageAttachments.length === 2
-                                ? 'grid grid-cols-2 gap-1.5 max-w-[320px]'
-                                : 'grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-w-[320px]'
+                                ? 'grid grid-cols-2 gap-2 max-w-full sm:max-w-[520px]'
+                                : 'grid grid-cols-2 sm:grid-cols-3 gap-2 max-w-full sm:max-w-[520px]'
                           }`}
                         >
                           {imageAttachments.map((img, imgIdx) => (
@@ -318,9 +324,9 @@ export const ChatMessagesArea = ({
                                 src={img.downloadUrl}
                                 alt={img.name}
                                 loading='lazy'
-                                className={`w-full object-cover transition-transform duration-200 group-hover:scale-[1.02] ${
+                                className={`w-full object-cover transition-transform duration-200 group-hover:scale-[1.01] ${
                                   imageAttachments.length === 1
-                                    ? 'max-h-[340px] rounded-xl'
+                                    ? 'max-h-[520px] rounded-xl'
                                     : 'aspect-square rounded-lg'
                                 }`}
                               />
