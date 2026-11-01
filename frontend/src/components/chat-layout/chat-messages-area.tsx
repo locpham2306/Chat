@@ -335,24 +335,9 @@ export const ChatMessagesArea = ({
                         </div>
                       )}
 
-                      {/* Text content rendered right below images in the same bubble */}
-                      {message.content && (
-                        <p
-                          className={`whitespace-pre-wrap break-words ${
-                            imageAttachments.length > 0 ? 'mt-2 px-0.5' : ''
-                          }`}
-                        >
-                          {message.content}
-                        </p>
-                      )}
-
-                      {/* Non-image attachments */}
+                      {/* Non-image attachments (documents, videos, etc.) rendered above text */}
                       {otherAttachments.length > 0 && (
-                        <div
-                          className={`space-y-1 text-xs ${
-                            message.content || imageAttachments.length > 0 ? 'mt-2' : ''
-                          }`}
-                        >
+                        <div className={`space-y-1 text-xs ${imageAttachments.length > 0 ? 'mt-2' : ''}`}>
                           {otherAttachments.map((file) => (
                             <a
                               key={file.id}
@@ -364,6 +349,17 @@ export const ChatMessagesArea = ({
                             </a>
                           ))}
                         </div>
+                      )}
+
+                      {/* Text content rendered right below attachments in the same bubble */}
+                      {message.content && (
+                        <p
+                          className={`whitespace-pre-wrap break-words ${
+                            imageAttachments.length > 0 || otherAttachments.length > 0 ? 'mt-2 px-0.5' : ''
+                          }`}
+                        >
+                          {message.content}
+                        </p>
                       )}
 
                       <time
