@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { LoaderCircle, LogOut, MessageSquare, Moon, Sun } from 'lucide-react'
-import { Avatar, AvatarFallback } from '~/components/ui/avatar'
+import { ProfileSettingsDialog } from '~/components/profile-settings'
+import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { useLogoutMutation } from '~/hooks/use-auth'
@@ -10,6 +11,7 @@ import { useAuthStore } from '~/stores/use-auth-store'
 export const MainLayout = () => {
   const [isDark, setIsDark] = useState(false)
   const [logoutError, setLogoutError] = useState<string | null>(null)
+  const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false)
   const user = useAuthStore((state) => state.user)
   const logoutMutation = useLogoutMutation()
   const navigate = useNavigate()
@@ -52,8 +54,15 @@ export const MainLayout = () => {
           )}
 
           {user && (
-            <div className='flex items-center gap-2'>
+            <button
+              type='button'
+              onClick={() => setIsProfileSettingsOpen(true)}
+              className='flex items-center gap-2 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+              title='Chỉnh sửa hồ sơ'
+              aria-label='Chỉnh sửa hồ sơ'
+            >
               <Avatar className='h-8 w-8'>
+                {user.avatarFileId && <AvatarImage src={`/api/files/${user.avatarFileId}`} alt={user.fullName} />}
                 <AvatarFallback>{(user.fullName || user.username || 'U').slice(0, 1).toUpperCase()}</AvatarFallback>
               </Avatar>
               <div className='hidden sm:block text-left'>
@@ -64,7 +73,7 @@ export const MainLayout = () => {
                   </Badge>
                 </div>
               </div>
-            </div>
+            </button>
           )}
 
           <Button variant='ghost' size='icon' onClick={toggleTheme} aria-label='Đổi giao diện sáng tối'>
@@ -87,6 +96,10 @@ export const MainLayout = () => {
           </Button>
         </div>
       </header>
+
+      {user && (
+        <ProfileSettingsDialog open={isProfileSettingsOpen} onOpenChange={setIsProfileSettingsOpen} user={user} />
+      )}
 
       {/* Main Workspace Area */}
       <div className='flex flex-1 overflow-hidden'>

@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import authApi from '~/apis/auth.api'
+import userApi from '~/apis/user.api'
 import { isUnauthorizedError } from '~/lib/api-error'
 import { wsClient } from '~/lib/websocket-client'
 import { useAuthStore } from '~/stores/use-auth-store'
 import { useWebSocketStore } from '~/stores/use-websocket-store'
 import type { LoginBody, LoginResponse, RegisterBody } from '~/types/auth.type'
-import type { User } from '~/types/user.type'
+import type { UpdateProfileBody, User } from '~/types/user.type'
 
 export const profileQueryKey = ['auth', 'profile'] as const
 
@@ -21,6 +22,11 @@ const login = async (body: LoginBody): Promise<LoginResponse> => {
 
 const register = async (body: RegisterBody): Promise<User> => {
   const response = await authApi.register(body)
+  return response.data.content
+}
+
+const updateProfile = async (body: UpdateProfileBody): Promise<User> => {
+  const response = await userApi.updateProfile(body)
   return response.data.content
 }
 
@@ -70,5 +76,17 @@ export const useProfileQuery = () => {
     queryFn: getProfile,
     staleTime: 30_000,
     retry: false
+  })
+}
+
+export const useUpdateProfileMutation = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: updateProfile,
+    onSuccess: (user) => {
+      queryClient.setQueryData(profileQueryKey, user)
+      useAuthStore.getState().login(user)
+    }
   })
 }

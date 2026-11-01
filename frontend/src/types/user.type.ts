@@ -8,3 +8,8 @@ export interface User {
   status: UserStatus
   lastSeen: string | null
 }
+
+export interface UpdateProfileBody {
+  fullName: string
+  avatarFileId: string | null
+}
