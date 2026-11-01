@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect, useMemo, type ChangeEvent, type KeyboardEvent, type FormEvent } from 'react'
-import { AlertCircle, FileIcon, LoaderCircle, Paperclip, RotateCcw, SendHorizontal, X } from 'lucide-react'
+import { useState, useRef, useEffect, type ChangeEvent, type KeyboardEvent, type FormEvent } from 'react'
+import { AlertCircle, FileIcon, LoaderCircle, Maximize2, Paperclip, RotateCcw, SendHorizontal, X } from 'lucide-react'
+import { ImageLightbox, type LightboxImage } from '~/components/chat-layout/image-lightbox'
 import { Button } from '~/components/ui/button'
 import { Textarea } from '~/components/ui/textarea'
 import { useFileAttachments } from '~/hooks/use-file-attachments'
@@ -15,32 +16,61 @@ interface ChatComposerProps {
 const MIN_HEIGHT = 38
 const MAX_HEIGHT = 140 // Giới hạn tối đa khoảng 5-6 dòng văn bản
 
-const AttachmentThumbnail = ({ file }: { file: globalThis.File }) => {
-  const isImage = file.type.startsWith('image/')
-  const previewUrl = useMemo(() => {
-    if (!isImage) return null
-    return URL.createObjectURL(file)
-  }, [file, isImage])
+const isImageFile = (file: globalThis.File) => {
+  if (file.type?.startsWith('image/')) return true
+  return /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(file.name)
+}
+
+interface AttachmentThumbnailProps {
+  file: globalThis.File
+  onPreviewImage: (url: string, name: string) => void
+}
+
+const AttachmentThumbnail = ({ file, onPreviewImage }: AttachmentThumbnailProps) => {
+  const isImage = isImageFile(file)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   useEffect(() => {
-    return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl)
+    if (!isImage) return
+
+    let isMounted = true
+    const reader = new FileReader()
+
+    reader.onload = () => {
+      if (isMounted && typeof reader.result === 'string') {
+        setPreviewUrl(reader.result)
       }
     }
-  }, [previewUrl])
+
+    reader.readAsDataURL(file)
+
+    return () => {
+      isMounted = false
+    }
+  }, [file, isImage])
 
   if (isImage && previewUrl) {
     return (
-      <img
-        src={previewUrl}
-        alt={file.name}
-        className='h-8 w-8 rounded-md object-cover border border-border/60 shrink-0'
-      />
+      <button
+        type='button'
+        onClick={() => onPreviewImage(previewUrl, file.name)}
+        className='relative group h-10 w-10 shrink-0 overflow-hidden rounded-md border border-border/60 cursor-pointer focus:outline-hidden focus:ring-1 focus:ring-ring'
+        title='Nhấp để xem to ảnh'
+        aria-label={`Xem to ảnh ${file.name}`}
+      >
+        <img
+          src={previewUrl}
+          alt={file.name}
+          className='h-full w-full object-cover transition-transform group-hover:scale-105'
+        />
+        <div className='absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity'>
+          <Maximize2 className='h-3.5 w-3.5 text-white drop-shadow-sm' />
+        </div>
+      </button>
     )
   }
 
-  return <FileIcon className='h-3.5 w-3.5 shrink-0 text-muted-foreground' />
+  return <FileIcon className='h-4 w-4 shrink-0 text-muted-foreground' />
 }
 
 export const ChatComposer = ({
@@ -53,6 +83,16 @@ export const ChatComposer = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { attachments, uploadedFiles, hasUploading, hasFailed, addFiles, retry, remove, clear } = useFileAttachments()
+
+  const [lightboxState, setLightboxState] = useState<{
+    isOpen: boolean
+    images: LightboxImage[]
+    initialIndex: number
+  }>({
+    isOpen: false,
+    images: [],
+    initialIndex: 0
+  })
 
   useEffect(() => {
     const textarea = textareaRef.current
@@ -102,6 +142,14 @@ export const ChatComposer = ({
     handleSend()
   }
 
+  const handlePreviewImage = (url: string, name: string) => {
+    setLightboxState({
+      isOpen: true,
+      images: [{ id: url, name, url }],
+      initialIndex: 0
+    })
+  }
+
   const isSendDisabled = disabled || hasUploading || hasFailed || (!content.trim() && uploadedFiles.length === 0)
 
   return (
@@ -112,19 +160,25 @@ export const ChatComposer = ({
           {attachments.map((attachment) => (
             <div
               key={attachment.localId}
-              className='flex items-center gap-2 rounded-md border bg-background px-2 py-1.5 text-xs'
+              className='flex items-center gap-2.5 rounded-md border bg-background p-1.5 text-xs'
             >
-              <AttachmentThumbnail file={attachment.source} />
-              <span className='min-w-0 flex-1 truncate'>{attachment.source.name}</span>
+              <AttachmentThumbnail file={attachment.source} onPreviewImage={handlePreviewImage} />
+              <div className='min-w-0 flex-1'>
+                <p className='truncate font-medium text-foreground'>{attachment.source.name}</p>
+                <p className='text-[10px] text-muted-foreground'>{(attachment.source.size / 1024).toFixed(0)} KB</p>
+              </div>
               {attachment.status === 'uploading' && (
-                <span className='flex items-center gap-1 text-muted-foreground'>
-                  <LoaderCircle className='h-3 w-3 animate-spin' />
+                <span className='flex items-center gap-1 text-muted-foreground text-[11px] pr-1'>
+                  <LoaderCircle className='h-3.5 w-3.5 animate-spin' />
                   {attachment.progress}%
                 </span>
               )}
               {attachment.status === 'failed' && (
-                <span className='flex min-w-0 items-center gap-1 text-destructive' title={attachment.error}>
-                  <AlertCircle className='h-3 w-3' />
+                <span
+                  className='flex min-w-0 items-center gap-1 text-destructive text-[11px] pr-1'
+                  title={attachment.error}
+                >
+                  <AlertCircle className='h-3.5 w-3.5 shrink-0' />
                   <span className='truncate'>{attachment.error ?? 'Lỗi tải tệp'}</span>
                 </span>
               )}
@@ -133,7 +187,7 @@ export const ChatComposer = ({
                   type='button'
                   variant='ghost'
                   size='icon'
-                  className='h-6 w-6'
+                  className='h-7 w-7'
                   onClick={() => retry(attachment.localId)}
                   aria-label={`Tải lại ${attachment.source.name}`}
                 >
@@ -144,7 +198,7 @@ export const ChatComposer = ({
                 type='button'
                 variant='ghost'
                 size='icon'
-                className='h-6 w-6'
+                className='h-7 w-7'
                 onClick={() => remove(attachment.localId)}
                 aria-label={`Xóa ${attachment.source.name}`}
               >
@@ -202,6 +256,14 @@ export const ChatComposer = ({
           <kbd className='px-1 py-0.5 rounded bg-muted font-mono text-[9px]'>Shift + Enter</kbd> xuống dòng
         </span>
       </div>
+
+      {/* Lightbox preview for attachments before sending */}
+      <ImageLightbox
+        isOpen={lightboxState.isOpen}
+        images={lightboxState.images}
+        initialIndex={lightboxState.initialIndex}
+        onClose={() => setLightboxState((prev) => ({ ...prev, isOpen: false }))}
+      />
     </form>
   )
 }
