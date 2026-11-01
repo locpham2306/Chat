@@ -1,4 +1,4 @@
-import { ArrowLeft, MoreVertical, Users } from 'lucide-react'
+import { ArrowLeft, Settings, Users } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import { Button } from '~/components/ui/button'
 
@@ -51,9 +51,10 @@ export const ChatHeader = ({ title, isGroup = false, subtitle, avatarUrl, onBack
             size='icon'
             onClick={onOpenInfo}
             className='h-8 w-8 text-muted-foreground hover:text-foreground'
-            aria-label='Tùy chọn hội thoại'
+            aria-label='Cài đặt hội thoại'
+            title='Cài đặt hội thoại'
           >
-            <MoreVertical className='h-4 w-4' />
+            <Settings className='h-4 w-4' />
           </Button>
         </div>
       )}

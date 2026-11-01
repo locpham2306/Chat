@@ -1,6 +1,8 @@
 import type { Message } from './message.type'
+import type { User } from './user.type'
 
 export type ConversationType = 'DIRECT' | 'GROUP'
+export type MemberRole = 'OWNER' | 'MEMBER'
 
 interface BaseConversation {
   id: string
@@ -67,4 +69,19 @@ export interface CreateGroupBody {
 export interface UpdateConversationBody {
   name: string
   avatarFileId: string | null
+}
+
+export interface ConversationMember {
+  user: User
+  role: MemberRole
+  joinedAt: string
+}
+
+export interface AddConversationMembersBody {
+  memberIds: string[]
+}
+
+export interface AddConversationMembersResponse {
+  addedUserIds: string[]
+  existingUserIds: string[]
 }
