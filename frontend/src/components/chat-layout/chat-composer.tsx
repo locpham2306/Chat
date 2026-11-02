@@ -11,6 +11,8 @@ interface ChatComposerProps {
   placeholder?: string
   onSendMessage?: (draft: MessageSendDraft) => boolean | void
   onAttachFile?: () => void
+  onTyping?: () => void
+  onStopTyping?: () => void
 }
 
 const MIN_HEIGHT = 38
@@ -77,7 +79,9 @@ export const ChatComposer = ({
   disabled = false,
   placeholder = 'Nhập tin nhắn...',
   onSendMessage,
-  onAttachFile
+  onAttachFile,
+  onTyping,
+  onStopTyping
 }: ChatComposerProps) => {
   const [content, setContent] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -111,11 +115,21 @@ export const ChatComposer = ({
     }
   }, [content])
 
+  const handleContentChange = (value: string) => {
+    setContent(value)
+    if (value.trim().length > 0) {
+      onTyping?.()
+    } else {
+      onStopTyping?.()
+    }
+  }
+
   const handleSend = () => {
     const trimmed = content.trim()
     if ((!trimmed && uploadedFiles.length === 0) || disabled || hasUploading || hasFailed) return
     const sent = onSendMessage?.({ content: trimmed, attachments: uploadedFiles })
     if (sent === false) return
+    onStopTyping?.()
     setContent('')
     clear()
     if (textareaRef.current) {
@@ -230,7 +244,7 @@ export const ChatComposer = ({
           <Textarea
             ref={textareaRef}
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => handleContentChange(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={disabled}
             placeholder={placeholder}
