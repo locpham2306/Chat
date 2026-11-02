@@ -10,6 +10,8 @@ import type {
   DirectConversation,
   DirectConversationLookupResult,
   GroupConversation,
+  MarkConversationReadBody,
+  MarkConversationReadResponse,
   UpdateConversationBody
 } from '~/types/conversation.type'
 import type { User } from '~/types/user.type'
@@ -44,6 +46,8 @@ const conversationApi = {
   createGroup: (body: CreateGroupBody) => http.post<ApiResponse<GroupConversation>>('/api/conversations/group', body),
   updateConversation: (id: string, body: UpdateConversationBody) =>
     http.put<ApiResponse<ConversationDetail>>(`/api/conversations/${id}`, body),
+  markAsRead: (id: string, body: MarkConversationReadBody) =>
+    http.put<ApiResponse<MarkConversationReadResponse>>(`/api/conversations/${id}/read`, body),
   getMembers: (id: string, params?: GetGroupMembersParams) =>
     http.get<ApiResponse<ApiPage<ConversationMember[]>>>(`/api/conversations/${id}/members`, { params }),
   addMembers: (id: string, body: AddConversationMembersBody) =>

@@ -7,6 +7,7 @@ import type {
   ConversationSummary,
   CreateGroupBody,
   GroupConversation,
+  MarkConversationReadResponse,
   UpdateConversationBody
 } from '~/types/conversation.type'
 
@@ -125,6 +126,53 @@ export const useUpdateConversationMutation = () => {
     onSuccess: (updatedDetail, variables) => {
       queryClient.setQueryData(conversationKeys.detail(variables.id), updatedDetail)
       queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] })
+    }
+  })
+}
+
+export const useMarkConversationReadMutation = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      conversationId,
+      lastReadMessageId
+    }: {
+      conversationId: string
+      lastReadMessageId: string
+    }): Promise<MarkConversationReadResponse> => {
+      const response = await conversationApi.markAsRead(conversationId, { lastReadMessageId })
+      return response.data.content
+    },
+    onMutate: async ({ conversationId }) => {
+      queryClient.setQueriesData<ApiPage<ConversationSummary[]>>({ queryKey: ['conversations', 'list'] }, (old) => {
+        if (!old || !Array.isArray(old.data)) return old
+        let changed = false
+        const updated = old.data.map((c) => {
+          if (c.id === conversationId && c.unreadCount > 0) {
+            changed = true
+            return { ...c, unreadCount: 0 }
+          }
+          return c
+        })
+        return changed ? { ...old, data: updated } : old
+      })
+    },
+    onSuccess: (data) => {
+      queryClient.setQueriesData<ApiPage<ConversationSummary[]>>({ queryKey: ['conversations', 'list'] }, (old) => {
+        if (!old || !Array.isArray(old.data)) return old
+        let changed = false
+        const updated = old.data.map((c) => {
+          if (c.id === data.conversationId) {
+            changed = true
+            return {
+              ...c,
+              unreadCount: data.unreadCount
+            }
+          }
+          return c
+        })
+        return changed ? { ...old, data: updated } : old
+      })
     }
   })
 }

@@ -32,6 +32,7 @@ export interface ConversationPeer {
   avatarFileId: string | null
   avatarUrl?: string | null
   status?: string
+  lastSeen?: string | null
 }
 
 export interface ConversationDetail {
@@ -84,4 +85,15 @@ export interface AddConversationMembersBody {
 export interface AddConversationMembersResponse {
   addedUserIds: string[]
   existingUserIds: string[]
+}
+
+export interface MarkConversationReadBody {
+  lastReadMessageId: string
+}
+
+export interface MarkConversationReadResponse {
+  conversationId: string
+  userId: string
+  lastReadMessageId: string
+  unreadCount: number
 }

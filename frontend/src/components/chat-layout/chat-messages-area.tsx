@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import { Button } from '~/components/ui/button'
 import { ImageLightbox, type LightboxImage } from '~/components/chat-layout/image-lightbox'
 import { TypingIndicator } from '~/components/chat-layout/typing-indicator'
+import { useMarkConversationReadMutation } from '~/hooks/use-conversation'
 import { mergeChronologicalMessages, useMessageHistoryQuery } from '~/hooks/use-message-history'
 import { getApiErrorMessage } from '~/lib/api-error'
 import { wsClient } from '~/lib/websocket-client'
@@ -111,6 +112,49 @@ export const ChatMessagesArea = ({
   const snapshotRef = useRef<ScrollSnapshot | null>(null)
   const pageCount = history.data?.pages.length ?? 0
   const newestMessageId = messages.at(-1)?.id
+
+  // Đánh dấu đã đọc tự động khi có tin nhắn thực tế mới nhất
+  const markAsReadMutation = useMarkConversationReadMutation()
+  const lastMarkedReadIdRef = useRef<string | null>(null)
+
+  const lastRealMessage = useMemo(() => {
+    return [...messages].reverse().find((m) => m.id && !m.id.startsWith('pending:'))
+  }, [messages])
+
+  useEffect(() => {
+    lastMarkedReadIdRef.current = null
+  }, [conversationId])
+
+  useEffect(() => {
+    if (!conversationId || !lastRealMessage?.id) return
+    if (lastMarkedReadIdRef.current === lastRealMessage.id) return
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+
+    lastMarkedReadIdRef.current = lastRealMessage.id
+    markAsReadMutation.mutate({
+      conversationId,
+      lastReadMessageId: lastRealMessage.id
+    })
+  }, [conversationId, lastRealMessage?.id, markAsReadMutation])
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && conversationId && lastRealMessage?.id) {
+        if (lastMarkedReadIdRef.current !== lastRealMessage.id) {
+          lastMarkedReadIdRef.current = lastRealMessage.id
+          markAsReadMutation.mutate({
+            conversationId,
+            lastReadMessageId: lastRealMessage.id
+          })
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [conversationId, lastRealMessage?.id, markAsReadMutation])
 
   const handleOpenLightbox = (images: LightboxImage[], index: number) => {
     setLightboxState({
