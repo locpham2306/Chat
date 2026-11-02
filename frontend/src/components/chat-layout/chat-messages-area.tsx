@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type UIEvent } f
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import { Button } from '~/components/ui/button'
 import { ImageLightbox, type LightboxImage } from '~/components/chat-layout/image-lightbox'
+import { TypingIndicator } from '~/components/chat-layout/typing-indicator'
 import { mergeChronologicalMessages, useMessageHistoryQuery } from '~/hooks/use-message-history'
 import { getApiErrorMessage } from '~/lib/api-error'
 import { wsClient } from '~/lib/websocket-client'
@@ -58,6 +59,8 @@ interface ChatMessagesAreaProps {
   loadHistory?: boolean
   failedClientMessageIds?: string[]
   onRetryMessage?: (clientMessageId: string) => void
+  typingText?: string
+  isTyping?: boolean
 }
 
 interface ScrollSnapshot {
@@ -74,7 +77,9 @@ export const ChatMessagesArea = ({
   optimisticMessages = [],
   loadHistory = true,
   failedClientMessageIds = [],
-  onRetryMessage
+  onRetryMessage,
+  typingText,
+  isTyping
 }: ChatMessagesAreaProps) => {
   const currentUserId = useAuthStore((state) => state.user?.id)
   const history = useMessageHistoryQuery(conversationId, loadHistory && !isLoading)
@@ -149,7 +154,7 @@ export const ChatMessagesArea = ({
       viewport.scrollTop = viewport.scrollHeight
       initializedRef.current = true
     }
-  }, [history.isSuccess, loadHistory, pageCount, newestMessageId])
+  }, [history.isSuccess, loadHistory, pageCount, newestMessageId, isTyping])
 
   const loadOlder = () => {
     const viewport = scrollRef.current
@@ -393,6 +398,13 @@ export const ChatMessagesArea = ({
               </div>
             )
           })}
+
+          {/* Typing Indicator */}
+          {Boolean(isTyping && typingText) && (
+            <div className='mt-2'>
+              <TypingIndicator text={typingText || ''} visible={Boolean(isTyping && typingText)} />
+            </div>
+          )}
 
           {(isLoading || (loadHistory && history.isPending)) && (
             <p className='py-4 text-center text-xs text-muted-foreground' role='status'>

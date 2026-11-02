@@ -7,6 +7,7 @@ import { ChatMessagesArea } from './chat-messages-area'
 import { GroupSettingsDialog } from '~/components/group-settings'
 import { Button } from '~/components/ui/button'
 import { useConversationDetailQuery } from '~/hooks/use-conversation'
+import { useTypingIndicator } from '~/hooks/use-typing-indicator'
 import type { Message } from '~/types/message.type'
 import type { MessageSendDraft } from '~/lib/message-send'
 
@@ -33,6 +34,11 @@ export const ChatLayout = ({
 }: ChatLayoutProps) => {
   const { data: conversation, isLoading, isError, error } = useConversationDetailQuery(conversationId)
   const [isGroupSettingsOpen, setIsGroupSettingsOpen] = useState(false)
+
+  const { isTyping, typingText, triggerTyping, stopTyping } = useTypingIndicator({
+    conversationId,
+    conversation
+  })
 
   if (isError) {
     const isForbiddenOrNotFound =
@@ -66,10 +72,10 @@ export const ChatLayout = ({
   if (conversation) {
     if (isGroup) {
       title = conversation.name || 'Nhóm chat'
-      subtitle = `${conversation.memberCount} thành viên`
+      subtitle = isTyping ? typingText : `${conversation.memberCount} thành viên`
     } else {
       title = conversation.peer?.fullName || conversation.name || 'Hội thoại trực tiếp'
-      subtitle = conversation.peer?.status === 'ONLINE' ? 'Trực tuyến' : undefined
+      subtitle = isTyping ? 'Đang nhập...' : conversation.peer?.status === 'ONLINE' ? 'Trực tuyến' : undefined
     }
   }
 
@@ -110,12 +116,16 @@ export const ChatLayout = ({
         optimisticMessages={optimisticMessages}
         failedClientMessageIds={failedClientMessageIds}
         onRetryMessage={onRetryMessage}
+        isTyping={isTyping}
+        typingText={typingText}
       />
 
       {/* 3. Chat Composer */}
       <ChatComposer
         onSendMessage={onSendMessage}
         onAttachFile={onAttachFile}
+        onTyping={triggerTyping}
+        onStopTyping={stopTyping}
         placeholder={`Nhắn tin tới ${title}...`}
       />
 
