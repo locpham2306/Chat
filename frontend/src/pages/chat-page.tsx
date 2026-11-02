@@ -31,7 +31,7 @@ export const ChatPage = () => {
   const locationState = location.state as DirectConversationLocationState | null
   const recipient = locationState?.recipient
   const chatNotFound = Boolean(locationState?.chatNotFound)
-  const { optimisticMessages, failedClientMessageIds, send, hasLocallySentMessage, retry } = useMessageSend({
+  const { optimisticMessages, messageDeliveryStates, send, hasLocallySentMessageToRecipient, retry } = useMessageSend({
     conversationId,
     recipientId
   })
@@ -41,12 +41,17 @@ export const ChatPage = () => {
   useRealtimeMessageSync({
     activeConversationId: conversationId,
     onMessageAck: (payload) => {
-      if (!conversationId && recipientId && hasLocallySentMessage(payload.clientMessageId) && payload.conversationId) {
+      if (
+        !conversationId &&
+        recipientId &&
+        hasLocallySentMessageToRecipient(payload.clientMessageId, recipientId) &&
+        payload.conversationId
+      ) {
         navigate(`/chat/${payload.conversationId}`, { replace: true })
       }
     },
     onNewMessage: (payload) => {
-      if (!conversationId && recipientId && hasLocallySentMessage(payload.clientMessageId)) {
+      if (!conversationId && recipientId && hasLocallySentMessageToRecipient(payload.clientMessageId, recipientId)) {
         navigate(`/chat/${payload.conversationId}`, { replace: true })
       }
     }
@@ -159,7 +164,7 @@ export const ChatPage = () => {
             onBack={handleBackToList}
             onSendMessage={send}
             optimisticMessages={visibleOptimisticMessages}
-            failedClientMessageIds={failedClientMessageIds}
+            messageDeliveryStates={messageDeliveryStates}
             onRetryMessage={retry}
           />
         ) : recipientId ? (
@@ -177,7 +182,7 @@ export const ChatPage = () => {
               onBack={handleBackToList}
               onSendMessage={send}
               optimisticMessages={visibleOptimisticMessages}
-              failedClientMessageIds={failedClientMessageIds}
+              messageDeliveryStates={messageDeliveryStates}
               onRetryMessage={retry}
             />
           )
