@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -8,9 +9,12 @@ import { CreateGroupDialog } from '~/components/group-create'
 import { UserSearchDialog } from '~/components/user-search'
 import { useDirectConversationLookupQuery, useDirectConversationMutation } from '~/hooks/use-conversation'
 import { useMessageSend } from '~/hooks/use-message-send'
+import { usePresenceSync } from '~/hooks/use-presence-sync'
 import { useRealtimeMessageSync } from '~/hooks/use-realtime-message-sync'
 import { getApiErrorMessage } from '~/lib/api-error'
 import { cn } from '~/lib/utils'
+import type { ApiPage } from '~/types/api-response.type'
+import type { ConversationSummary } from '~/types/conversation.type'
 import type { User } from '~/types/user.type'
 
 interface DirectConversationLocationState {
@@ -23,6 +27,7 @@ export const ChatPage = () => {
   const [searchParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [isUserSearchOpen, setIsUserSearchOpen] = useState(false)
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
   const selectionVersion = useRef(0)
@@ -38,6 +43,12 @@ export const ChatPage = () => {
 
   const { data: lookupData, isLoading: isLookingUp, error: lookupError } = useDirectConversationLookupQuery(recipientId)
 
+  // Đồng bộ presence (WS-06) và read receipt (WS-05) realtime
+  usePresenceSync({
+    activeConversationId: conversationId
+  })
+
+  // Đồng bộ tin nhắn (WS-02, WS-03) realtime
   useRealtimeMessageSync({
     activeConversationId: conversationId,
     onMessageAck: (payload) => {
@@ -95,6 +106,21 @@ export const ChatPage = () => {
   const handleSelectConversation = (id: string) => {
     selectionVersion.current += 1
     directConversationMutation.reset()
+
+    // Xóa ngay unreadCount trên UI khi người dùng bấm vào xem cuộc trò chuyện
+    queryClient.setQueriesData<ApiPage<ConversationSummary[]>>({ queryKey: ['conversations', 'list'] }, (old) => {
+      if (!old || !Array.isArray(old.data)) return old
+      let changed = false
+      const updated = old.data.map((c) => {
+        if (c.id === id && c.unreadCount > 0) {
+          changed = true
+          return { ...c, unreadCount: 0 }
+        }
+        return c
+      })
+      return changed ? { ...old, data: updated } : old
+    })
+
     navigate(`/chat/${id}`)
   }
 

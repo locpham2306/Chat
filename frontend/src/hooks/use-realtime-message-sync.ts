@@ -124,7 +124,7 @@ export const useRealtimeMessageSync = (options: UseRealtimeMessageSyncOptions = 
             return { ...page, data: updatedList }
           })
 
-          // Nếu chưa có trong bất kỳ page nào, append vào page mới nhất (page cuối hoặc đầu tùy thiết kế)
+          // Nếu chưa có trong bất kỳ page nào, append vào page mới nhất
           if (!messageHandled && newPages.length > 0) {
             const targetPage = newPages[0]
             if (Array.isArray(targetPage.data)) {
@@ -234,8 +234,11 @@ export const useRealtimeMessageSync = (options: UseRealtimeMessageSyncOptions = 
           Boolean(message.sender?.id && message.sender.id !== currentUserIdRef.current)
 
         const isNotActiveChat = activeConversationIdRef.current !== targetId
-        const nextUnreadCount =
-          isFromOther && isNotActiveChat ? (targetConv.unreadCount || 0) + 1 : targetConv.unreadCount || 0
+        const nextUnreadCount = isNotActiveChat
+          ? isFromOther
+            ? (targetConv.unreadCount || 0) + 1
+            : targetConv.unreadCount || 0
+          : 0
 
         const updatedConv: ConversationSummary = {
           ...targetConv,
