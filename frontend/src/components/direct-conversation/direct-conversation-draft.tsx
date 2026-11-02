@@ -1,7 +1,7 @@
 import { MessageSquarePlus } from 'lucide-react'
 import { ChatComposer, ChatHeader, ChatMessagesArea } from '~/components/chat-layout'
 import type { Message } from '~/types/message.type'
-import type { MessageSendDraft } from '~/lib/message-send'
+import type { MessageDeliveryState, MessageSendDraft } from '~/lib/message-send'
 import type { User } from '~/types/user.type'
 
 interface DirectConversationDraftProps {
@@ -10,7 +10,7 @@ interface DirectConversationDraftProps {
   onBack?: () => void
   onSendMessage?: (draft: MessageSendDraft) => boolean | void
   optimisticMessages?: Message[]
-  failedClientMessageIds?: string[]
+  messageDeliveryStates?: Record<string, MessageDeliveryState>
   onRetryMessage?: (clientMessageId: string) => void
 }
 
@@ -20,7 +20,7 @@ export const DirectConversationDraft = ({
   onBack,
   onSendMessage,
   optimisticMessages,
-  failedClientMessageIds,
+  messageDeliveryStates,
   onRetryMessage
 }: DirectConversationDraftProps) => {
   const title = recipient?.fullName || recipient?.username || 'Hội thoại trực tiếp'
@@ -35,7 +35,7 @@ export const DirectConversationDraft = ({
           title={title}
           optimisticMessages={optimisticMessages}
           loadHistory={false}
-          failedClientMessageIds={failedClientMessageIds}
+          messageDeliveryStates={messageDeliveryStates}
           onRetryMessage={onRetryMessage}
         />
       ) : (

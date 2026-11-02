@@ -9,6 +9,7 @@ import { getApiErrorMessage } from '~/lib/api-error'
 import { wsClient } from '~/lib/websocket-client'
 import { useAuthStore } from '~/stores/use-auth-store'
 import type { Message } from '~/types/message.type'
+import type { MessageDeliveryState } from '~/lib/message-send'
 
 const TIME_GAP_THRESHOLD_MS = 5 * 60 * 1000 // 5 phút gom cụm tin nhắn
 
@@ -57,7 +58,7 @@ interface ChatMessagesAreaProps {
   isLoading?: boolean
   optimisticMessages?: Message[]
   loadHistory?: boolean
-  failedClientMessageIds?: string[]
+  messageDeliveryStates?: Record<string, MessageDeliveryState>
   onRetryMessage?: (clientMessageId: string) => void
   typingText?: string
   isTyping?: boolean
@@ -76,7 +77,7 @@ export const ChatMessagesArea = ({
   isLoading = false,
   optimisticMessages = [],
   loadHistory = true,
-  failedClientMessageIds = [],
+  messageDeliveryStates = {},
   onRetryMessage,
   typingText,
   isTyping
@@ -249,7 +250,7 @@ export const ChatMessagesArea = ({
             // 4. Sang ngày mới -> tách nhóm
             const isGroupedWithPrev = isSameSender && isOwn === isPrevOwn && isWithin5Minutes && !isNewDay
 
-            const isFailed = failedClientMessageIds.includes(message.clientMessageId)
+            const deliveryState = messageDeliveryStates[message.clientMessageId]
             const sender = message.sender
             const senderName = sender?.fullName || sender?.username || (isGroup ? 'Thành viên' : title)
             const avatarUrl = sender?.avatarUrl || (sender?.avatarFileId ? `/api/files/${sender.avatarFileId}` : null)
@@ -378,9 +379,12 @@ export const ChatMessagesArea = ({
                           minute: '2-digit'
                         })}
                       </time>
-                      {isFailed && (
+                      {deliveryState?.status === 'pending' && (
+                        <div className='mt-1 text-right text-[10px] opacity-70'>Đang gửi...</div>
+                      )}
+                      {deliveryState?.status === 'failed' && (
                         <div className='mt-1 flex items-center justify-end gap-2 text-[10px] text-destructive'>
-                          <span>Không gửi được</span>
+                          <span>{deliveryState.error || 'Không gửi được tin nhắn.'}</span>
                           <Button
                             type='button'
                             variant='ghost'

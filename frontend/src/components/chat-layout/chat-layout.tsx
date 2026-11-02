@@ -9,7 +9,7 @@ import { Button } from '~/components/ui/button'
 import { useConversationDetailQuery } from '~/hooks/use-conversation'
 import { useTypingIndicator } from '~/hooks/use-typing-indicator'
 import type { Message } from '~/types/message.type'
-import type { MessageSendDraft } from '~/lib/message-send'
+import type { MessageDeliveryState, MessageSendDraft } from '~/lib/message-send'
 
 interface ChatLayoutProps {
   conversationId: string
@@ -18,7 +18,7 @@ interface ChatLayoutProps {
   onAttachFile?: () => void
   onOpenInfo?: () => void
   optimisticMessages?: Message[]
-  failedClientMessageIds?: string[]
+  messageDeliveryStates?: Record<string, MessageDeliveryState>
   onRetryMessage?: (clientMessageId: string) => void
 }
 
@@ -29,7 +29,7 @@ export const ChatLayout = ({
   onAttachFile,
   onOpenInfo,
   optimisticMessages,
-  failedClientMessageIds,
+  messageDeliveryStates,
   onRetryMessage
 }: ChatLayoutProps) => {
   const { data: conversation, isLoading, isError, error } = useConversationDetailQuery(conversationId)
@@ -114,7 +114,7 @@ export const ChatLayout = ({
         isGroup={isGroup}
         isLoading={isLoading}
         optimisticMessages={optimisticMessages}
-        failedClientMessageIds={failedClientMessageIds}
+        messageDeliveryStates={messageDeliveryStates}
         onRetryMessage={onRetryMessage}
         isTyping={isTyping}
         typingText={typingText}

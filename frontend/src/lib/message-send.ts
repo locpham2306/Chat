@@ -27,14 +27,31 @@ export interface OutgoingMessage {
   message: Message
 }
 
+export interface MessageDeliveryState {
+  status: 'pending' | 'failed'
+  error?: string
+}
+
+interface QueueDeliveryState extends MessageDeliveryState {
+  retryOnReconnect: boolean
+}
+
+const NETWORK_SEND_ERROR = 'Mất kết nối. Tin nhắn chưa được gửi.'
+
 export class MessageSendQueue {
   private readonly pending = new Map<string, OutgoingMessage>()
   private readonly failed = new Set<string>()
   private readonly locallySent = new Set<string>()
+  private readonly delivery = new Map<string, QueueDeliveryState>()
+  private readonly draftRecipientByClientId = new Map<string, string>()
 
   public enqueue(outgoing: OutgoingMessage): void {
     this.pending.set(outgoing.payload.clientMessageId, outgoing)
     this.locallySent.add(outgoing.payload.clientMessageId)
+    this.delivery.set(outgoing.payload.clientMessageId, { status: 'pending', retryOnReconnect: true })
+    if (outgoing.payload.recipientId) {
+      this.draftRecipientByClientId.set(outgoing.payload.clientMessageId, outgoing.payload.recipientId)
+    }
   }
 
   public attempt(clientMessageId: string, sendFrame: SendFrame): boolean {
@@ -44,8 +61,14 @@ export class MessageSendQueue {
     const sent = sendFrame('SEND_MESSAGE', outgoing.payload)
     if (sent) {
       this.failed.delete(clientMessageId)
+      this.delivery.set(clientMessageId, { status: 'pending', retryOnReconnect: true })
     } else {
       this.failed.add(clientMessageId)
+      this.delivery.set(clientMessageId, {
+        status: 'failed',
+        error: NETWORK_SEND_ERROR,
+        retryOnReconnect: true
+      })
     }
     return sent
   }
@@ -54,10 +77,25 @@ export class MessageSendQueue {
     return this.attempt(clientMessageId, sendFrame)
   }
 
-  public markFailed(clientMessageId: string): boolean {
+  public markFailed(clientMessageId: string, error = 'Không gửi được tin nhắn.', retryOnReconnect = false): boolean {
     if (!this.pending.has(clientMessageId)) return false
     this.failed.add(clientMessageId)
+    this.delivery.set(clientMessageId, { status: 'failed', error, retryOnReconnect })
     return true
+  }
+
+  public retryUnresolved(sendFrame: SendFrame): void {
+    for (const [clientMessageId, state] of this.delivery) {
+      if (state.retryOnReconnect) this.attempt(clientMessageId, sendFrame)
+    }
+  }
+
+  public markUnresolvedFailed(error: string): void {
+    for (const [clientMessageId, state] of this.delivery) {
+      if (!state.retryOnReconnect) continue
+      this.failed.add(clientMessageId)
+      this.delivery.set(clientMessageId, { status: 'failed', error, retryOnReconnect: false })
+    }
   }
 
   public findFailed(conversationId: string, content: string, attachmentIds: string[]): string | undefined {
@@ -81,14 +119,28 @@ export class MessageSendQueue {
   public resolve(clientMessageId: string): void {
     this.pending.delete(clientMessageId)
     this.failed.delete(clientMessageId)
+    this.delivery.delete(clientMessageId)
   }
 
   public isLocallySent(clientMessageId: string): boolean {
     return this.locallySent.has(clientMessageId)
   }
 
+  public isLocallySentToRecipient(clientMessageId: string, recipientId: string): boolean {
+    return this.locallySent.has(clientMessageId) && this.draftRecipientByClientId.get(clientMessageId) === recipientId
+  }
+
   public failedClientMessageIds(): string[] {
     return [...this.failed]
+  }
+
+  public deliveryStates(): Record<string, MessageDeliveryState> {
+    return Object.fromEntries(
+      [...this.delivery].map(([clientMessageId, { status, error }]) => [
+        clientMessageId,
+        error ? { status, error } : { status }
+      ])
+    )
   }
 }
 
