@@ -138,7 +138,7 @@ const AddMembersDialogContent = ({ onOpenChange, conversationId, onSuccess }: Ad
                     type='button'
                     onClick={() => handleRemoveSelected(user.id)}
                     className='rounded-full p-0.5 hover:bg-muted text-muted-foreground hover:text-foreground'
-                    aria-label={`Bỏ chọn ${user.fullName}`}
+                    aria-label={`Xóa ${user.fullName} khỏi danh sách đã chọn`}
                   >
                     <X className='h-3 w-3' />
                   </button>
@@ -155,6 +155,7 @@ const AddMembersDialogContent = ({ onOpenChange, conversationId, onSuccess }: Ad
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             placeholder='Tìm theo họ tên hoặc username...'
+            aria-label='Tìm theo họ tên hoặc username để thêm vào nhóm'
             className='pl-9 text-sm'
             autoFocus
           />
@@ -164,19 +165,27 @@ const AddMembersDialogContent = ({ onOpenChange, conversationId, onSuccess }: Ad
         <ScrollArea className='flex-1'>
           <div className='p-3'>
             {isLoading ? (
-              <div className='flex items-center justify-center py-12 text-sm text-muted-foreground'>
-                <LoaderCircle className='mr-2 h-4 w-4 animate-spin' />
+              <div
+                role='status'
+                aria-live='polite'
+                className='flex items-center justify-center py-12 text-sm text-muted-foreground'
+              >
+                <LoaderCircle className='mr-2 h-4 w-4 animate-spin' aria-hidden='true' />
                 <span>Đang tìm kiếm...</span>
               </div>
             ) : availableQuery.isError ? (
-              <div className='flex flex-col items-center justify-center py-10 text-center'>
+              <div role='alert' className='flex flex-col items-center justify-center py-10 text-center'>
                 <p className='text-xs text-destructive'>{getApiErrorMessage(availableQuery.error)}</p>
                 <Button variant='ghost' size='sm' onClick={() => availableQuery.refetch()} className='mt-2 text-xs'>
                   Thử lại
                 </Button>
               </div>
             ) : availableUsers.length === 0 ? (
-              <div className='flex flex-col items-center justify-center py-12 text-center text-muted-foreground'>
+              <div
+                role='status'
+                aria-live='polite'
+                className='flex flex-col items-center justify-center py-12 text-center text-muted-foreground'
+              >
                 <p className='text-sm font-medium'>Không tìm thấy người dùng phù hợp</p>
                 <p className='mt-1 text-xs'>
                   {keyword ? 'Thử tìm với từ khóa khác' : 'Tất cả người dùng khả dụng đã có trong nhóm'}
@@ -192,11 +201,14 @@ const AddMembersDialogContent = ({ onOpenChange, conversationId, onSuccess }: Ad
                   return (
                     <div
                       key={user.id}
-                      role='button'
+                      role='checkbox'
+                      aria-checked={selected}
+                      aria-label={`Chọn thành viên ${user.fullName} (@${user.username})`}
                       tabIndex={0}
                       onClick={() => handleToggleUser(user)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
                           handleToggleUser(user)
                         }
                       }}

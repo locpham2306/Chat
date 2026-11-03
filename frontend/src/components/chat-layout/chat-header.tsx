@@ -15,7 +15,11 @@ export const ChatHeader = ({ title, isGroup = false, subtitle, avatarUrl, onBack
   const initials = (title.trim().slice(0, 1) || 'U').toUpperCase()
 
   return (
-    <div className='h-14 border-b px-4 flex items-center justify-between bg-card/50 backdrop-blur shrink-0'>
+    <header
+      role='banner'
+      aria-label={`Cuộc trò chuyện: ${title}`}
+      className='h-14 border-b px-4 flex items-center justify-between bg-card/50 backdrop-blur shrink-0'
+    >
       <div className='flex items-center gap-3 min-w-0'>
         {onBack && (
           <Button
@@ -25,7 +29,7 @@ export const ChatHeader = ({ title, isGroup = false, subtitle, avatarUrl, onBack
             className='h-8 w-8 sm:hidden shrink-0'
             aria-label='Quay lại danh sách'
           >
-            <ArrowLeft className='h-4 w-4' />
+            <ArrowLeft className='h-4 w-4' aria-hidden='true' />
           </Button>
         )}
 
@@ -34,7 +38,7 @@ export const ChatHeader = ({ title, isGroup = false, subtitle, avatarUrl, onBack
           <AvatarFallback
             className={isGroup ? 'bg-primary/10 text-primary' : 'bg-primary/10 text-primary font-semibold text-xs'}
           >
-            {isGroup ? <Users className='h-4 w-4' /> : initials}
+            {isGroup ? <Users className='h-4 w-4' aria-hidden='true' /> : initials}
           </AvatarFallback>
         </Avatar>
 
@@ -51,13 +55,13 @@ export const ChatHeader = ({ title, isGroup = false, subtitle, avatarUrl, onBack
             size='icon'
             onClick={onOpenInfo}
             className='h-8 w-8 text-muted-foreground hover:text-foreground'
-            aria-label='Cài đặt hội thoại'
-            title='Cài đặt hội thoại'
+            aria-label='Cài đặt nhóm chat'
+            title='Cài đặt nhóm chat'
           >
-            <Settings className='h-4 w-4' />
+            <Settings className='h-4 w-4' aria-hidden='true' />
           </Button>
         </div>
       )}
-    </div>
+    </header>
   )
 }

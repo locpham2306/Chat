@@ -79,13 +79,18 @@ export const ConversationItem = ({ conversation, isActive = false, onSelect }: C
 
   const previewText = getPreviewText()
 
+  const itemAriaLabel = `Cuộc trò chuyện với ${title}, ${previewText}${conversation.unreadCount > 0 ? `, ${conversation.unreadCount} tin nhắn chưa đọc` : ''}${isOnline ? ', đang trực tuyến' : ''}`
+
   return (
     <div
       role='button'
       tabIndex={0}
+      aria-label={itemAriaLabel}
+      aria-current={isActive ? 'true' : undefined}
       onClick={() => onSelect(conversation.id)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
           onSelect(conversation.id)
         }
       }}
@@ -107,6 +112,8 @@ export const ConversationItem = ({ conversation, isActive = false, onSelect }: C
           <span
             className='absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-background'
             title='Đang trực tuyến'
+            role='status'
+            aria-label='Đang trực tuyến'
           />
         )}
       </div>

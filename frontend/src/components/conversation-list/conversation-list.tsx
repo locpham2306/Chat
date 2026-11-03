@@ -35,7 +35,7 @@ export const ConversationList = ({
   const totalPages = data?.totalPages ?? (items.length > 0 ? 1 : 0)
 
   return (
-    <div className='flex flex-col h-full w-full bg-card'>
+    <div className='flex flex-col h-full w-full bg-card' role='region' aria-label='Danh sách cuộc trò chuyện'>
       {/* Header */}
       <div className='p-3 border-b flex items-center justify-between shrink-0'>
         <div>
@@ -78,7 +78,7 @@ export const ConversationList = ({
           <ConversationEmpty />
         ) : (
           <ScrollArea className='h-full w-full'>
-            <div className='p-2 space-y-1 w-full min-w-0'>
+            <div className='p-2 space-y-1 w-full min-w-0' role='list' aria-label='Các cuộc trò chuyện'>
               {items.map((conversation) => (
                 <ConversationItem
                   key={conversation.id}
@@ -101,8 +101,9 @@ export const ConversationList = ({
             disabled={page === 0}
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             className='h-7 px-2 text-xs gap-1'
+            aria-label='Trang trước'
           >
-            <ChevronLeft className='h-3.5 w-3.5' />
+            <ChevronLeft className='h-3.5 w-3.5' aria-hidden='true' />
             Trước
           </Button>
           <span>
@@ -114,9 +115,10 @@ export const ConversationList = ({
             disabled={page + 1 >= totalPages}
             onClick={() => setPage((p) => p + 1)}
             className='h-7 px-2 text-xs gap-1'
+            aria-label='Trang sau'
           >
             Sau
-            <ChevronRight className='h-3.5 w-3.5' />
+            <ChevronRight className='h-3.5 w-3.5' aria-hidden='true' />
           </Button>
         </div>
       )}
