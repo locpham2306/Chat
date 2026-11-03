@@ -27,7 +27,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# Local tests are not committed in this project
-**/*.test.ts
-**/*.test.tsx
