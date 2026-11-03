@@ -165,12 +165,22 @@ export const ChatComposer = ({
   }
 
   const isSendDisabled = disabled || hasUploading || hasFailed || (!content.trim() && uploadedFiles.length === 0)
+  const failedAttachmentNames = attachments
+    .filter((attachment) => attachment.status === 'failed')
+    .map((attachment) => attachment.source.name)
 
   return (
-    <form onSubmit={handleSubmit} className='p-3 border-t bg-card/60 backdrop-blur shrink-0'>
-      <input ref={fileInputRef} type='file' multiple className='hidden' onChange={handleSelectFiles} />
+    <form onSubmit={handleSubmit} className='p-3 border-t bg-card/60 backdrop-blur shrink-0' aria-label='Soạn tin nhắn'>
+      <input
+        ref={fileInputRef}
+        type='file'
+        multiple
+        className='hidden'
+        onChange={handleSelectFiles}
+        aria-label='Chọn tệp đính kèm'
+      />
       {attachments.length > 0 && (
-        <div className='mb-2 space-y-1.5' aria-live='polite'>
+        <div className='mb-2 space-y-1.5'>
           {attachments.map((attachment) => (
             <div
               key={attachment.localId}
@@ -183,7 +193,7 @@ export const ChatComposer = ({
               </div>
               {attachment.status === 'uploading' && (
                 <span className='flex items-center gap-1 text-muted-foreground text-[11px] pr-1'>
-                  <LoaderCircle className='h-3.5 w-3.5 animate-spin' />
+                  <LoaderCircle className='h-3.5 w-3.5 animate-spin' aria-hidden='true' />
                   {attachment.progress}%
                 </span>
               )}
@@ -192,7 +202,7 @@ export const ChatComposer = ({
                   className='flex min-w-0 items-center gap-1 text-destructive text-[11px] pr-1'
                   title={attachment.error}
                 >
-                  <AlertCircle className='h-3.5 w-3.5 shrink-0' />
+                  <AlertCircle className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
                   <span className='truncate'>{attachment.error ?? 'Lỗi tải tệp'}</span>
                 </span>
               )}
@@ -205,7 +215,7 @@ export const ChatComposer = ({
                   onClick={() => retry(attachment.localId)}
                   aria-label={`Tải lại ${attachment.source.name}`}
                 >
-                  <RotateCcw className='h-3.5 w-3.5' />
+                  <RotateCcw className='h-3.5 w-3.5' aria-hidden='true' />
                 </Button>
               )}
               <Button
@@ -216,11 +226,15 @@ export const ChatComposer = ({
                 onClick={() => remove(attachment.localId)}
                 aria-label={`Xóa ${attachment.source.name}`}
               >
-                <X className='h-3.5 w-3.5' />
+                <X className='h-3.5 w-3.5' aria-hidden='true' />
               </Button>
             </div>
           ))}
-          {hasFailed && <p className='text-[10px] text-destructive'>Xóa hoặc tải lại tệp lỗi trước khi gửi tin.</p>}
+          {hasFailed && (
+            <p role='alert' className='text-[10px] text-destructive'>
+              Không thể tải {failedAttachmentNames.join(', ')}. Xóa hoặc tải lại tệp lỗi trước khi gửi tin.
+            </p>
+          )}
         </div>
       )}
       <div className='flex items-end gap-2'>
@@ -237,7 +251,7 @@ export const ChatComposer = ({
           title='Đính kèm tệp'
           aria-label='Đính kèm tệp'
         >
-          <Paperclip className='h-4 w-4' />
+          <Paperclip className='h-4 w-4' aria-hidden='true' />
         </Button>
 
         <div className='flex-1 min-w-0'>
@@ -249,6 +263,9 @@ export const ChatComposer = ({
             disabled={disabled}
             placeholder={placeholder}
             rows={1}
+            aria-label='Nội dung tin nhắn'
+            aria-describedby='chat-composer-shortcuts'
+            aria-keyshortcuts='Enter Shift+Enter'
             className='py-2 text-xs leading-normal'
           />
         </div>
@@ -261,11 +278,11 @@ export const ChatComposer = ({
           title='Gửi tin nhắn (Enter)'
           aria-label='Gửi tin nhắn'
         >
-          <SendHorizontal className='h-4 w-4' />
+          <SendHorizontal className='h-4 w-4' aria-hidden='true' />
         </Button>
       </div>
       <div className='flex justify-between items-center mt-1 px-1'>
-        <span className='text-[10px] text-muted-foreground'>
+        <span id='chat-composer-shortcuts' className='text-[10px] text-muted-foreground'>
           Nhấn <kbd className='px-1 py-0.5 rounded bg-muted font-mono text-[9px]'>Enter</kbd> để gửi,{' '}
           <kbd className='px-1 py-0.5 rounded bg-muted font-mono text-[9px]'>Shift + Enter</kbd> xuống dòng
         </span>

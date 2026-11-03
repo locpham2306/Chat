@@ -92,18 +92,25 @@ const UserSearchDialogContent = ({ onSelectUser, selectingUserId, selectionError
             onChange={(event) => setKeyword(event.target.value)}
             placeholder='Nhập tên hoặc tài khoản...'
             aria-label='Tìm kiếm người dùng'
+            aria-controls='user-search-results'
+            aria-describedby='user-search-status'
+            aria-busy={isLoading}
             className='pl-9 pr-9'
             autoFocus
           />
           {searchQuery.isFetching && !isLoading && (
             <LoaderCircle
               className='absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground'
-              aria-label='Đang cập nhật kết quả'
+              aria-hidden='true'
             />
           )}
         </div>
-        <p className='mt-2 text-xs text-muted-foreground' aria-live='polite'>
-          {isLoading ? 'Đang tìm kiếm...' : `${totalElements} người dùng`}
+        <p id='user-search-status' className='mt-2 text-xs text-muted-foreground' role='status'>
+          {isLoading
+            ? 'Đang tìm kiếm...'
+            : searchQuery.isFetching
+              ? 'Đang cập nhật kết quả...'
+              : `${totalElements} người dùng`}
         </p>
       </div>
 
@@ -113,7 +120,12 @@ const UserSearchDialogContent = ({ onSelectUser, selectingUserId, selectionError
         </div>
       )}
 
-      <div className='min-h-0 flex-1 overflow-hidden'>
+      <div
+        id='user-search-results'
+        role='region'
+        aria-label='Kết quả tìm kiếm người dùng'
+        className='min-h-0 flex-1 overflow-hidden'
+      >
         {isLoading ? (
           <div role='status' className='flex h-full items-center justify-center gap-2 text-sm text-muted-foreground'>
             <LoaderCircle className='h-4 w-4 animate-spin' aria-hidden='true' />
@@ -140,36 +152,37 @@ const UserSearchDialogContent = ({ onSelectUser, selectingUserId, selectionError
           </div>
         ) : (
           <ScrollArea className='h-full'>
-            <div className='space-y-1 p-2'>
+            <ul className='space-y-1 p-2' aria-label='Kết quả tìm kiếm người dùng'>
               {users.map((user) => (
-                <button
-                  key={user.id}
-                  type='button'
-                  onClick={() => onSelectUser(user)}
-                  disabled={Boolean(selectingUserId)}
-                  aria-busy={selectingUserId === user.id}
-                  className='flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
-                >
-                  <Avatar className='h-10 w-10 shrink-0'>
-                    <AvatarFallback>{(user.fullName || user.username).slice(0, 1).toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  <div className='min-w-0 flex-1'>
-                    <p className='truncate text-sm font-medium'>{user.fullName || user.username}</p>
-                    <p className='truncate text-xs text-muted-foreground'>@{user.username}</p>
-                  </div>
-                  {selectingUserId === user.id ? (
-                    <LoaderCircle
-                      className='h-4 w-4 animate-spin text-muted-foreground'
-                      aria-label='Đang mở hội thoại'
-                    />
-                  ) : (
-                    <Badge variant={user.status === 'ONLINE' ? 'online' : 'offline'}>
-                      {user.status === 'ONLINE' ? 'Online' : 'Offline'}
-                    </Badge>
-                  )}
-                </button>
+                <li key={user.id}>
+                  <button
+                    type='button'
+                    onClick={() => onSelectUser(user)}
+                    disabled={Boolean(selectingUserId)}
+                    aria-busy={selectingUserId === user.id}
+                    className='flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                  >
+                    <Avatar className='h-10 w-10 shrink-0'>
+                      <AvatarFallback>{(user.fullName || user.username).slice(0, 1).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div className='min-w-0 flex-1'>
+                      <p className='truncate text-sm font-medium'>{user.fullName || user.username}</p>
+                      <p className='truncate text-xs text-muted-foreground'>@{user.username}</p>
+                    </div>
+                    {selectingUserId === user.id ? (
+                      <LoaderCircle
+                        className='h-4 w-4 animate-spin text-muted-foreground'
+                        aria-label='Đang mở hội thoại'
+                      />
+                    ) : (
+                      <Badge variant={user.status === 'ONLINE' ? 'online' : 'offline'}>
+                        {user.status === 'ONLINE' ? 'Online' : 'Offline'}
+                      </Badge>
+                    )}
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
           </ScrollArea>
         )}
       </div>

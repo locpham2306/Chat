@@ -7,7 +7,7 @@ export const AuthLayout = () => {
       <div className='w-full max-w-sm space-y-6'>
         <div className='flex flex-col items-center space-y-2 text-center'>
           <div className='flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm'>
-            <MessageSquare className='h-6 w-6' />
+            <MessageSquare className='h-6 w-6' aria-hidden='true' />
           </div>
           <h1 className='text-xl font-bold tracking-tight'>Chat App</h1>
           <p className='text-xs text-muted-foreground'>BTL Lập Trình Mạng</p>

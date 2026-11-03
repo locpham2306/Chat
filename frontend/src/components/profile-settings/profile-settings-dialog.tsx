@@ -152,7 +152,7 @@ const ProfileSettingsDialogContent = ({ onOpenChange, onUploadingChange, user }:
       <DialogHeader className='border-b p-5 pr-12'>
         <div className='flex items-center gap-2'>
           <div className='flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary'>
-            <UserRound className='h-4 w-4' />
+            <UserRound className='h-4 w-4' aria-hidden='true' />
           </div>
           <div>
             <DialogTitle>Chỉnh sửa hồ sơ</DialogTitle>
@@ -177,6 +177,7 @@ const ProfileSettingsDialogContent = ({ onOpenChange, onUploadingChange, user }:
               className='hidden'
               onChange={handleSelectAvatar}
               disabled={isPending}
+              aria-label='Chọn ảnh đại diện'
             />
             <button
               type='button'
@@ -186,7 +187,11 @@ const ProfileSettingsDialogContent = ({ onOpenChange, onUploadingChange, user }:
               title='Đổi ảnh đại diện'
               aria-label='Đổi ảnh đại diện'
             >
-              {isUploading ? <LoaderCircle className='h-3.5 w-3.5 animate-spin' /> : <Camera className='h-3.5 w-3.5' />}
+              {isUploading ? (
+                <LoaderCircle className='h-3.5 w-3.5 animate-spin' aria-hidden='true' />
+              ) : (
+                <Camera className='h-3.5 w-3.5' aria-hidden='true' />
+              )}
             </button>
           </div>
 
@@ -199,12 +204,21 @@ const ProfileSettingsDialogContent = ({ onOpenChange, onUploadingChange, user }:
               disabled={isPending}
               className='h-7 gap-1 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive'
             >
-              <Trash2 className='h-3 w-3' />
+              <Trash2 className='h-3 w-3' aria-hidden='true' />
               Xóa ảnh đại diện
             </Button>
           )}
 
-          {uploadError && <p className='text-center text-xs text-destructive'>{uploadError}</p>}
+          {isUploading && (
+            <p className='sr-only' role='status'>
+              Đang tải ảnh đại diện...
+            </p>
+          )}
+          {uploadError && (
+            <p className='text-center text-xs text-destructive' role='alert'>
+              {uploadError}
+            </p>
+          )}
         </div>
 
         <div className='space-y-1.5'>
@@ -217,8 +231,14 @@ const ProfileSettingsDialogContent = ({ onOpenChange, onUploadingChange, user }:
             onChange={(event) => setFullName(event.target.value)}
             disabled={isPending}
             autoComplete='name'
+            aria-invalid={Boolean(fullNameError)}
+            aria-describedby={fullNameError ? 'profile-full-name-error' : undefined}
           />
-          {fullNameError && <p className='text-xs text-destructive'>{fullNameError}</p>}
+          {fullNameError && (
+            <p id='profile-full-name-error' className='text-xs text-destructive' role='alert'>
+              {fullNameError}
+            </p>
+          )}
         </div>
 
         <div className='rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground'>
@@ -230,7 +250,7 @@ const ProfileSettingsDialogContent = ({ onOpenChange, onUploadingChange, user }:
             className='flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive'
             role='alert'
           >
-            <AlertCircle className='mt-0.5 h-3.5 w-3.5 shrink-0' />
+            <AlertCircle className='mt-0.5 h-3.5 w-3.5 shrink-0' aria-hidden='true' />
             <span>{getApiErrorMessage(updateProfileMutation.error)}</span>
           </div>
         )}
@@ -246,7 +266,7 @@ const ProfileSettingsDialogContent = ({ onOpenChange, onUploadingChange, user }:
           onClick={handleSave}
           disabled={Boolean(fullNameError) || !hasChanges || isPending}
         >
-          {updateProfileMutation.isPending && <LoaderCircle className='h-3.5 w-3.5 animate-spin' />}
+          {updateProfileMutation.isPending && <LoaderCircle className='h-3.5 w-3.5 animate-spin' aria-hidden='true' />}
           Lưu thay đổi
         </Button>
       </DialogFooter>

@@ -43,6 +43,70 @@ describe('LoginPage', () => {
     expect(adapter).not.toHaveBeenCalled()
   })
 
+  it('names the form and focuses the first field after a delayed server rejection', async () => {
+    let rejectLogin: (() => void) | undefined
+    http.defaults.adapter = (config) =>
+      new Promise((_, reject) => {
+        rejectLogin = () => {
+          const response = {
+            data: {
+              status: 422,
+              code: 'VALIDATION_ERROR',
+              message: 'Dữ liệu không hợp lệ',
+              path: '/api/auth/login',
+              timestamp: '2026-11-03T00:00:00Z',
+              fieldErrors: [
+                { field: 'username', message: 'Tài khoản không hợp lệ' },
+                { field: 'password', message: 'Mật khẩu không hợp lệ' }
+              ]
+            },
+            status: 422,
+            statusText: 'Unprocessable Entity',
+            headers: {},
+            config
+          } satisfies AxiosResponse
+          reject(new AxiosError('Validation failed', AxiosError.ERR_BAD_REQUEST, config, undefined, response))
+        }
+      })
+    renderLogin()
+    const user = await fillCredentials()
+
+    expect(screen.getByRole('form', { name: 'Đăng nhập' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }))
+    expect(await screen.findByRole('button', { name: 'Đang đăng nhập...' })).toBeDisabled()
+    rejectLogin?.()
+
+    expect(await screen.findByText('Tài khoản không hợp lệ')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByLabelText('Tài khoản')).toHaveFocus())
+  })
+
+  it('uses high-contrast text for authentication errors', async () => {
+    http.defaults.adapter = async (config) => {
+      const response = {
+        data: {
+          status: 401,
+          code: 'UNAUTHENTICATED',
+          message: 'Unauthorized',
+          path: '/api/auth/login',
+          timestamp: '2026-11-03T00:00:00Z',
+          fieldErrors: []
+        },
+        status: 401,
+        statusText: 'Unauthorized',
+        headers: {},
+        config
+      } satisfies AxiosResponse
+      throw new AxiosError('Unauthorized', AxiosError.ERR_BAD_REQUEST, config, undefined, response)
+    }
+    renderLogin()
+    const user = await fillCredentials()
+
+    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveClass('text-auth-error-foreground')
+  })
+
   it('disables the form while login is pending', async () => {
     let resolveLogin: (() => void) | undefined
     http.defaults.adapter = (config) =>
