@@ -238,38 +238,66 @@ const GroupSettingsDialogContent = ({ onOpenChange, conversation }: GroupSetting
       </DialogHeader>
 
       {/* Tabs navigation */}
-      <div className='flex border-b px-5 bg-muted/20 shrink-0'>
+      <div className='flex border-b px-5 bg-muted/20 shrink-0' role='tablist' aria-label='Cài đặt nhóm'>
         <button
           type='button'
+          role='tab'
+          id='tab-group-info'
+          aria-selected={activeTab === 'info'}
+          aria-controls='tabpanel-group-info'
+          tabIndex={activeTab === 'info' ? 0 : -1}
           onClick={() => setActiveTab('info')}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+              e.preventDefault()
+              setActiveTab('members')
+            }
+          }}
           className={cn(
-            'flex items-center gap-2 py-3 px-3 text-xs font-semibold border-b-2 transition-colors -mb-px',
+            'flex items-center gap-2 py-3 px-3 text-xs font-semibold border-b-2 transition-colors -mb-px focus:outline-hidden focus:ring-1 focus:ring-ring',
             activeTab === 'info'
               ? 'border-primary text-primary'
               : 'border-transparent text-muted-foreground hover:text-foreground'
           )}
         >
-          <Settings className='h-3.5 w-3.5' />
+          <Settings className='h-3.5 w-3.5' aria-hidden='true' />
           Cài đặt chung
         </button>
         <button
           type='button'
+          role='tab'
+          id='tab-group-members'
+          aria-selected={activeTab === 'members'}
+          aria-controls='tabpanel-group-members'
+          tabIndex={activeTab === 'members' ? 0 : -1}
           onClick={() => setActiveTab('members')}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+              e.preventDefault()
+              setActiveTab('info')
+            }
+          }}
           className={cn(
-            'flex items-center gap-2 py-3 px-3 text-xs font-semibold border-b-2 transition-colors -mb-px',
+            'flex items-center gap-2 py-3 px-3 text-xs font-semibold border-b-2 transition-colors -mb-px focus:outline-hidden focus:ring-1 focus:ring-ring',
             activeTab === 'members'
               ? 'border-primary text-primary'
               : 'border-transparent text-muted-foreground hover:text-foreground'
           )}
         >
-          <Users className='h-3.5 w-3.5' />
+          <Users className='h-3.5 w-3.5' aria-hidden='true' />
           Thành viên ({currentConv.memberCount})
         </button>
       </div>
 
       {/* Tab 1: Cài đặt chung */}
       {activeTab === 'info' && (
-        <div className='flex-1 overflow-y-auto p-5 space-y-5'>
+        <div
+          role='tabpanel'
+          id='tabpanel-group-info'
+          aria-labelledby='tab-group-info'
+          tabIndex={0}
+          className='flex-1 overflow-y-auto p-5 space-y-5 focus:outline-hidden'
+        >
           {/* Vai trò của người dùng */}
           <div className='flex items-center justify-between p-3 rounded-lg bg-muted/40 border text-xs'>
             <span className='text-muted-foreground'>Vai trò của bạn:</span>
@@ -362,6 +390,8 @@ const GroupSettingsDialogContent = ({ onOpenChange, conversation }: GroupSetting
               id='settings-group-name'
               value={name}
               maxLength={100}
+              aria-invalid={Boolean(nameError)}
+              aria-describedby={nameError ? 'settings-group-name-error' : undefined}
               disabled={!isOwner || updateMutation.isPending}
               onChange={(e) => {
                 setName(e.target.value)
@@ -370,7 +400,11 @@ const GroupSettingsDialogContent = ({ onOpenChange, conversation }: GroupSetting
               placeholder='Nhập tên nhóm...'
               className={!isOwner ? 'bg-muted cursor-not-allowed opacity-80' : ''}
             />
-            {nameError && <p className='text-xs text-destructive'>{nameError}</p>}
+            {nameError && (
+              <p id='settings-group-name-error' className='text-xs text-destructive' role='alert'>
+                {nameError}
+              </p>
+            )}
           </div>
 
           {/* Thống kê nhóm */}
@@ -395,7 +429,13 @@ const GroupSettingsDialogContent = ({ onOpenChange, conversation }: GroupSetting
 
       {/* Tab 2: Quản lý thành viên */}
       {activeTab === 'members' && (
-        <div className='flex flex-1 flex-col overflow-hidden'>
+        <div
+          role='tabpanel'
+          id='tabpanel-group-members'
+          aria-labelledby='tab-group-members'
+          tabIndex={0}
+          className='flex flex-1 flex-col overflow-hidden focus:outline-hidden'
+        >
           {/* Header hành động của Tab Members */}
           <div className='p-3 border-b flex items-center justify-between gap-2 shrink-0 bg-muted/10'>
             <div className='relative flex-1'>
@@ -404,6 +444,7 @@ const GroupSettingsDialogContent = ({ onOpenChange, conversation }: GroupSetting
                 value={memberKeyword}
                 onChange={(e) => setMemberKeyword(e.target.value)}
                 placeholder='Lọc thành viên...'
+                aria-label='Lọc thành viên trong nhóm'
                 className='pl-8 h-8 text-xs'
               />
             </div>
@@ -633,10 +674,17 @@ const GroupSettingsDialogContent = ({ onOpenChange, conversation }: GroupSetting
 
       {/* Dialog xác nhận xóa thành viên khỏi nhóm */}
       <Dialog open={Boolean(memberToRemove)} onOpenChange={(open) => !open && setMemberToRemove(null)}>
-        <DialogContent className='max-w-sm'>
+        <DialogContent
+          className='max-w-sm'
+          role='alertdialog'
+          aria-labelledby='remove-member-dialog-title'
+          aria-describedby='remove-member-dialog-desc'
+        >
           <DialogHeader>
-            <DialogTitle className='text-sm'>Xóa thành viên khỏi nhóm?</DialogTitle>
-            <DialogDescription className='text-xs leading-relaxed'>
+            <DialogTitle id='remove-member-dialog-title' className='text-sm'>
+              Xóa thành viên khỏi nhóm?
+            </DialogTitle>
+            <DialogDescription id='remove-member-dialog-desc' className='text-xs leading-relaxed'>
               Bạn có chắc chắn muốn xóa <strong>{memberToRemove?.user.fullName}</strong> khỏi nhóm trò chuyện này không?
             </DialogDescription>
           </DialogHeader>
@@ -670,10 +718,17 @@ const GroupSettingsDialogContent = ({ onOpenChange, conversation }: GroupSetting
 
       {/* Dialog xác nhận rời nhóm */}
       <Dialog open={isConfirmLeaveOpen} onOpenChange={setIsConfirmLeaveOpen}>
-        <DialogContent className='max-w-sm'>
+        <DialogContent
+          className='max-w-sm'
+          role='alertdialog'
+          aria-labelledby='leave-group-dialog-title'
+          aria-describedby='leave-group-dialog-desc'
+        >
           <DialogHeader>
-            <DialogTitle className='text-sm'>Rời khỏi nhóm trò chuyện?</DialogTitle>
-            <DialogDescription className='text-xs leading-relaxed'>
+            <DialogTitle id='leave-group-dialog-title' className='text-sm'>
+              Rời khỏi nhóm trò chuyện?
+            </DialogTitle>
+            <DialogDescription id='leave-group-dialog-desc' className='text-xs leading-relaxed'>
               Bạn sẽ không còn nhận được tin nhắn từ nhóm <strong>{currentConv.name}</strong> nữa.
             </DialogDescription>
           </DialogHeader>

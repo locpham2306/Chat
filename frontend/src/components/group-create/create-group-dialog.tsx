@@ -146,6 +146,8 @@ const CreateGroupDialogContent = ({ onOpenChange, onSuccess }: CreateGroupDialog
             id='group-name'
             value={groupName}
             maxLength={100}
+            aria-invalid={Boolean(nameError)}
+            aria-describedby={nameError ? 'group-name-error' : undefined}
             onChange={(e) => {
               setGroupName(e.target.value)
               if (!nameTouched) setNameTouched(true)
@@ -153,7 +155,11 @@ const CreateGroupDialogContent = ({ onOpenChange, onSuccess }: CreateGroupDialog
             placeholder='Ví dụ: Nhóm học tập LTM, Dự án Chat...'
             autoFocus
           />
-          {nameError && <p className='text-xs text-destructive'>{nameError}</p>}
+          {nameError && (
+            <p id='group-name-error' className='text-xs text-destructive' role='alert'>
+              {nameError}
+            </p>
+          )}
         </div>
 
         {/* Danh sách thành viên đã chọn */}
@@ -164,6 +170,7 @@ const CreateGroupDialogContent = ({ onOpenChange, onSuccess }: CreateGroupDialog
               <button
                 type='button'
                 onClick={() => setSelectedUsers([])}
+                aria-label='Bỏ chọn tất cả thành viên'
                 className='text-[11px] text-muted-foreground hover:text-foreground transition-colors'
               >
                 Xóa tất cả
@@ -185,7 +192,7 @@ const CreateGroupDialogContent = ({ onOpenChange, onSuccess }: CreateGroupDialog
                     type='button'
                     onClick={() => handleRemoveUser(user.id)}
                     className='ml-0.5 rounded-full p-0.5 hover:bg-muted text-muted-foreground hover:text-foreground'
-                    aria-label={`Xóa ${user.fullName}`}
+                    aria-label={`Xóa ${user.fullName} khỏi danh sách đã chọn`}
                   >
                     <X className='h-3 w-3' />
                   </button>
@@ -206,6 +213,8 @@ const CreateGroupDialogContent = ({ onOpenChange, onSuccess }: CreateGroupDialog
                 setSearchParams((prev) => ({ ...prev, page: 0 }))
               }}
               placeholder='Tìm người theo tên hoặc username...'
+              aria-label='Tìm kiếm thành viên'
+              aria-describedby='create-group-search-status'
               className='pl-9 pr-9 text-xs'
             />
             {isLoading && (
@@ -216,14 +225,24 @@ const CreateGroupDialogContent = ({ onOpenChange, onSuccess }: CreateGroupDialog
 
         {/* Danh sách người dùng để chọn */}
         <ScrollArea className='flex-1'>
-          <div className='p-2 space-y-1'>
+          <div className='p-2 space-y-1' role='group' aria-label='Danh sách người dùng'>
             {isLoading ? (
-              <div className='flex items-center justify-center p-8 text-xs text-muted-foreground gap-2'>
-                <LoaderCircle className='h-4 w-4 animate-spin' />
+              <div
+                id='create-group-search-status'
+                role='status'
+                aria-live='polite'
+                className='flex items-center justify-center p-8 text-xs text-muted-foreground gap-2'
+              >
+                <LoaderCircle className='h-4 w-4 animate-spin' aria-hidden='true' />
                 Đang tìm kiếm...
               </div>
             ) : availableUsers.length === 0 ? (
-              <div className='p-8 text-center text-xs text-muted-foreground'>
+              <div
+                id='create-group-search-status'
+                role='status'
+                aria-live='polite'
+                className='p-8 text-center text-xs text-muted-foreground'
+              >
                 {keyword.trim()
                   ? `Không tìm thấy người dùng nào phù hợp với "${keyword.trim()}".`
                   : 'Không có người dùng nào.'}
@@ -234,11 +253,14 @@ const CreateGroupDialogContent = ({ onOpenChange, onSuccess }: CreateGroupDialog
                 return (
                   <div
                     key={user.id}
-                    role='button'
+                    role='checkbox'
+                    aria-checked={checked}
+                    aria-label={`Chọn thành viên ${user.fullName} (@${user.username})`}
                     tabIndex={0}
                     onClick={() => handleToggleUser(user)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
                         handleToggleUser(user)
                       }
                     }}
@@ -279,8 +301,12 @@ const CreateGroupDialogContent = ({ onOpenChange, onSuccess }: CreateGroupDialog
 
         {/* Phân trang kết quả tìm kiếm nếu có nhiều hơn 1 trang */}
         {totalPages > 1 && (
-          <div className='shrink-0 border-t bg-muted/20 px-3 py-1.5 flex items-center justify-between text-xs'>
-            <span className='text-[11px] text-muted-foreground'>
+          <div
+            className='shrink-0 border-t bg-muted/20 px-3 py-1.5 flex items-center justify-between text-xs'
+            role='navigation'
+            aria-label='Phân trang người dùng'
+          >
+            <span className='text-[11px] text-muted-foreground' aria-live='polite'>
               Trang {searchParams.page + 1}/{totalPages}
             </span>
             <div className='flex items-center gap-1'>
@@ -292,8 +318,9 @@ const CreateGroupDialogContent = ({ onOpenChange, onSuccess }: CreateGroupDialog
                 disabled={searchParams.page <= 0}
                 onClick={() => setSearchParams((prev) => ({ ...prev, page: prev.page - 1 }))}
                 title='Trang trước'
+                aria-label='Trang trước'
               >
-                <ChevronLeft className='h-3.5 w-3.5' />
+                <ChevronLeft className='h-3.5 w-3.5' aria-hidden='true' />
               </Button>
               <Button
                 type='button'
@@ -303,8 +330,9 @@ const CreateGroupDialogContent = ({ onOpenChange, onSuccess }: CreateGroupDialog
                 disabled={searchParams.page >= totalPages - 1}
                 onClick={() => setSearchParams((prev) => ({ ...prev, page: prev.page + 1 }))}
                 title='Trang sau'
+                aria-label='Trang sau'
               >
-                <ChevronRight className='h-3.5 w-3.5' />
+                <ChevronRight className='h-3.5 w-3.5' aria-hidden='true' />
               </Button>
             </div>
           </div>
@@ -314,12 +342,12 @@ const CreateGroupDialogContent = ({ onOpenChange, onSuccess }: CreateGroupDialog
       {/* Footer */}
       <DialogFooter className='shrink-0 border-t p-4 flex flex-col sm:flex-row items-center justify-between gap-2 bg-muted/10'>
         {createGroupMutation.error ? (
-          <div className='flex items-center gap-1.5 text-xs text-destructive max-w-xs truncate'>
-            <AlertCircle className='h-3.5 w-3.5 shrink-0' />
+          <div role='alert' className='flex items-center gap-1.5 text-xs text-destructive max-w-xs truncate'>
+            <AlertCircle className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
             <span>{getApiErrorMessage(createGroupMutation.error)}</span>
           </div>
         ) : (
-          <div className='text-xs text-muted-foreground'>
+          <div role='status' aria-live='polite' className='text-xs text-muted-foreground'>
             {selectedUsers.length === 0 ? 'Chưa chọn thành viên' : `${selectedUsers.length} thành viên được chọn`}
           </div>
         )}

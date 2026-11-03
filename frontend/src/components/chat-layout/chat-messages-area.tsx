@@ -300,8 +300,9 @@ export const ChatMessagesArea = ({
             const avatarUrl = sender?.avatarUrl || (sender?.avatarFileId ? `/api/files/${sender.avatarFileId}` : null)
             const initials = (senderName.trim().slice(0, 1) || 'U').toUpperCase()
 
-            const imageAttachments = message.attachments.filter(isImageAttachment)
-            const otherAttachments = message.attachments.filter((f) => !isImageAttachment(f))
+            const attachments = message.attachments || []
+            const imageAttachments = attachments.filter(isImageAttachment)
+            const otherAttachments = attachments.filter((f) => !isImageAttachment(f))
             const lightboxImages: LightboxImage[] = imageAttachments.map((img) => ({
               id: img.id,
               name: img.name,
@@ -334,7 +335,7 @@ export const ChatMessagesArea = ({
                       <div className='w-8 shrink-0' aria-hidden='true' />
                     ))}
                   <div
-                    className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} ${
+                    className={`flex flex-col min-w-0 ${isOwn ? 'items-end' : 'items-start'} ${
                       imageAttachments.length > 0
                         ? 'max-w-[92%] sm:max-w-[85%] md:max-w-[560px]'
                         : 'max-w-[85%] sm:max-w-[70%]'
@@ -344,7 +345,7 @@ export const ChatMessagesArea = ({
                       <span className='mb-1 px-1 text-xs font-medium text-muted-foreground'>{senderName}</span>
                     )}
                     <div
-                      className={`rounded-2xl shadow-sm text-sm ${
+                      className={`rounded-2xl shadow-sm text-sm min-w-0 ${
                         imageAttachments.length > 0 && !message.content && otherAttachments.length === 0
                           ? 'p-1.5'
                           : 'px-3 py-2'
@@ -404,7 +405,7 @@ export const ChatMessagesArea = ({
                       {/* Text content rendered right below attachments in the same bubble */}
                       {message.content && (
                         <p
-                          className={`whitespace-pre-wrap break-words ${
+                          className={`whitespace-pre-wrap break-words [overflow-wrap:anywhere] min-w-0 ${
                             imageAttachments.length > 0 || otherAttachments.length > 0 ? 'mt-2 px-0.5' : ''
                           }`}
                         >

@@ -102,7 +102,7 @@ describe('FE-14, FE-16 & FE-18: Quản Lý Nhóm & Cài Đặt Nhóm', () => {
       expect(screen.getByText('Cài đặt chung')).toBeInTheDocument()
 
       // Chuyển sang tab Thành viên
-      const membersTab = screen.getByRole('button', { name: /Thành viên/ })
+      const membersTab = screen.getByRole('tab', { name: /Thành viên/ })
       fireEvent.click(membersTab)
 
       // Hiển thị danh sách thành viên
@@ -121,7 +121,7 @@ describe('FE-14, FE-16 & FE-18: Quản Lý Nhóm & Cài Đặt Nhóm', () => {
       )
 
       // Chuyển sang tab Thành viên
-      const membersTab = screen.getByRole('button', { name: /Thành viên/ })
+      const membersTab = screen.getByRole('tab', { name: /Thành viên/ })
       fireEvent.click(membersTab)
 
       // OWNER có nút thêm thành viên
@@ -141,7 +141,7 @@ describe('FE-14, FE-16 & FE-18: Quản Lý Nhóm & Cài Đặt Nhóm', () => {
       )
 
       // Chuyển sang tab Thành viên
-      const membersTab = screen.getByRole('button', { name: /Thành viên/ })
+      const membersTab = screen.getByRole('tab', { name: /Thành viên/ })
       fireEvent.click(membersTab)
 
       // MEMBER không có nút thêm thành viên
