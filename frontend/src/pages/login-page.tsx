@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Eye, EyeOff, LoaderCircle } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '~/components/ui/button'
@@ -11,6 +11,7 @@ import { loginSchema, type LoginBody } from '~/types/auth.type'
 
 export const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false)
+  const [serverFocusField, setServerFocusField] = useState<keyof LoginBody | null>(null)
   const navigate = useNavigate()
   const location = useLocation()
   const loginMutation = useLoginMutation()
@@ -19,6 +20,7 @@ export const LoginPage = () => {
     register,
     handleSubmit,
     setError,
+    setFocus,
     formState: { errors }
   } = useForm<LoginBody>({
     resolver: zodResolver(loginSchema),
@@ -28,7 +30,14 @@ export const LoginPage = () => {
     }
   })
 
+  useEffect(() => {
+    if (loginMutation.isPending || !serverFocusField) return
+
+    setFocus(serverFocusField)
+  }, [loginMutation.isPending, serverFocusField, setFocus])
+
   const onSubmit = (body: LoginBody) => {
+    setServerFocusField(null)
     loginMutation.mutate(body, {
       onSuccess: () => {
         navigate('/chat', { replace: true })
@@ -36,10 +45,15 @@ export const LoginPage = () => {
       onError: (error: unknown) => {
         const apiError = getApiError(error)
 
-        apiError?.fieldErrors.forEach((fieldError) => {
-          if (fieldError.field === 'username' || fieldError.field === 'password') {
-            setError(fieldError.field, { type: 'server', message: fieldError.message })
-          }
+        const supportedFieldErrors =
+          apiError?.fieldErrors.filter(
+            (fieldError) => fieldError.field === 'username' || fieldError.field === 'password'
+          ) ?? []
+
+        supportedFieldErrors.forEach((fieldError, index) => {
+          const field = fieldError.field as keyof LoginBody
+          setError(field, { type: 'server', message: fieldError.message })
+          if (index === 0) setServerFocusField(field)
         })
       }
     })
@@ -50,20 +64,37 @@ export const LoginPage = () => {
     apiError?.status === 401 ? 'Tài khoản hoặc mật khẩu không đúng' : getApiErrorMessage(loginMutation.error)
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className='space-y-4' noValidate>
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className='space-y-4'
+      noValidate
+      aria-labelledby='login-title'
+      aria-describedby='login-description'
+      aria-busy={loginMutation.isPending}
+    >
       <div className='space-y-1 text-center'>
-        <h2 className='text-lg font-semibold'>Đăng nhập</h2>
-        <p className='text-xs text-muted-foreground'>Nhập tài khoản để tiếp tục</p>
+        <h2 id='login-title' className='text-lg font-semibold'>
+          Đăng nhập
+        </h2>
+        <p id='login-description' className='text-xs text-muted-foreground'>
+          Nhập tài khoản để tiếp tục
+        </p>
       </div>
 
       {successMessage && (
-        <p role='status' className='rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700'>
+        <p
+          role='status'
+          className='rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-foreground'
+        >
           {successMessage}
         </p>
       )}
 
       {submitError && (
-        <p role='alert' className='rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700'>
+        <p
+          role='alert'
+          className='rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-auth-error-foreground'
+        >
           {submitError}
         </p>
       )}
@@ -83,7 +114,7 @@ export const LoginPage = () => {
             {...register('username')}
           />
           {errors.username?.message && (
-            <p id='username-error' role='alert' className='text-xs text-red-600'>
+            <p id='username-error' role='alert' className='text-xs text-auth-error-foreground'>
               {errors.username.message}
             </p>
           )}
@@ -106,7 +137,7 @@ export const LoginPage = () => {
             />
             <button
               type='button'
-              className='absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+              className='absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
               aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
               aria-pressed={showPassword}
               disabled={loginMutation.isPending}
@@ -120,7 +151,7 @@ export const LoginPage = () => {
             </button>
           </div>
           {errors.password?.message && (
-            <p id='password-error' role='alert' className='text-xs text-red-600'>
+            <p id='password-error' role='alert' className='text-xs text-auth-error-foreground'>
               {errors.password.message}
             </p>
           )}

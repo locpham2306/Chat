@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Eye, EyeOff, LoaderCircle } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '~/components/ui/button'
@@ -11,12 +11,14 @@ import { registerSchema, type RegisterBody } from '~/types/auth.type'
 
 export const RegisterPage = () => {
   const [showPassword, setShowPassword] = useState(false)
+  const [serverFocusField, setServerFocusField] = useState<keyof RegisterBody | null>(null)
   const navigate = useNavigate()
   const registerMutation = useRegisterMutation()
   const {
     register,
     handleSubmit,
     setError,
+    setFocus,
     formState: { errors }
   } = useForm<RegisterBody>({
     resolver: zodResolver(registerSchema),
@@ -27,7 +29,14 @@ export const RegisterPage = () => {
     }
   })
 
+  useEffect(() => {
+    if (registerMutation.isPending || !serverFocusField) return
+
+    setFocus(serverFocusField)
+  }, [registerMutation.isPending, serverFocusField, setFocus])
+
   const onSubmit = (body: RegisterBody) => {
+    setServerFocusField(null)
     registerMutation.mutate(body, {
       onSuccess: () => {
         navigate('/login', {
@@ -40,13 +49,20 @@ export const RegisterPage = () => {
 
         if (apiError?.status === 409) {
           setError('username', { type: 'server', message: 'Tài khoản đã tồn tại' })
+          setServerFocusField('username')
           return
         }
 
-        apiError?.fieldErrors.forEach((fieldError) => {
-          if (fieldError.field === 'fullName' || fieldError.field === 'username' || fieldError.field === 'password') {
-            setError(fieldError.field, { type: 'server', message: fieldError.message })
-          }
+        const supportedFieldErrors =
+          apiError?.fieldErrors.filter(
+            (fieldError) =>
+              fieldError.field === 'fullName' || fieldError.field === 'username' || fieldError.field === 'password'
+          ) ?? []
+
+        supportedFieldErrors.forEach((fieldError, index) => {
+          const field = fieldError.field as keyof RegisterBody
+          setError(field, { type: 'server', message: fieldError.message })
+          if (index === 0) setServerFocusField(field)
         })
       }
     })
@@ -56,14 +72,28 @@ export const RegisterPage = () => {
   const submitError = apiError?.status === 409 ? undefined : getApiErrorMessage(registerMutation.error)
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className='space-y-4' noValidate>
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className='space-y-4'
+      noValidate
+      aria-labelledby='register-title'
+      aria-describedby='register-description'
+      aria-busy={registerMutation.isPending}
+    >
       <div className='space-y-1 text-center'>
-        <h2 className='text-lg font-semibold'>Tạo tài khoản</h2>
-        <p className='text-xs text-muted-foreground'>Điền thông tin để bắt đầu</p>
+        <h2 id='register-title' className='text-lg font-semibold'>
+          Tạo tài khoản
+        </h2>
+        <p id='register-description' className='text-xs text-muted-foreground'>
+          Điền thông tin để bắt đầu
+        </p>
       </div>
 
       {submitError && (
-        <p role='alert' className='rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700'>
+        <p
+          role='alert'
+          className='rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-auth-error-foreground'
+        >
           {submitError}
         </p>
       )}
@@ -83,7 +113,7 @@ export const RegisterPage = () => {
             {...register('fullName')}
           />
           {errors.fullName?.message && (
-            <p id='full-name-error' role='alert' className='text-xs text-red-600'>
+            <p id='full-name-error' role='alert' className='text-xs text-auth-error-foreground'>
               {errors.fullName.message}
             </p>
           )}
@@ -102,7 +132,7 @@ export const RegisterPage = () => {
             {...register('username')}
           />
           {errors.username?.message && (
-            <p id='reg-username-error' role='alert' className='text-xs text-red-600'>
+            <p id='reg-username-error' role='alert' className='text-xs text-auth-error-foreground'>
               {errors.username.message}
             </p>
           )}
@@ -125,7 +155,7 @@ export const RegisterPage = () => {
             />
             <button
               type='button'
-              className='absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+              className='absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
               aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
               aria-pressed={showPassword}
               disabled={registerMutation.isPending}
@@ -139,7 +169,7 @@ export const RegisterPage = () => {
             </button>
           </div>
           {errors.password?.message && (
-            <p id='reg-password-error' role='alert' className='text-xs text-red-600'>
+            <p id='reg-password-error' role='alert' className='text-xs text-auth-error-foreground'>
               {errors.password.message}
             </p>
           )}

@@ -27,7 +27,11 @@ export const DirectConversationDraft = ({
   const subtitle = recipient?.username ? `@${recipient.username}` : `Người nhận #${recipientId.slice(0, 8)}`
 
   return (
-    <div className='flex h-full w-full flex-col overflow-hidden bg-background'>
+    <div
+      className='flex h-full w-full flex-col overflow-hidden bg-background'
+      role='region'
+      aria-label={`Hội thoại với ${title}`}
+    >
       <ChatHeader title={title} subtitle={subtitle} onBack={onBack} />
       {optimisticMessages?.length ? (
         <ChatMessagesArea

@@ -39,6 +39,9 @@ describe('ProfileSettingsDialog', () => {
     await userEvent.clear(screen.getByLabelText(/Họ và tên/))
 
     expect(screen.getByText('Họ và tên không được để trống.')).toBeInTheDocument()
+    expect(screen.getByLabelText(/Họ và tên/)).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText(/Họ và tên/)).toHaveAccessibleDescription('Họ và tên không được để trống.')
+    expect(screen.getByText('Họ và tên không được để trống.')).toHaveAttribute('role', 'alert')
     expect(screen.getByRole('button', { name: 'Lưu thay đổi' })).toBeDisabled()
     expect(userApiMock.updateProfile).not.toHaveBeenCalled()
   })
