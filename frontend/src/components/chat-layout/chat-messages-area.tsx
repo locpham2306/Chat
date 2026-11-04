@@ -1,5 +1,5 @@
-import { MessageSquareDashed, Users, User as UserIcon } from 'lucide-react'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type UIEvent } from 'react'
+import { ChevronDown, MessageSquareDashed, Users, User as UserIcon } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type UIEvent } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import { Button } from '~/components/ui/button'
 import { ImageLightbox, type LightboxImage } from '~/components/chat-layout/image-lightbox'
@@ -7,6 +7,7 @@ import { TypingIndicator } from '~/components/chat-layout/typing-indicator'
 import { useMarkConversationReadMutation } from '~/hooks/use-conversation'
 import { mergeChronologicalMessages, useMessageHistoryQuery } from '~/hooks/use-message-history'
 import { getApiErrorMessage } from '~/lib/api-error'
+import { cn } from '~/lib/utils'
 import { wsClient } from '~/lib/websocket-client'
 import { useAuthStore } from '~/stores/use-auth-store'
 import type { Message } from '~/types/message.type'
@@ -109,21 +110,51 @@ export const ChatMessagesArea = ({
   const scrollRef = useRef<HTMLDivElement>(null)
   const initializedRef = useRef(false)
   const nearBottomRef = useRef(true)
+  const lastMarkedReadIdRef = useRef<string | null>(null)
   const snapshotRef = useRef<ScrollSnapshot | null>(null)
   const pageCount = history.data?.pages.length ?? 0
   const newestMessageId = messages.at(-1)?.id
 
+  // Quản lý trạng thái cuộn và đếm tin nhắn mới kiểu Zalo
+  const [prevConversationId, setPrevConversationId] = useState(conversationId)
+  const [isAtBottom, setIsAtBottom] = useState(true)
+  const [newMessagesCount, setNewMessagesCount] = useState(0)
+  const prevNewestMessageIdRef = useRef<string | undefined>(newestMessageId)
+
+  if (prevConversationId !== conversationId) {
+    setPrevConversationId(conversationId)
+    setIsAtBottom(true)
+    setNewMessagesCount(0)
+  }
+
+  useEffect(() => {
+    lastMarkedReadIdRef.current = null
+    initializedRef.current = false
+    nearBottomRef.current = true
+    prevNewestMessageIdRef.current = undefined
+  }, [conversationId])
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+    const viewport = scrollRef.current
+    if (!viewport) return
+
+    if (typeof viewport.scrollTo === 'function') {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior })
+    } else {
+      viewport.scrollTop = viewport.scrollHeight
+    }
+
+    nearBottomRef.current = true
+    setIsAtBottom(true)
+    setNewMessagesCount(0)
+  }, [])
+
   // Đánh dấu đã đọc tự động khi có tin nhắn thực tế mới nhất
   const markAsReadMutation = useMarkConversationReadMutation()
-  const lastMarkedReadIdRef = useRef<string | null>(null)
 
   const lastRealMessage = useMemo(() => {
     return [...messages].reverse().find((m) => m.id && !m.id.startsWith('pending:'))
   }, [messages])
-
-  useEffect(() => {
-    lastMarkedReadIdRef.current = null
-  }, [conversationId])
 
   useEffect(() => {
     if (!conversationId || !lastRealMessage?.id) return
@@ -195,11 +226,42 @@ export const ChatMessagesArea = ({
       return
     }
 
-    if (!initializedRef.current || nearBottomRef.current) {
+    if (!initializedRef.current) {
       viewport.scrollTop = viewport.scrollHeight
       initializedRef.current = true
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+        }
+      })
+      return
+    }
+
+    if (nearBottomRef.current) {
+      viewport.scrollTop = viewport.scrollHeight
     }
   }, [history.isSuccess, loadHistory, pageCount, newestMessageId, isTyping])
+
+  // Lắng nghe tin nhắn mới đến khi người dùng đang cuộn lên trên đọc tin cũ
+  useEffect(() => {
+    if (!initializedRef.current) {
+      prevNewestMessageIdRef.current = newestMessageId
+      return
+    }
+
+    if (newestMessageId && newestMessageId !== prevNewestMessageIdRef.current) {
+      prevNewestMessageIdRef.current = newestMessageId
+      if (!nearBottomRef.current) {
+        // Đang cuộn lên đọc tin cũ -> cộng dồn số tin nhắn mới
+        setNewMessagesCount((prev) => prev + 1)
+      } else {
+        // Đang ở đáy -> cuộn xuống xem tin mới
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+        }
+      }
+    }
+  }, [newestMessageId])
 
   const loadOlder = () => {
     const viewport = scrollRef.current
@@ -216,7 +278,18 @@ export const ChatMessagesArea = ({
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     const viewport = event.currentTarget
     if (snapshotRef.current) snapshotRef.current.top = viewport.scrollTop
-    nearBottomRef.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 80
+
+    const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight
+    const isNear = distanceFromBottom < 100
+    nearBottomRef.current = isNear
+
+    if (isNear) {
+      if (!isAtBottom) setIsAtBottom(true)
+      if (newMessagesCount > 0) setNewMessagesCount(0)
+    } else {
+      if (isAtBottom) setIsAtBottom(false)
+    }
+
     if (viewport.scrollTop < 80 && !history.isFetchNextPageError) loadOlder()
   }
 
@@ -471,6 +544,34 @@ export const ChatMessagesArea = ({
           )}
         </div>
       </div>
+
+      {/* Nút cuộn xuống cuối kèm thông báo tin nhắn mới kiểu Zalo */}
+      {!isAtBottom && (
+        <button
+          type='button'
+          onClick={() => scrollToBottom('smooth')}
+          className={cn(
+            'absolute bottom-4 right-4 z-20 flex items-center justify-center transition-all duration-200 cursor-pointer shadow-lg active:scale-95',
+            newMessagesCount > 0
+              ? 'rounded-full bg-primary text-primary-foreground px-3.5 py-2 gap-1.5 text-xs font-semibold hover:bg-primary/90 shadow-primary/25'
+              : 'h-10 w-10 rounded-full bg-card/95 text-foreground hover:bg-accent border border-border/80 backdrop-blur-sm'
+          )}
+          aria-label={
+            newMessagesCount > 0
+              ? `Cuộn xuống tin nhắn mới nhất, có ${newMessagesCount} tin nhắn mới`
+              : 'Cuộn xuống tin nhắn mới nhất'
+          }
+          title='Cuộn xuống tin nhắn mới nhất'
+        >
+          <ChevronDown
+            className={cn('h-4 w-4 shrink-0', newMessagesCount > 0 ? 'stroke-[2.5]' : '')}
+            aria-hidden='true'
+          />
+          {newMessagesCount > 0 && (
+            <span className='select-none font-medium whitespace-nowrap'>{newMessagesCount} tin nhắn mới</span>
+          )}
+        </button>
+      )}
 
       {/* Lightbox for full-screen image preview (Facebook style) */}
       <ImageLightbox
