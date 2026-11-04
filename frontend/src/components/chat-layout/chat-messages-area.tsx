@@ -147,6 +147,16 @@ export const ChatMessagesArea = ({
     nearBottomRef.current = true
     setIsAtBottom(true)
     setNewMessagesCount(0)
+
+    requestAnimationFrame(() => {
+      if (scrollRef.current) {
+        if (typeof scrollRef.current.scrollTo === 'function') {
+          scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior })
+        } else {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+        }
+      }
+    })
   }, [])
 
   // Đánh dấu đã đọc tự động khi có tin nhắn thực tế mới nhất
@@ -242,7 +252,7 @@ export const ChatMessagesArea = ({
     }
   }, [history.isSuccess, loadHistory, pageCount, newestMessageId, isTyping])
 
-  // Lắng nghe tin nhắn mới đến khi người dùng đang cuộn lên trên đọc tin cũ
+  // Lắng nghe tin nhắn mới đến
   useEffect(() => {
     if (!initializedRef.current) {
       prevNewestMessageIdRef.current = newestMessageId
@@ -251,17 +261,26 @@ export const ChatMessagesArea = ({
 
     if (newestMessageId && newestMessageId !== prevNewestMessageIdRef.current) {
       prevNewestMessageIdRef.current = newestMessageId
-      if (!nearBottomRef.current) {
-        // Đang cuộn lên đọc tin cũ -> cộng dồn số tin nhắn mới
+
+      const newestMessage = messages.at(-1)
+      const isFromCurrentUser = Boolean(
+        currentUserId && (newestMessage?.senderId === currentUserId || newestMessage?.sender?.id === currentUserId)
+      )
+
+      if (isFromCurrentUser) {
+        // Người dùng tự gửi tin nhắn -> Luôn tự động cuộn xuống cuối cùng và không tính vào tin nhắn mới
+        scrollToBottom('smooth')
+      } else if (!nearBottomRef.current) {
+        // Tin nhắn mới từ người khác trong khi người dùng đang cuộn lên đọc tin cũ -> cộng dồn số tin nhắn mới
         setNewMessagesCount((prev) => prev + 1)
       } else {
-        // Đang ở đáy -> cuộn xuống xem tin mới
+        // Đang ở đáy -> cuộn xuống xem tin mới từ người khác
         if (scrollRef.current) {
           scrollRef.current.scrollTop = scrollRef.current.scrollHeight
         }
       }
     }
-  }, [newestMessageId])
+  }, [currentUserId, messages, newestMessageId, scrollToBottom])
 
   const loadOlder = () => {
     const viewport = scrollRef.current

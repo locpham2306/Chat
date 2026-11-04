@@ -1,15 +1,12 @@
 import { Outlet } from 'react-router-dom'
-import { MessageSquare } from 'lucide-react'
 
 export const AuthLayout = () => {
   return (
     <div className='min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-4'>
       <div className='w-full max-w-sm space-y-6'>
         <div className='flex flex-col items-center space-y-2 text-center'>
-          <div className='flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm'>
-            <MessageSquare className='h-6 w-6' aria-hidden='true' />
-          </div>
-          <h1 className='text-xl font-bold tracking-tight'>Chat App</h1>
+          <img src='/logo.png' alt='ChitChat' className='h-12 w-12 rounded-2xl object-cover shadow-sm' />
+          <h1 className='text-xl font-bold tracking-tight'>ChitChat</h1>
           <p className='text-xs text-muted-foreground'>BTL Lập Trình Mạng</p>
         </div>
         <div className='rounded-xl border bg-card p-6 shadow-sm'>

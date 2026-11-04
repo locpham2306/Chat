@@ -406,5 +406,55 @@ describe('FE-26: Responsive & Accessibility Chat Nhóm & Layout', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Cuộn xuống tin nhắn mới nhất, có 1 tin nhắn mới' }))
       expect(screen.queryByText('1 tin nhắn mới')).not.toBeInTheDocument()
     })
+
+    it('ChatMessagesArea tự động cuộn xuống cuối và KHÔNG đếm tin nhắn mới khi chính người dùng gửi tin nhắn trong lúc đang ở trên', () => {
+      useAuthStore.setState({ user: mockCurrentUser, isAuthenticated: true })
+
+      const { rerender } = renderWithProviders(
+        <ChatMessagesArea
+          conversationId={mockGroupConversationDetail.id}
+          title={mockGroupConversationDetail.name || 'Team Backend'}
+          isGroup={true}
+          optimisticMessages={[]}
+        />
+      )
+
+      const logContainer = screen.getByRole('log', { name: 'Tin nhắn' })
+
+      // Cuộn lên trên để đọc tin cũ
+      Object.defineProperty(logContainer, 'scrollHeight', { configurable: true, value: 1200 })
+      Object.defineProperty(logContainer, 'clientHeight', { configurable: true, value: 600 })
+      Object.defineProperty(logContainer, 'scrollTop', { configurable: true, writable: true, value: 200 })
+      fireEvent.scroll(logContainer)
+
+      // Nút cuộn xuống đáy xuất hiện
+      expect(screen.getByRole('button', { name: 'Cuộn xuống tin nhắn mới nhất' })).toBeInTheDocument()
+
+      // Người dùng tự gửi tin nhắn mới
+      const ownMessage: Message = {
+        id: 'msg-own-1',
+        clientMessageId: 'c-own-1',
+        conversationId: mockGroupConversationDetail.id,
+        senderId: mockCurrentUser.id,
+        sender: mockCurrentUser,
+        content: 'Tin nhắn do chính tôi vừa gửi đi',
+        createdAt: '2026-11-04T09:25:00Z',
+        attachments: []
+      }
+
+      rerender(
+        <ChatMessagesArea
+          conversationId={mockGroupConversationDetail.id}
+          title={mockGroupConversationDetail.name || 'Team Backend'}
+          isGroup={true}
+          optimisticMessages={[ownMessage]}
+        />
+      )
+
+      // Không bao giờ hiển thị thông báo "1 tin nhắn mới" cho tin nhắn chính chủ
+      expect(screen.queryByText(/tin nhắn mới/)).not.toBeInTheDocument()
+      // Tự động cuộn xuống cuối và ẩn nút cuộn
+      expect(screen.queryByRole('button', { name: /Cuộn xuống/ })).not.toBeInTheDocument()
+    })
   })
 })

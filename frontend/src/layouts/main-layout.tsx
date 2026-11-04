@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
-import { LoaderCircle, LogOut, MessageSquare, Moon, Sun } from 'lucide-react'
+import { LoaderCircle, LogOut, Moon, Sun } from 'lucide-react'
 import { ProfileSettingsDialog } from '~/components/profile-settings'
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import { Badge } from '~/components/ui/badge'
@@ -34,11 +34,9 @@ export const MainLayout = () => {
       {/* Top Header */}
       <header className='flex h-14 items-center justify-between border-b px-4 shrink-0 bg-card'>
         <div className='flex items-center gap-3'>
-          <div className='flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground'>
-            <MessageSquare className='h-5 w-5' />
-          </div>
+          <img src='/logo.png' alt='ChitChat' className='h-9 w-9 rounded-xl object-cover shadow-xs' />
           <div>
-            <h1 className='text-sm font-semibold leading-none'>Chat App</h1>
+            <h1 className='text-sm font-semibold leading-none'>ChitChat</h1>
             <p className='text-xs text-muted-foreground mt-0.5'>BTL LTM</p>
           </div>
         </div>
