@@ -119,6 +119,7 @@ vi.mock('~/hooks/use-message-history', async (importOriginal) => {
       data: {
         pages: [{ data: mockSampleMessages }]
       },
+      isSuccess: true,
       isPending: false,
       isError: false,
       hasNextPage: false,
@@ -319,6 +320,91 @@ describe('FE-26: Responsive & Accessibility Chat Nhóm & Layout', () => {
       expect(messageContent).toHaveClass('[overflow-wrap:anywhere]')
       expect(messageContent).toHaveClass('break-words')
       expect(messageContent).toHaveClass('min-w-0')
+    })
+
+    it('ChatMessagesArea hiển thị nút cuộn xuống cuối khi người dùng cuộn lên trên và ẩn đi khi bấm cuộn xuống', () => {
+      useAuthStore.setState({ user: mockCurrentUser, isAuthenticated: true })
+
+      renderWithProviders(
+        <ChatMessagesArea
+          conversationId={mockGroupConversationDetail.id}
+          title={mockGroupConversationDetail.name || 'Team Backend'}
+          isGroup={true}
+        />
+      )
+
+      const logContainer = screen.getByRole('log', { name: 'Tin nhắn' })
+      expect(screen.queryByRole('button', { name: 'Cuộn xuống tin nhắn mới nhất' })).not.toBeInTheDocument()
+
+      // Giả lập người dùng cuộn lên trên để đọc tin cũ (cách đáy > 100px)
+      Object.defineProperty(logContainer, 'scrollHeight', { configurable: true, value: 1200 })
+      Object.defineProperty(logContainer, 'clientHeight', { configurable: true, value: 600 })
+      Object.defineProperty(logContainer, 'scrollTop', { configurable: true, writable: true, value: 300 })
+      fireEvent.scroll(logContainer)
+
+      // Nút cuộn xuống đáy xuất hiện
+      const scrollBottomBtn = screen.getByRole('button', { name: 'Cuộn xuống tin nhắn mới nhất' })
+      expect(scrollBottomBtn).toBeInTheDocument()
+
+      // Bấm vào nút cuộn xuống đáy
+      fireEvent.click(scrollBottomBtn)
+
+      // Nút biến mất khi cuộn xuống đáy
+      expect(screen.queryByRole('button', { name: 'Cuộn xuống tin nhắn mới nhất' })).not.toBeInTheDocument()
+    })
+
+    it('ChatMessagesArea cộng dồn số tin nhắn mới kiểu Zalo khi có tin nhắn mới đến trong lúc người dùng đang ở trên', () => {
+      useAuthStore.setState({ user: mockCurrentUser, isAuthenticated: true })
+
+      const { rerender } = renderWithProviders(
+        <ChatMessagesArea
+          conversationId={mockGroupConversationDetail.id}
+          title={mockGroupConversationDetail.name || 'Team Backend'}
+          isGroup={true}
+          optimisticMessages={[]}
+        />
+      )
+
+      const logContainer = screen.getByRole('log', { name: 'Tin nhắn' })
+
+      // Cuộn lên trên
+      Object.defineProperty(logContainer, 'scrollHeight', { configurable: true, value: 1200 })
+      Object.defineProperty(logContainer, 'clientHeight', { configurable: true, value: 600 })
+      Object.defineProperty(logContainer, 'scrollTop', { configurable: true, writable: true, value: 200 })
+      fireEvent.scroll(logContainer)
+
+      expect(screen.getByRole('button', { name: 'Cuộn xuống tin nhắn mới nhất' })).toBeInTheDocument()
+
+      // Tin nhắn mới đến qua optimisticMessages
+      const newIncomingMsg: Message = {
+        id: 'msg-realtime-zalo-1',
+        clientMessageId: 'c-zalo-1',
+        conversationId: mockGroupConversationDetail.id,
+        senderId: mockPeerUserOnline.id,
+        sender: mockPeerUserOnline,
+        content: 'Tin nhắn mới tới khi đang đọc tin cũ!',
+        createdAt: '2026-11-04T09:20:00Z',
+        attachments: []
+      }
+
+      rerender(
+        <ChatMessagesArea
+          conversationId={mockGroupConversationDetail.id}
+          title={mockGroupConversationDetail.name || 'Team Backend'}
+          isGroup={true}
+          optimisticMessages={[newIncomingMsg]}
+        />
+      )
+
+      // Nút hiển thị dạng pill với số đếm kiểu Zalo: "1 tin nhắn mới"
+      expect(screen.getByText('1 tin nhắn mới')).toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: 'Cuộn xuống tin nhắn mới nhất, có 1 tin nhắn mới' })
+      ).toBeInTheDocument()
+
+      // Bấm nút cuộn xuống -> biến mất và reset
+      fireEvent.click(screen.getByRole('button', { name: 'Cuộn xuống tin nhắn mới nhất, có 1 tin nhắn mới' }))
+      expect(screen.queryByText('1 tin nhắn mới')).not.toBeInTheDocument()
     })
   })
 })
