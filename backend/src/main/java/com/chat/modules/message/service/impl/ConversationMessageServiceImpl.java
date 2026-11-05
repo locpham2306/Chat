@@ -1,9 +1,7 @@
 package com.chat.modules.message.service.impl;
 
 import com.chat.common.constant.ErrorConstants;
-import com.chat.exception.BadRequestException;
-import com.chat.exception.NoPermissionException;
-import com.chat.exception.NotFoundException;
+import com.chat.exception.BusinessException;
 import com.chat.modules.conversation.entity.ConversationReadStateEntity;
 import com.chat.modules.conversation.repository.ConversationMemberRepository;
 import com.chat.modules.conversation.repository.ConversationReadStateRepository;
@@ -57,7 +55,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
             UUID currentUserId, UUID conversationId, UUID before, Integer limit) {
         requireConversationAndMembership(currentUserId, conversationId);
         if (limit == null || limit < 1 || limit > MAX_HISTORY_LIMIT) {
-            throw new BadRequestException(ErrorConstants.VALIDATION_ERROR);
+            throw BusinessException.badRequest(ErrorConstants.VALIDATION_ERROR);
         }
 
         var page = PageRequest.of(0, limit + 1);
@@ -86,14 +84,14 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
     public ConversationReadResponse markRead(
             UUID currentUserId, UUID conversationId, UUID lastReadMessageId) {
         if (!conversations.existsById(conversationId)) {
-            throw new NotFoundException(ErrorConstants.NOT_FOUND);
+            throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
         var membership = members.findActiveForUpdate(conversationId, currentUserId)
-                .orElseThrow(() -> new NoPermissionException(ErrorConstants.FORBIDDEN));
+                .orElseThrow(() -> BusinessException.forbidden(ErrorConstants.FORBIDDEN));
         var requestedMessage = messages.findById(lastReadMessageId)
-                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
         if (!conversationId.equals(requestedMessage.getConversationId())) {
-            throw new BadRequestException(ErrorConstants.VALIDATION_ERROR);
+            throw BusinessException.badRequest(ErrorConstants.VALIDATION_ERROR);
         }
 
         var readState = readStates.findById(membership.getId()).orElse(null);
@@ -103,7 +101,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
             readStates.saveAndFlush(readState);
         } else {
             var storedMessage = messages.findById(readState.getLastReadMessageId())
-                    .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+                    .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
             if (isAfter(requestedMessage, storedMessage)) {
                 readState.advanceTo(requestedMessage.getId());
                 readStates.saveAndFlush(readState);
@@ -126,11 +124,11 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
 
     private void requireConversationAndMembership(UUID currentUserId, UUID conversationId) {
         if (!conversations.existsById(conversationId)) {
-            throw new NotFoundException(ErrorConstants.NOT_FOUND);
+            throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
         if (!members.existsByConversationIdAndUserIdAndLeftAtIsNull(
                 conversationId, currentUserId)) {
-            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+            throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
     }
 
@@ -168,11 +166,11 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
                 message -> messageMapper.toResponse(
                         message,
                         Optional.ofNullable(sendersById.get(message.getSenderId()))
-                                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND)),
+                                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND)),
                         filesByMessageId.getOrDefault(message.getId(), List.of()))));
     }
 
-    private BadRequestException invalidCursor() {
-        return new BadRequestException(ErrorConstants.VALIDATION_ERROR);
+    private BusinessException invalidCursor() {
+        return BusinessException.badRequest(ErrorConstants.VALIDATION_ERROR);
     }
 }

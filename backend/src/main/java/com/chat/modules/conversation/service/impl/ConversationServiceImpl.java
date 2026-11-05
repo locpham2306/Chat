@@ -2,10 +2,7 @@ package com.chat.modules.conversation.service.impl;
 
 import com.chat.common.constant.ErrorConstants;
 import com.chat.common.dto.response.PageResponse;
-import com.chat.exception.BadRequestException;
-import com.chat.exception.ConflictException;
-import com.chat.exception.NotFoundException;
-import com.chat.exception.NoPermissionException;
+import com.chat.exception.BusinessException;
 import com.chat.modules.conversation.dto.request.AddConversationMembersRequest;
 import com.chat.modules.conversation.dto.request.CreateGroupRequest;
 import com.chat.modules.conversation.dto.request.UpdateConversationRequest;
@@ -121,10 +118,10 @@ public class ConversationServiceImpl implements ConversationService {
     @Transactional(readOnly = true)
     public DirectConversationLookupResponse findDirectConversation(UUID currentUserId, UUID recipientId) {
         if (currentUserId.equals(recipientId)) {
-            throw new BadRequestException("conversation.recipientIsCurrentUser");
+            throw BusinessException.badRequest("conversation.recipientIsCurrentUser");
         }
         var recipient = users.findById(recipientId)
-                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
         var conversation = conversations.findDirectBetweenUsers(
                         ConversationTypeEnum.DIRECT, currentUserId, recipientId)
                 .map(conversationMapper::toDirectResponse)
@@ -139,10 +136,10 @@ public class ConversationServiceImpl implements ConversationService {
         var memberIds = new LinkedHashSet<>(request.memberIds());
         memberIds.remove(currentUserId);
         if (memberIds.isEmpty()) {
-            throw new BadRequestException("conversation.groupRequiresMember");
+            throw BusinessException.badRequest("conversation.groupRequiresMember");
         }
         if (users.countByIdIn(memberIds) != memberIds.size()) {
-            throw new NotFoundException(ErrorConstants.NOT_FOUND);
+            throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
         validateGroupAvatar(currentUserId, request.avatarFileId());
 
@@ -205,14 +202,14 @@ public class ConversationServiceImpl implements ConversationService {
     @Transactional(readOnly = true)
     public ConversationDetailResponse getConversation(UUID currentUserId, UUID conversationId) {
         var conversation = conversations.findById(conversationId)
-                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
         if (!members.existsByConversationIdAndUserIdAndLeftAtIsNull(conversationId, currentUserId)) {
-            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+            throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
         var memberCount = members.countByConversationIdAndLeftAtIsNull(conversationId);
         var peer = conversation.getType() == ConversationTypeEnum.DIRECT
                 ? mapPeer(users.findById(directPeerId(conversation, currentUserId))
-                        .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND)))
+                        .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND)))
                 : null;
         return conversationMapper.toDetailResponse(conversation, memberCount, peer);
     }
@@ -222,16 +219,16 @@ public class ConversationServiceImpl implements ConversationService {
     public ConversationDetailResponse updateConversation(
             UUID currentUserId, UUID conversationId, UpdateConversationRequest request) {
         var conversation = conversations.findById(conversationId)
-                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
         if (conversation.getType() != ConversationTypeEnum.GROUP) {
-            throw new ConflictException("conversation.directCannotBeUpdated");
+            throw BusinessException.conflict("conversation.directCannotBeUpdated");
         }
         var membership = members.findByConversationIdAndUserIdAndLeftAtIsNull(
                         conversationId, currentUserId)
-                .orElseThrow(() -> new NoPermissionException(ErrorConstants.FORBIDDEN));
+                .orElseThrow(() -> BusinessException.forbidden(ErrorConstants.FORBIDDEN));
         if (membership.getRole() != MemberRoleEnum.OWNER
                 || !currentUserId.equals(conversation.getOwnerId())) {
-            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+            throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
         validateGroupAvatar(currentUserId, request.avatarFileId());
 
@@ -245,11 +242,11 @@ public class ConversationServiceImpl implements ConversationService {
     public PageResponse<List<ConversationMemberResponse>> getConversationMembers(
             UUID currentUserId, UUID conversationId, Integer page, Integer size) {
         if (!conversations.existsById(conversationId)) {
-            throw new NotFoundException(ErrorConstants.NOT_FOUND);
+            throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
         if (!members.existsByConversationIdAndUserIdAndLeftAtIsNull(
                 conversationId, currentUserId)) {
-            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+            throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
 
         var sort = Sort.by(Sort.Order.asc("joinedAt"), Sort.Order.asc("id"));
@@ -268,7 +265,7 @@ public class ConversationServiceImpl implements ConversationService {
                 .map(membership -> conversationMemberMapper.toResponse(
                         membership,
                         Optional.ofNullable(usersById.get(membership.getUserId()))
-                                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND)),
+                                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND)),
                         presence.status(membership.getUserId())))
                 .toList();
         return PageResponse.of(
@@ -284,16 +281,16 @@ public class ConversationServiceImpl implements ConversationService {
             Integer page,
             Integer size) {
         var conversation = conversations.findById(conversationId)
-                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
         if (conversation.getType() != ConversationTypeEnum.GROUP) {
-            throw new ConflictException("conversation.availableMembersGroupOnly");
+            throw BusinessException.conflict("conversation.availableMembersGroupOnly");
         }
         var membership = members.findByConversationIdAndUserIdAndLeftAtIsNull(
                         conversationId, currentUserId)
-                .orElseThrow(() -> new NoPermissionException(ErrorConstants.FORBIDDEN));
+                .orElseThrow(() -> BusinessException.forbidden(ErrorConstants.FORBIDDEN));
         if (membership.getRole() != MemberRoleEnum.OWNER
                 || !currentUserId.equals(conversation.getOwnerId())) {
-            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+            throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
 
         String resolvedKeyword = StringUtils.trim(keyword);
@@ -317,21 +314,21 @@ public class ConversationServiceImpl implements ConversationService {
             UUID conversationId,
             AddConversationMembersRequest request) {
         var conversation = conversations.findByIdForUpdate(conversationId)
-                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
         if (conversation.getType() != ConversationTypeEnum.GROUP) {
-            throw new ConflictException("conversation.membersGroupOnly");
+            throw BusinessException.conflict("conversation.membersGroupOnly");
         }
         var ownerMembership = members.findByConversationIdAndUserIdAndLeftAtIsNull(
                         conversationId, currentUserId)
-                .orElseThrow(() -> new NoPermissionException(ErrorConstants.FORBIDDEN));
+                .orElseThrow(() -> BusinessException.forbidden(ErrorConstants.FORBIDDEN));
         if (ownerMembership.getRole() != MemberRoleEnum.OWNER
                 || !currentUserId.equals(conversation.getOwnerId())) {
-            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+            throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
 
         var requestedUserIds = new LinkedHashSet<>(request.memberIds());
         if (users.countByIdIn(requestedUserIds) != requestedUserIds.size()) {
-            throw new NotFoundException(ErrorConstants.NOT_FOUND);
+            throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
         var membershipsByUserId = members.findByConversationIdAndUserIdIn(
                         conversationId, requestedUserIds).stream()
@@ -372,30 +369,30 @@ public class ConversationServiceImpl implements ConversationService {
             UUID conversationId,
             UUID userId) {
         var conversation = conversations.findByIdForUpdate(conversationId)
-                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
         if (conversation.getType() != ConversationTypeEnum.GROUP) {
-            throw new ConflictException("conversation.membersGroupOnly");
+            throw BusinessException.conflict("conversation.membersGroupOnly");
         }
 
         var currentMembership = members.findByConversationIdAndUserIdAndLeftAtIsNull(
                         conversationId, currentUserId)
-                .orElseThrow(() -> new NoPermissionException(ErrorConstants.FORBIDDEN));
+                .orElseThrow(() -> BusinessException.forbidden(ErrorConstants.FORBIDDEN));
         boolean isOwner = currentMembership.getRole() == MemberRoleEnum.OWNER
                 && currentUserId.equals(conversation.getOwnerId());
         if (currentUserId.equals(conversation.getOwnerId()) && !isOwner) {
-            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+            throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
 
         if (currentUserId.equals(userId)) {
             if (isOwner) {
-                throw new ConflictException("conversation.ownerCannotLeave");
+                throw BusinessException.conflict("conversation.ownerCannotLeave");
             }
             currentMembership.leave(clock.instant());
             members.saveAndFlush(currentMembership);
             return;
         }
         if (!isOwner) {
-            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+            throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
 
         var targetMembership = members.findByConversationIdAndUserId(conversationId, userId);
@@ -403,7 +400,7 @@ public class ConversationServiceImpl implements ConversationService {
             return;
         }
         if (targetMembership.get().getRole() != MemberRoleEnum.MEMBER) {
-            throw new ConflictException("conversation.ownerCannotLeave");
+            throw BusinessException.conflict("conversation.ownerCannotLeave");
         }
         targetMembership.get().leave(clock.instant());
         members.saveAndFlush(targetMembership.get());
@@ -435,7 +432,7 @@ public class ConversationServiceImpl implements ConversationService {
                 message -> messageMapper.toResponse(
                         message,
                         Optional.ofNullable(sendersById.get(message.getSenderId()))
-                                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND)),
+                                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND)),
                         filesByMessageId.getOrDefault(message.getId(), List.of()))));
     }
 
@@ -462,7 +459,7 @@ public class ConversationServiceImpl implements ConversationService {
         }
         var peerId = directPeerId(conversation, currentUserId);
         return mapPeer(Optional.ofNullable(peersById.get(peerId))
-                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND)));
+                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND)));
     }
 
     private ConversationPeerResponse mapPeer(UserEntity user) {
@@ -476,7 +473,7 @@ public class ConversationServiceImpl implements ConversationService {
         if (currentUserId.equals(conversation.getDirectUserHighId())) {
             return conversation.getDirectUserLowId();
         }
-        throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+        throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
     }
 
     private void validateGroupAvatar(UUID currentUserId, UUID avatarFileId) {
@@ -484,12 +481,12 @@ public class ConversationServiceImpl implements ConversationService {
             return;
         }
         var avatar = files.findById(avatarFileId)
-                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
         boolean allowed = currentUserId.equals(avatar.getUploaderId())
                 && avatar.getConversationId() == null
                 && StringUtils.isImageContentType(avatar.getContentType());
         if (!allowed) {
-            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+            throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
     }
 }

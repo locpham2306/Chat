@@ -138,7 +138,8 @@ retry không tạo trùng, attachment, TYPING, lỗi frame và presence theo s�
 
 - `common.wrapper.BaseResponse`: envelope chung `code/strCode/message/content` theo QLCC.
 - `common.dto.response.PageResponse`: dữ liệu và metadata phân trang.
-- `exception.BusinessException` cùng các exception theo HTTP status: lỗi nghiệp vụ với message key.
+- `exception.BusinessException`: lỗi nghiệp vụ với HTTP status và message key; dùng các factory
+  `badRequest`, `unauthenticated`, `forbidden`, `notFound`, `conflict`, `payloadTooLarge`.
 - `exception.GlobalExceptionHandler`: chuẩn hóa lỗi Spring MVC vào `BaseResponse`.
 - `common.dto.response.ErrorDetailResponse`: timestamp UTC, status, path, fieldErrors.
 - `utils.MessageUtils`, `StringUtils`, `PageableUtils`: helper dùng chung đã có nhu cầu.
@@ -150,7 +151,7 @@ retry không tạo trùng, attachment, TYPING, lỗi frame và presence theo s�
 Ví dụ trong service khi đã có nghiệp vụ:
 
 ```java
-throw new NotFoundException(ErrorConstants.NOT_FOUND);
+throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
 ```
 
 Message riêng module khai báo trong bundle, `strCode` trả FE vẫn theo loại lỗi HTTP.

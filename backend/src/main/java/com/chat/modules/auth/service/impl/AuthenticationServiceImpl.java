@@ -1,9 +1,6 @@
 package com.chat.modules.auth.service.impl;
 
-import com.chat.exception.BadRequestException;
 import com.chat.exception.BusinessException;
-import com.chat.exception.DataExistedException;
-import com.chat.exception.UnauthenticatedException;
 import com.chat.modules.auth.constant.AuthMessageConstants;
 import com.chat.modules.auth.dto.request.LoginRequest;
 import com.chat.modules.auth.dto.request.RegisterRequest;
@@ -66,15 +63,15 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     private void validatePasswordLength(String password) {
         if (password.getBytes(StandardCharsets.UTF_8).length > BCRYPT_MAX_PASSWORD_BYTES) {
-            throw new BadRequestException(AuthMessageConstants.PASSWORD_TOO_LONG);
+            throw BusinessException.badRequest(AuthMessageConstants.PASSWORD_TOO_LONG);
         }
     }
 
     private BusinessException invalidCredentials() {
-        return new UnauthenticatedException(AuthMessageConstants.INVALID_CREDENTIALS);
+        return BusinessException.unauthenticated(AuthMessageConstants.INVALID_CREDENTIALS);
     }
 
     private BusinessException usernameExists() {
-        return new DataExistedException(AuthMessageConstants.USERNAME_EXISTS);
+        return BusinessException.conflict(AuthMessageConstants.USERNAME_EXISTS);
     }
 }

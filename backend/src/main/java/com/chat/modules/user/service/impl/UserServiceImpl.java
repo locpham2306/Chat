@@ -2,9 +2,7 @@ package com.chat.modules.user.service.impl;
 
 import com.chat.common.constant.ErrorConstants;
 import com.chat.common.dto.response.PageResponse;
-import com.chat.exception.NoPermissionException;
-import com.chat.exception.NotFoundException;
-import com.chat.exception.UnauthenticatedException;
+import com.chat.exception.BusinessException;
 import com.chat.modules.file.repository.FileRepository;
 import com.chat.modules.user.dto.request.UpdateProfileRequest;
 import com.chat.modules.user.dto.response.UserResponse;
@@ -60,12 +58,12 @@ public class UserServiceImpl implements UserService {
         var user = currentUser(userId);
         if (request.avatarFileId() != null) {
             var avatar = files.findById(request.avatarFileId())
-                    .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+                    .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
             boolean allowed = userId.equals(avatar.getUploaderId())
                     && avatar.getConversationId() == null
                     && StringUtils.isImageContentType(avatar.getContentType());
             if (!allowed) {
-                throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+                throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
             }
         }
         user.updateProfile(StringUtils.trim(request.fullName()), request.avatarFileId());
@@ -89,6 +87,6 @@ public class UserServiceImpl implements UserService {
 
     private UserEntity currentUser(UUID userId) {
         return users.findById(userId)
-                .orElseThrow(() -> new UnauthenticatedException(ErrorConstants.UNAUTHENTICATED));
+                .orElseThrow(() -> BusinessException.unauthenticated(ErrorConstants.UNAUTHENTICATED));
     }
 }

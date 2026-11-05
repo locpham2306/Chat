@@ -1,7 +1,6 @@
 package com.chat.modules.auth.service.impl;
 
 import com.chat.common.constant.ErrorConstants;
-import com.chat.exception.BadRequestException;
 import com.chat.exception.BusinessException;
 import com.chat.modules.auth.config.SessionCookieProperties;
 import com.chat.modules.auth.security.SessionTokenGenerator;
@@ -80,6 +79,6 @@ public class SessionCookieServiceImpl implements SessionCookieService {
     }
 
     private BusinessException invalidRequest() {
-        return new BadRequestException(ErrorConstants.VALIDATION_ERROR);
+        return BusinessException.badRequest(ErrorConstants.VALIDATION_ERROR);
     }
 }

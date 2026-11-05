@@ -2,10 +2,7 @@ package com.chat.modules.file.service.impl;
 
 import com.chat.common.constant.ErrorConstants;
 import com.chat.config.FileProperties;
-import com.chat.exception.BadRequestException;
-import com.chat.exception.NoPermissionException;
-import com.chat.exception.NotFoundException;
-import com.chat.exception.PayloadTooLargeException;
+import com.chat.exception.BusinessException;
 import com.chat.integration.storage.FileStorage;
 import com.chat.modules.conversation.repository.ConversationMemberRepository;
 import com.chat.modules.file.dto.response.FileResponse;
@@ -66,9 +63,9 @@ public class FileServiceImpl implements FileService {
     @Transactional(readOnly = true)
     public FileDownload download(UUID userId, UUID fileId) {
         var file = files.findById(fileId)
-                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
         if (!canRead(userId, file)) {
-            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+            throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
         return new FileDownload(file.getName(), file.getContentType(), file.getSize(),
                 storage.load(file.getStorageKey()));
@@ -76,10 +73,10 @@ public class FileServiceImpl implements FileService {
 
     private void validate(MultipartFile file) {
         if (file == null || file.isEmpty() || file.getSize() < 1) {
-            throw new BadRequestException("file.empty");
+            throw BusinessException.badRequest("file.empty");
         }
         if (file.getSize() > properties.maxSize().toBytes()) {
-            throw new PayloadTooLargeException("file.tooLarge");
+            throw BusinessException.payloadTooLarge("file.tooLarge");
         }
         fileName(file.getOriginalFilename());
         normalizeContentType(file.getContentType());
@@ -87,12 +84,12 @@ public class FileServiceImpl implements FileService {
 
     private String fileName(String originalName) {
         if (originalName == null) {
-            throw new BadRequestException("file.invalidName");
+            throw BusinessException.badRequest("file.invalidName");
         }
         String normalized = originalName.replace('\\', '/');
         normalized = normalized.substring(normalized.lastIndexOf('/') + 1).trim();
         if (normalized.isEmpty() || normalized.length() > MAX_FILE_NAME_LENGTH) {
-            throw new BadRequestException("file.invalidName");
+            throw BusinessException.badRequest("file.invalidName");
         }
         return normalized;
     }

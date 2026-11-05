@@ -1,10 +1,7 @@
 package com.chat.modules.message.service.impl;
 
 import com.chat.common.constant.ErrorConstants;
-import com.chat.exception.BadRequestException;
-import com.chat.exception.ConflictException;
-import com.chat.exception.NoPermissionException;
-import com.chat.exception.NotFoundException;
+import com.chat.exception.BusinessException;
 import com.chat.modules.conversation.entity.ConversationEntity;
 import com.chat.modules.conversation.entity.ConversationMemberEntity;
 import com.chat.modules.conversation.enums.ConversationTypeEnum;
@@ -85,7 +82,7 @@ public class MessageServiceImpl implements MessageService {
                 return retry(existing, command, sender);
             }
             conversation = conversations.findByIdForUpdate(command.conversationId())
-                    .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+                    .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
             requireActiveMember(conversation.getId(), command.senderId());
         }
 
@@ -148,7 +145,7 @@ public class MessageServiceImpl implements MessageService {
 
     private UserEntity lockUser(UUID userId) {
         return users.findByIdForUpdate(userId)
-                .orElseThrow(() -> new NotFoundException(ErrorConstants.NOT_FOUND));
+                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
     }
 
     private ConversationEntity createDirect(UUID senderId, UUID recipientId) {
@@ -162,7 +159,7 @@ public class MessageServiceImpl implements MessageService {
 
     private void requireActiveMember(UUID conversationId, UUID userId) {
         if (!members.existsByConversationIdAndUserIdAndLeftAtIsNull(conversationId, userId)) {
-            throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+            throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
     }
 
@@ -174,14 +171,14 @@ public class MessageServiceImpl implements MessageService {
         Map<UUID, FileEntity> filesById = files.findAllByIdForUpdate(attachmentIds).stream()
                 .collect(Collectors.toMap(FileEntity::getId, Function.identity()));
         if (filesById.size() != attachmentIds.size()) {
-            throw new NotFoundException(ErrorConstants.NOT_FOUND);
+            throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
         var orderedFiles = attachmentIds.stream().map(filesById::get).toList();
         for (var file : orderedFiles) {
             if (!senderId.equals(file.getUploaderId())
                     || (file.getConversationId() != null
                     && !conversationId.equals(file.getConversationId()))) {
-                throw new NoPermissionException(ErrorConstants.FORBIDDEN);
+                throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
             }
             file.bindToConversation(conversationId);
         }
@@ -204,7 +201,7 @@ public class MessageServiceImpl implements MessageService {
                 .filter(Objects::nonNull)
                 .toList();
         if (orderedFiles.size() != storedAttachmentIds.size()) {
-            throw new NotFoundException(ErrorConstants.NOT_FOUND);
+            throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
         return delivery(existing, sender, orderedFiles, List.of(), false);
     }
@@ -227,11 +224,11 @@ public class MessageServiceImpl implements MessageService {
                 message.getCreatedAt(), List.copyOf(activeMemberIds), newlyCreated);
     }
 
-    private BadRequestException invalid() {
-        return new BadRequestException(ErrorConstants.VALIDATION_ERROR);
+    private BusinessException invalid() {
+        return BusinessException.badRequest(ErrorConstants.VALIDATION_ERROR);
     }
 
-    private ConflictException conflict() {
-        return new ConflictException(ErrorConstants.CONFLICT);
+    private BusinessException conflict() {
+        return BusinessException.conflict(ErrorConstants.CONFLICT);
     }
 }

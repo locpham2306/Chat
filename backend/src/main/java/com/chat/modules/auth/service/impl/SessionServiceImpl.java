@@ -1,7 +1,7 @@
 package com.chat.modules.auth.service.impl;
 
 import com.chat.common.constant.ErrorConstants;
-import com.chat.exception.NotFoundException;
+import com.chat.exception.BusinessException;
 import com.chat.modules.auth.entity.SessionEntity;
 import com.chat.modules.auth.repository.SessionRepository;
 import com.chat.modules.auth.security.SessionTokenGenerator;
@@ -32,7 +32,7 @@ public class SessionServiceImpl implements SessionService {
     @Transactional
     public IssuedSession create(UUID userId) {
         if (userId == null || !users.existsById(userId)) {
-            throw new NotFoundException(ErrorConstants.NOT_FOUND);
+            throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
         var now = clock.instant().truncatedTo(ChronoUnit.MICROS);
         var rawToken = tokens.generate();

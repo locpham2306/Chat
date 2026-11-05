@@ -1,9 +1,7 @@
 package com.chat.modules.websocket.handler;
 
 import com.chat.common.constant.ErrorConstants;
-import com.chat.exception.BadRequestException;
 import com.chat.exception.BusinessException;
-import com.chat.exception.UnauthenticatedException;
 import com.chat.modules.auth.service.SessionIdentity;
 import com.chat.modules.auth.service.SessionService;
 import com.chat.modules.message.dto.response.MessageSenderResponse;
@@ -13,7 +11,6 @@ import com.chat.modules.websocket.config.WebSocketHandshakeInterceptor;
 import com.chat.modules.websocket.dto.MessageAckData;
 import com.chat.modules.websocket.dto.NewMessageData;
 import com.chat.modules.websocket.dto.SendMessageFrameData;
-import com.chat.modules.websocket.dto.TypingData;
 import com.chat.modules.websocket.dto.TypingFrameData;
 import com.chat.modules.websocket.dto.WebSocketErrorData;
 import com.chat.modules.websocket.service.RealtimeConversationService;
@@ -29,8 +26,6 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
-
-import java.util.List;
 
 @Component
 public class ChatWebSocketHandler extends TextWebSocketHandler {
@@ -174,10 +169,9 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         if (request.conversationId() == null || request.isTyping() == null) {
             throw invalid();
         }
-        List<java.util.UUID> audience = realtime.typingAudience(
-                identity.userId(), request.conversationId());
-        registry.broadcast(audience, TYPING, new TypingData(
-                request.conversationId(), identity.userId(), request.isTyping()));
+        var change = realtime.typing(
+                identity.userId(), request.conversationId(), request.isTyping());
+        registry.broadcast(change.audienceUserIds(), TYPING, change.data());
     }
 
     private void sendError(
@@ -189,7 +183,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private SessionIdentity requireIdentity(WebSocketSession session) {
         var identity = identity(session);
         if (identity == null) {
-            throw new UnauthenticatedException(ErrorConstants.UNAUTHENTICATED);
+            throw BusinessException.unauthenticated(ErrorConstants.UNAUTHENTICATED);
         }
         return identity;
     }
@@ -203,7 +197,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         return node != null && node.isTextual() ? node.textValue() : null;
     }
 
-    private BadRequestException invalid() {
-        return new BadRequestException(ErrorConstants.VALIDATION_ERROR);
+    private BusinessException invalid() {
+        return BusinessException.badRequest(ErrorConstants.VALIDATION_ERROR);
     }
 }

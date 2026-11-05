@@ -30,4 +30,28 @@ public class BusinessException extends RuntimeException {
     public Object[] getArguments() {
         return arguments.clone();
     }
+
+    public static BusinessException badRequest(String messageKey, Object... arguments) {
+        return new BusinessException(HttpStatus.BAD_REQUEST, messageKey, arguments);
+    }
+
+    public static BusinessException unauthenticated(String messageKey, Object... arguments) {
+        return new BusinessException(HttpStatus.UNAUTHORIZED, messageKey, arguments);
+    }
+
+    public static BusinessException forbidden(String messageKey, Object... arguments) {
+        return new BusinessException(HttpStatus.FORBIDDEN, messageKey, arguments);
+    }
+
+    public static BusinessException notFound(String messageKey, Object... arguments) {
+        return new BusinessException(HttpStatus.NOT_FOUND, messageKey, arguments);
+    }
+
+    public static BusinessException conflict(String messageKey, Object... arguments) {
+        return new BusinessException(HttpStatus.CONFLICT, messageKey, arguments);
+    }
+
+    public static BusinessException payloadTooLarge(String messageKey, Object... arguments) {
+        return new BusinessException(HttpStatus.PAYLOAD_TOO_LARGE, messageKey, arguments);
+    }
 }

@@ -2,7 +2,6 @@ package com.chat.modules.auth.security;
 
 import com.chat.common.constant.ErrorConstants;
 import com.chat.exception.BusinessException;
-import com.chat.exception.UnauthenticatedException;
 import com.chat.modules.auth.service.SessionCookieService;
 import com.chat.modules.auth.service.SessionService;
 import jakarta.servlet.FilterChain;
@@ -56,6 +55,6 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private BusinessException unauthenticated() {
-        return new UnauthenticatedException(ErrorConstants.UNAUTHENTICATED);
+        return BusinessException.unauthenticated(ErrorConstants.UNAUTHENTICATED);
     }
 }
