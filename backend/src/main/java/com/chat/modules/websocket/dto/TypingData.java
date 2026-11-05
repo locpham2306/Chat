@@ -5,6 +5,6 @@ import java.util.UUID;
 public record TypingData(
         UUID conversationId,
         UUID userId,
-        TypingUserData user,
+        RealtimeUserData user,
         boolean isTyping) {
 }

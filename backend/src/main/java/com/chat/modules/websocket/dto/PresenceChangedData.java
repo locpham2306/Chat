@@ -7,6 +7,7 @@ import java.util.UUID;
 
 public record PresenceChangedData(
         UUID userId,
+        RealtimeUserData user,
         UserStatusEnum status,
         Instant lastSeen) {
 }

@@ -8,8 +8,8 @@ import com.chat.modules.user.entity.UserEntity;
 import com.chat.modules.user.enums.UserStatusEnum;
 import com.chat.modules.user.repository.UserRepository;
 import com.chat.modules.websocket.dto.PresenceChangedData;
+import com.chat.modules.websocket.dto.RealtimeUserData;
 import com.chat.modules.websocket.dto.TypingData;
-import com.chat.modules.websocket.dto.TypingUserData;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,8 +41,7 @@ public class RealtimeConversationService {
                 new TypingData(
                         conversationId,
                         userId,
-                        new TypingUserData(
-                                user.getId(), user.getFullName(), user.getAvatarFileId()),
+                        toRealtimeUser(user),
                         isTyping),
                 audience);
     }
@@ -51,7 +50,9 @@ public class RealtimeConversationService {
     public PresenceChange connected(UUID userId) {
         var user = findUser(userId);
         return new PresenceChange(
-                new PresenceChangedData(userId, UserStatusEnum.ONLINE, user.getLastSeen()),
+                new PresenceChangedData(
+                        userId, toRealtimeUser(user),
+                        UserStatusEnum.ONLINE, user.getLastSeen()),
                 members.findActiveSharedConversationUserIds(userId));
     }
 
@@ -61,8 +62,15 @@ public class RealtimeConversationService {
         var lastSeen = clock.instant();
         user.markLastSeen(lastSeen);
         return new PresenceChange(
-                new PresenceChangedData(userId, UserStatusEnum.OFFLINE, lastSeen),
+                new PresenceChangedData(
+                        userId, toRealtimeUser(user),
+                        UserStatusEnum.OFFLINE, lastSeen),
                 members.findActiveSharedConversationUserIds(userId));
+    }
+
+    private RealtimeUserData toRealtimeUser(UserEntity user) {
+        return new RealtimeUserData(
+                user.getId(), user.getFullName(), user.getAvatarFileId());
     }
 
     private UserEntity findUser(UUID userId) {

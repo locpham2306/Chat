@@ -418,6 +418,8 @@ Payload giữ `senderId` để tương thích và có thêm `sender` gồm `id`,
 `avatarFileId`, cùng cấu trúc sender của HTTP-16.
 TYPING giữ `userId` để tương thích và có thêm `user` gồm `id`, `fullName`,
 `avatarFileId` để FE hiển thị người đang nhập.
+PRESENCE_CHANGED cũng giữ `userId` và có `user` cùng cấu trúc để FE cập nhật trạng thái,
+tên và avatar mà không cần gọi thêm API.
 Chỉ thành viên hiện tại được truy cập hội thoại.
 
 Đã triển khai SEND_MESSAGE, MESSAGE_ACK, NEW_MESSAGE, TYPING, PRESENCE_CHANGED và ERROR.
