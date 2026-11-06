@@ -15,6 +15,7 @@ import {
   mockCurrentUser,
   mockDirectConversationDetail,
   mockDirectConversationSummary,
+  mockGroupConversationDetail,
   mockPeerUserOffline,
   mockPeerUserOnline
 } from './mocks/mock-data'
@@ -96,6 +97,41 @@ describe('FE-12, FE-20 & FE-22: Realtime WebSocket, Typing, Presence & Read Stat
       })
 
       expect(result.current.isTyping).toBe(false)
+    })
+
+    it('hiển thị chính xác tên người đang gõ trong nhóm chat từ thông tin user trong payload TYPING thay vì hiển thị Ai đó', () => {
+      const queryClient = createTestQueryClient()
+      const { result } = renderHook(
+        () =>
+          useTypingIndicator({
+            conversationId: mockGroupConversationDetail.id,
+            conversation: mockGroupConversationDetail
+          }),
+        { wrapper: createWrapper(queryClient) }
+      )
+
+      expect(result.current.isTyping).toBe(false)
+
+      // Giả lập Server gửi sự kiện TYPING trong nhóm chat kèm thông tin user (Trần Gia Bình)
+      act(() => {
+        listeners['TYPING']?.forEach((fn) =>
+          fn({
+            conversationId: mockGroupConversationDetail.id,
+            userId: 'user-binh-id',
+            user: {
+              id: 'user-binh-id',
+              fullName: 'Trần Gia Bình',
+              avatarFileId: null
+            },
+            isTyping: true
+          })
+        )
+      })
+
+      expect(result.current.isTyping).toBe(true)
+      expect(result.current.typingText).toBe('Trần Gia Bình đang nhập...')
+      expect(result.current.typingText).not.toContain('Ai đó')
+      expect(result.current.typingUsers[0].name).toBe('Trần Gia Bình')
     })
 
     it('tự động ẩn chỉ báo đang nhập khi người đó gửi tin nhắn mới (NEW_MESSAGE)', () => {

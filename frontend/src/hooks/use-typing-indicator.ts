@@ -18,14 +18,21 @@ interface UseTypingIndicatorOptions {
 export interface TypingUser {
   userId: string
   name: string
+  avatarFileId?: string | null
+}
+
+interface TypingEntry {
+  timer: ReturnType<typeof setTimeout>
+  name?: string
+  avatarFileId?: string | null
 }
 
 export const useTypingIndicator = ({ conversationId, conversation }: UseTypingIndicatorOptions) => {
   const currentUserId = useAuthStore((state) => state.user?.id)
   const queryClient = useQueryClient()
 
-  // Danh sách các userId đang nhập: Map<userId, { timer: NodeJS.Timeout }>
-  const [typingMap, setTypingMap] = useState<Map<string, { timer: ReturnType<typeof setTimeout> }>>(new Map())
+  // Danh sách các userId đang nhập kèm thông tin profile nhận từ payload
+  const [typingMap, setTypingMap] = useState<Map<string, TypingEntry>>(new Map())
 
   // Ref lưu trạng thái gửi typing của client hiện tại
   const isSelfTypingRef = useRef(false)
@@ -93,14 +100,20 @@ export const useTypingIndicator = ({ conversationId, conversation }: UseTypingIn
   // Hàm tìm tên hiển thị của userId
   const resolveUserName = useCallback(
     (userId: string): string => {
-      if (!conversation) return 'Ai đó'
+      // 1. Ưu tiên lấy trực tiếp từ typingMap (do server gửi kèm trong payload TYPING)
+      const mappedUser = typingMap.get(userId)
+      if (mappedUser?.name) {
+        return mappedUser.name
+      }
 
-      // Nếu là hội thoại 1-1 và đúng là peer
+      if (!conversation) return 'Người dùng'
+
+      // 2. Nếu là hội thoại 1-1 và đúng là peer
       if (conversation.type === 'DIRECT' && conversation.peer?.id === userId) {
         return conversation.peer.fullName || conversation.peer.username || 'Người dùng'
       }
 
-      // Nếu là group, thử tìm trong cache thành viên nhóm
+      // 3. Nếu là group, thử tìm trong cache thành viên nhóm
       if (conversationId) {
         const queries = queryClient.getQueriesData<ApiPage<ConversationMember[]>>({
           queryKey: ['group-members', conversationId]
@@ -113,9 +126,9 @@ export const useTypingIndicator = ({ conversationId, conversation }: UseTypingIn
         }
       }
 
-      return 'Ai đó'
+      return 'Thành viên'
     },
-    [conversation, conversationId, queryClient]
+    [conversation, conversationId, queryClient, typingMap]
   )
 
   // Lắng nghe sự kiện TYPING từ WebSocket
@@ -127,6 +140,9 @@ export const useTypingIndicator = ({ conversationId, conversation }: UseTypingIn
       if (payload.conversationId !== conversationId || payload.userId === currentUserId) {
         return
       }
+
+      const userName = payload.user?.fullName?.trim() || (payload.user as any)?.username?.trim()
+      const avatarFileId = payload.user?.avatarFileId
 
       setTypingMap((prev) => {
         const next = new Map(prev)
@@ -146,7 +162,11 @@ export const useTypingIndicator = ({ conversationId, conversation }: UseTypingIn
             })
           }, AUTO_DISMISS_MS)
 
-          next.set(payload.userId, { timer })
+          next.set(payload.userId, {
+            timer,
+            name: userName || existing?.name,
+            avatarFileId: avatarFileId !== undefined ? avatarFileId : existing?.avatarFileId
+          })
         } else {
           next.delete(payload.userId)
         }
@@ -186,10 +206,14 @@ export const useTypingIndicator = ({ conversationId, conversation }: UseTypingIn
 
   // Xây dựng danh sách typingUsers và chuỗi typingText
   const userIds = conversationId ? Array.from(typingMap.keys()) : []
-  const typingUsers: TypingUser[] = userIds.map((userId) => ({
-    userId,
-    name: resolveUserName(userId)
-  }))
+  const typingUsers: TypingUser[] = userIds.map((userId) => {
+    const entry = typingMap.get(userId)
+    return {
+      userId,
+      name: resolveUserName(userId),
+      avatarFileId: entry?.avatarFileId
+    }
+  })
 
   let typingText = ''
   if (typingUsers.length === 1) {
