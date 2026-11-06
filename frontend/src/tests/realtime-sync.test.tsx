@@ -28,9 +28,11 @@ const createWrapper = (queryClient: QueryClient) => {
 
 describe('FE-12, FE-20 & FE-22: Realtime WebSocket, Typing, Presence & Read State', () => {
   const listeners: { [key: string]: ((payload: any) => void)[] } = {}
+  const statusListeners: ((status: any) => void)[] = []
 
   beforeEach(() => {
     Object.keys(listeners).forEach((k) => delete listeners[k])
+    statusListeners.length = 0
     useAuthStore.setState({ user: mockCurrentUser, isAuthenticated: true })
 
     vi.spyOn(wsClient, 'on').mockImplementation((event: ServerEvent, handler: WebSocketListener<any>) => {
@@ -40,6 +42,14 @@ describe('FE-12, FE-20 & FE-22: Realtime WebSocket, Typing, Presence & Read Stat
       listeners[event].push(handler)
       return () => {
         listeners[event] = listeners[event]?.filter((h) => h !== handler)
+      }
+    })
+
+    vi.spyOn(wsClient, 'onStatusChange').mockImplementation((handler) => {
+      statusListeners.push(handler)
+      return () => {
+        const index = statusListeners.indexOf(handler)
+        if (index !== -1) statusListeners.splice(index, 1)
       }
     })
 
@@ -205,6 +215,81 @@ describe('FE-12, FE-20 & FE-22: Realtime WebSocket, Typing, Presence & Read Stat
         'conv-direct-0001'
       ])
       expect(updatedDetail?.peer?.status).toBe('OFFLINE')
+    })
+
+    it('cập nhật đồng thời thông tin user (tên, avatar) và trạng thái từ payload WS-06', () => {
+      const queryClient = createTestQueryClient()
+
+      const initialConversations: ApiPage<ConversationSummary[]> = {
+        data: [
+          {
+            ...mockDirectConversationSummary,
+            peer: {
+              ...mockDirectConversationSummary.peer!,
+              fullName: 'Tên Cũ',
+              avatarFileId: null,
+              status: 'OFFLINE'
+            }
+          }
+        ],
+        totalPages: 1,
+        totalElements: 1
+      }
+      queryClient.setQueryData(['conversations', 'list'], initialConversations)
+
+      renderHook(() => usePresenceSync({ activeConversationId: 'conv-direct-0001' }), {
+        wrapper: createWrapper(queryClient)
+      })
+
+      // Giả lập WS-06 PRESENCE_CHANGED có chứa thông tin user mới
+      act(() => {
+        listeners['PRESENCE_CHANGED']?.forEach((fn) =>
+          fn({
+            userId: mockPeerUserOnline.id,
+            user: {
+              id: mockPeerUserOnline.id,
+              fullName: 'Tên Mới Sau Khi Cập Nhật',
+              avatarFileId: 'avatar-new-123'
+            },
+            status: 'ONLINE',
+            lastSeen: new Date().toISOString()
+          })
+        )
+      })
+
+      const updatedCache = queryClient.getQueryData<ApiPage<ConversationSummary[]>>(['conversations', 'list'])
+      expect(updatedCache?.data[0].peer?.status).toBe('ONLINE')
+      expect(updatedCache?.data[0].peer?.fullName).toBe('Tên Mới Sau Khi Cập Nhật')
+      expect(updatedCache?.data[0].peer?.avatarFileId).toBe('avatar-new-123')
+    })
+
+    it('đồng bộ trạng thái Online/Offline của chính người dùng hiện tại qua WebSocket', () => {
+      const queryClient = createTestQueryClient()
+      useAuthStore.setState({ user: { ...mockCurrentUser, status: 'OFFLINE' }, isAuthenticated: true })
+
+      renderHook(() => usePresenceSync(), {
+        wrapper: createWrapper(queryClient)
+      })
+
+      // Giả lập WS-06 gửi thông báo user hiện tại chuyển ONLINE
+      act(() => {
+        listeners['PRESENCE_CHANGED']?.forEach((fn) =>
+          fn({
+            userId: mockCurrentUser.id,
+            status: 'ONLINE',
+            lastSeen: new Date().toISOString()
+          })
+        )
+      })
+
+      expect(useAuthStore.getState().user?.status).toBe('ONLINE')
+
+      // Giả lập kết nối WebSocket bị đóng
+      act(() => {
+        statusListeners.forEach((fn) => fn('CLOSED'))
+      })
+
+      expect(useAuthStore.getState().user?.status).toBe('OFFLINE')
     })
   })
 

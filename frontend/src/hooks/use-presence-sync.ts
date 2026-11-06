@@ -40,6 +40,8 @@ export const usePresenceSync = ({ activeConversationId }: UsePresenceSyncOptions
               ...conv,
               peer: {
                 ...conv.peer,
+                fullName: payload.user?.fullName ?? conv.peer.fullName,
+                avatarFileId: payload.user?.avatarFileId ?? conv.peer.avatarFileId,
                 status: payload.status,
                 lastSeen: payload.lastSeen
               }
@@ -59,6 +61,8 @@ export const usePresenceSync = ({ activeConversationId }: UsePresenceSyncOptions
             ...detail,
             peer: {
               ...detail.peer,
+              fullName: payload.user?.fullName ?? detail.peer.fullName,
+              avatarFileId: payload.user?.avatarFileId ?? detail.peer.avatarFileId,
               status: payload.status,
               lastSeen: payload.lastSeen
             }
@@ -79,6 +83,8 @@ export const usePresenceSync = ({ activeConversationId }: UsePresenceSyncOptions
               ...member,
               user: {
                 ...member.user,
+                fullName: payload.user?.fullName ?? member.user.fullName,
+                avatarFileId: payload.user?.avatarFileId ?? member.user.avatarFileId,
                 status: payload.status,
                 lastSeen: payload.lastSeen
               }
@@ -89,6 +95,17 @@ export const usePresenceSync = ({ activeConversationId }: UsePresenceSyncOptions
 
         return changed ? { ...old, data: updated } : old
       })
+
+      // D. Cập nhật trạng thái của chính người dùng hiện tại nếu có thông báo
+      if (payload.userId === currentUserIdRef.current) {
+        const stateUser = useAuthStore.getState().user
+        if (stateUser && stateUser.id === payload.userId && stateUser.status !== payload.status) {
+          useAuthStore.getState().login({
+            ...stateUser,
+            status: payload.status
+          })
+        }
+      }
     })
 
     // 2. Lắng nghe WS-05 READ_RECEIPT
@@ -117,10 +134,19 @@ export const usePresenceSync = ({ activeConversationId }: UsePresenceSyncOptions
       }
     })
 
-    // 3. Khi WebSocket kết nối lại thành công, làm mới danh sách hội thoại để đồng bộ presence mới nhất
+    // 3. Khi WebSocket kết nối lại hoặc thay đổi trạng thái, làm mới danh sách hội thoại và cập nhật presence
     const unsubscribeStatus = wsClient.onStatusChange((status) => {
       if (status === 'OPEN') {
         queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] })
+        const stateUser = useAuthStore.getState().user
+        if (stateUser && stateUser.status !== 'ONLINE') {
+          useAuthStore.getState().login({ ...stateUser, status: 'ONLINE' })
+        }
+      } else if (status === 'CLOSED') {
+        const stateUser = useAuthStore.getState().user
+        if (stateUser && stateUser.status !== 'OFFLINE') {
+          useAuthStore.getState().login({ ...stateUser, status: 'OFFLINE' })
+        }
       }
     })
 

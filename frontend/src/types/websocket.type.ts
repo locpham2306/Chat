@@ -27,9 +27,16 @@ export interface MessageAckPayload {
 
 export type NewMessagePayload = Message
 
+export interface RealtimeUserData {
+  id: string
+  fullName?: string
+  avatarFileId?: string | null
+}
+
 export interface ServerTypingPayload {
   conversationId: string
   userId: string
+  user?: RealtimeUserData
   isTyping: boolean
 }
 
@@ -41,6 +48,7 @@ export interface ReadReceiptPayload {
 
 export interface PresenceChangedPayload {
   userId: string
+  user?: RealtimeUserData
   status: UserStatus
   lastSeen: string
 }
