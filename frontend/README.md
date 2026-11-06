@@ -1,126 +1,141 @@
-# Course Frontend
+# MODULE CLIENT
 
-Frontend của hệ thống khóa học, được khởi tạo bằng React, Vite và TypeScript.
+> Frontend React cho hệ thống nhắn tin trực tuyến. Client giao tiếp với backend bằng REST API và WebSocket raw.
 
-## Yêu cầu môi trường
+---
 
-- Node.js 24 trở lên
-- pnpm 12 trở lên
+## 🎯 MỤC TIÊU
 
-## Khởi động dự án
+Client chịu trách nhiệm:
+
+- Gửi request HTTP đến backend cho đăng ký, đăng nhập, quản lý hồ sơ, hội thoại, nhóm, tin nhắn và tệp đính kèm.
+- Kết nối WebSocket để nhận tin nhắn mới, đồng bộ trạng thái online/offline, đang nhập và đã đọc theo thời gian thực.
+- Hiển thị giao diện chat cá nhân/nhóm, lịch sử tin nhắn, tìm kiếm người dùng và các thông báo lỗi/trạng thái cho người dùng.
+
+---
+
+## ⚙️ CÔNG NGHỆ SỬ DỤNG
+
+| Thành phần | Công nghệ |
+| --- | --- |
+| Ngôn ngữ | TypeScript |
+| Runtime và build tool | Node.js, pnpm, Vite |
+| Framework giao diện | React 19 |
+| Thư viện chính | Axios, TanStack Query, React Hook Form, Zustand, Zod |
+| Giao thức | HTTP/REST, WebSocket raw JSON |
+| Giao diện | Tailwind CSS, shadcn/ui (Radix UI), Lucide React |
+
+---
+
+## 🚀 HƯỚNG DẪN CHẠY
+
+### Cài đặt
+
+Yêu cầu Node.js `20.19+`, `22.12+` hoặc `24+` để tương thích Vite 8. Nhóm đã kiểm tra dự án với pnpm 12.
+
+```powershell
+pnpm install
+```
+
+Tạo file môi trường theo hệ điều hành:
+
+```powershell
+# Windows PowerShell
+Copy-Item .env.example .env
+```
 
 ```bash
-pnpm install
-Copy-Item .env.example .env
+# macOS hoặc Linux
+cp .env.example .env
+```
+
+### Chạy chương trình
+
+```bash
 pnpm dev
 ```
 
-Ứng dụng chạy mặc định tại `http://localhost:3001`.
+Mở client tại `http://localhost:3001`.
 
-## Các lệnh chính
-
-| Lệnh                | Mục đích                                    |
-| ------------------- | ------------------------------------------- |
-| `pnpm dev`          | Chạy môi trường phát triển                  |
-| `pnpm build`        | Kiểm tra TypeScript và tạo production build |
-| `pnpm lint`         | Kiểm tra source bằng Oxlint                 |
-| `pnpm lint:fix`     | Tự động sửa các lỗi Oxlint có thể xử lý     |
-| `pnpm prettier`     | Kiểm tra định dạng source                   |
-| `pnpm prettier:fix` | Tự động định dạng source                    |
-| `pnpm preview`      | Xem thử production build                    |
-
-## Biến môi trường
-
-Sao chép `.env.example` thành `.env` và thay đổi giá trị theo môi trường chạy.
-
-```env
-VITE_API_URL=http://localhost:8080
-VITE_TIMEOUT=10000
-```
-
-Chỉ các biến có tiền tố `VITE_` được Vite đưa vào frontend. Không commit token, mật khẩu hoặc khóa bí mật vào file `.env`.
-
-## Cấu trúc dự án
-
-```text
-frontend/
-├── public/                       # Tài nguyên được phục vụ nguyên trạng
-├── src/
-│   ├── apis/                    # Hàm gọi API, tách theo module
-│   │   └── auth.api.ts
-│   ├── assets/                  # Ảnh, font và tài nguyên tĩnh được import
-│   ├── components/              # Component tái sử dụng
-│   │   ├── common/              # Component dùng chung theo nghiệp vụ
-│   │   └── ui/                  # Component nền từ shadcn/ui
-│   ├── hooks/                   # TanStack Query và custom hooks
-│   │   └── use-auth.ts
-│   ├── layouts/                 # Khung giao diện dùng chung
-│   │   └── main-layout.tsx
-│   ├── lib/                     # Cấu hình và tiện ích lõi
-│   │   ├── config.ts            # Vị trí dành cho cấu hình môi trường
-│   │   ├── http.ts              # Axios instance dùng chung khi được triển khai
-│   │   └── utils.ts             # Hàm tiện ích dùng chung
-│   ├── pages/                   # Màn hình gắn với route
-│   │   └── login-page.tsx
-│   ├── routes/                  # Router và route guards
-│   │   └── app-router.tsx
-│   ├── stores/                  # Zustand client/shared state
-│   │   └── use-auth-store.ts
-│   ├── types/                   # Type và interface theo module
-│   │   └── auth.type.ts
-│   ├── app.tsx                  # Component gốc của ứng dụng
-│   ├── app.css                  # Style của component gốc
-│   ├── index.css                # Style toàn cục và Tailwind
-│   └── main.tsx                 # Điểm khởi động React
-├── .env.example                 # Mẫu biến môi trường
-├── .oxlintrc.json               # Cấu hình Oxlint
-├── .prettierrc                  # Cấu hình Prettier
-├── tsconfig.json                # Cấu hình TypeScript và alias `~/`
-└── vite.config.ts               # Cấu hình Vite
-```
-
-Các file ví dụ trong cây trên mô tả vị trí và quy tắc đặt tên. Chỉ tạo file khi module tương ứng được triển khai.
-
-## Quy tắc đặt tên
-
-- Tất cả file và thư mục tự tạo dùng kebab-case theo mẫu `a-b-c.ext`.
-- Component export bên trong file dùng PascalCase.
-- Hook dùng tiền tố `use-`, ví dụ `use-auth.ts`.
-- Zustand store dùng mẫu `use-<module>-store.ts`.
-- API module dùng mẫu `<module>.api.ts`.
-- Type module dùng mẫu `<module>.type.ts`.
-
-## Luồng gọi API
-
-```text
-Page hoặc component TSX
-        ↓
-Hook trong src/hooks
-        ↓
-Module API trong src/apis
-        ↓
-Axios instance trong src/lib/http.ts
-        ↓
-Backend
-```
-
-- Component và page không gọi Axios, `http.ts` hoặc module API trực tiếp.
-- Server state và API cache được quản lý bằng TanStack Query.
-- Zustand chỉ lưu client/shared state, không lưu trùng server state.
-- Mọi API module dùng chung một Axios instance tại `src/lib/http.ts` khi tầng HTTP được triển khai.
-
-## Import alias
-
-Alias `~/` trỏ tới thư mục `src/`.
-
-Ví dụ: `~/lib/config` trỏ tới `src/lib/config.ts`.
-
-## Kiểm tra trước khi mở pull request
+Để chạy bản production đã build:
 
 ```bash
 pnpm build
-pnpm lint
-pnpm prettier
+pnpm preview
 ```
 
-Pull request cần ghi Task ID, cách kiểm thử và ảnh minh chứng nếu có thay đổi giao diện.
+### Cấu hình
+
+Cấu hình trong file `.env`, được tạo từ `.env.example`:
+
+```env
+# HTTP API của backend Chat
+VITE_API_URL=http://localhost:8086
+
+# Raw WebSocket của backend Chat
+VITE_WS_URL=ws://localhost:8086/ws
+
+# Thời gian chờ HTTP, đơn vị mili giây
+VITE_TIMEOUT=10000
+```
+
+- `VITE_API_URL`: base URL cho các request HTTP/REST.
+- `VITE_WS_URL`: endpoint WebSocket raw JSON tại `/ws`.
+- `VITE_TIMEOUT`: thời gian chờ request HTTP tính bằng mili giây.
+
+Không đặt token, mật khẩu, khóa API hoặc secret khác vào `.env` frontend vì biến `VITE_*` được đưa vào mã chạy trên trình duyệt.
+
+---
+
+## 📦 CẤU TRÚC
+
+```text
+frontend/
+├── README.md                     # Tài liệu module client
+├── .env.example                  # Mẫu cấu hình môi trường
+├── package.json                  # Scripts và dependencies
+├── vite.config.ts                # Cấu hình Vite và proxy backend
+├── src/
+│   ├── main.tsx                  # Điểm khởi động React
+│   ├── app.tsx                   # Component ứng dụng gốc
+│   ├── apis/                     # Module gọi HTTP API
+│   ├── components/               # Component UI, chat, nhóm và hồ sơ
+│   ├── hooks/                    # Hooks HTTP, WebSocket và TanStack Query
+│   ├── lib/                      # Axios, cấu hình môi trường, WebSocket client
+│   ├── pages/                    # Các màn hình login, đăng ký và chat
+│   ├── routes/                   # Router và protected route
+│   ├── stores/                   # Zustand stores cho state cục bộ
+│   └── types/                    # Kiểu dữ liệu API, chat, user, file, WebSocket
+└── public/                       # Tài nguyên tĩnh
+```
+
+---
+
+## 💡 SỬ DỤNG
+
+1. Khởi động backend Chat tại `http://localhost:8086`.
+2. Chạy `pnpm dev` trong thư mục `frontend`.
+3. Mở `http://localhost:3001`, đăng ký hoặc đăng nhập.
+4. Dùng giao diện để tìm người dùng, tạo hội thoại, gửi tin nhắn hoặc tệp đính kèm.
+
+Với cấu hình mẫu, client kết nối trực tiếp đến các URL backend đã khai báo. Nếu để trống `VITE_API_URL` và `VITE_WS_URL`, client sẽ dùng đường dẫn tương đối `/api` và `/ws`; Vite proxy các đường dẫn này về backend trong development. HTTP dùng cookie session; WebSocket dùng cùng session cookie và không sử dụng STOMP.
+
+Các lệnh kiểm tra:
+
+```bash
+pnpm test:run
+pnpm test:typecheck
+pnpm lint
+pnpm prettier
+pnpm build
+```
+
+---
+
+## 📝 GHI CHÚ
+
+- Đảm bảo backend đã chạy trước khi khởi động client.
+- Backend local mặc định: `http://localhost:8086`.
+- Client local mặc định: `http://localhost:3001`.
+- Backend cần cho phép origin `http://localhost:3001` và khởi động endpoint WebSocket `/ws`.
+- Khi `VITE_WS_URL` không được cấu hình, client tự suy ra `ws(s)://<host-client>/ws`; Vite sẽ proxy endpoint này trong development.
