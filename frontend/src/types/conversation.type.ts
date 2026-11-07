@@ -1,0 +1,99 @@
+import type { Message } from './message.type'
+import type { User } from './user.type'
+
+export type ConversationType = 'DIRECT' | 'GROUP'
+export type MemberRole = 'OWNER' | 'MEMBER'
+
+interface BaseConversation {
+  id: string
+  type: ConversationType
+  createdAt: string
+}
+
+export interface DirectConversation extends BaseConversation {
+  type: 'DIRECT'
+  memberIds: string[]
+}
+
+export interface GroupConversation extends BaseConversation {
+  type: 'GROUP'
+  name: string
+  avatarFileId: string | null
+  ownerId: string
+  memberCount: number
+}
+
+export type Conversation = DirectConversation | GroupConversation
+
+export interface ConversationPeer {
+  id: string
+  username: string
+  fullName: string
+  avatarFileId: string | null
+  avatarUrl?: string | null
+  status?: string
+  lastSeen?: string | null
+}
+
+export interface ConversationDetail {
+  id: string
+  type: ConversationType
+  name: string | null
+  avatarFileId: string | null
+  avatarUrl?: string | null
+  ownerId: string | null
+  memberCount: number
+  createdAt: string
+  peer?: ConversationPeer | null
+}
+
+export interface DirectConversationLookupResult {
+  conversation: DirectConversation | null
+  peer?: ConversationPeer | null
+}
+
+export type ConversationSummary = Conversation & {
+  name?: string | null
+  avatarFileId?: string | null
+  avatarUrl?: string | null
+  peer?: ConversationPeer | null
+  lastMessage: Message | null
+  unreadCount: number
+}
+
+export interface CreateGroupBody {
+  name: string
+  memberIds: string[]
+  avatarFileId?: string | null
+}
+
+export interface UpdateConversationBody {
+  name: string
+  avatarFileId: string | null
+}
+
+export interface ConversationMember {
+  user: User
+  role: MemberRole
+  joinedAt: string
+}
+
+export interface AddConversationMembersBody {
+  memberIds: string[]
+}
+
+export interface AddConversationMembersResponse {
+  addedUserIds: string[]
+  existingUserIds: string[]
+}
+
+export interface MarkConversationReadBody {
+  lastReadMessageId: string
+}
+
+export interface MarkConversationReadResponse {
+  conversationId: string
+  userId: string
+  lastReadMessageId: string
+  unreadCount: number
+}
