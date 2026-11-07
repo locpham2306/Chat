@@ -1,20 +1,3 @@
-<<<<<<< HEAD
-# Frontend
-
-Thư mục dành cho toàn bộ source, build, cấu hình và test của frontend.
-Chưa dựng base; hiện chưa có lệnh chạy hoặc test.
-
-Khi bắt đầu triển khai:
-
-1. Chốt framework, phiên bản runtime và package manager.
-2. Đặt project ngay trong `frontend/`, không tạo thêm tầng `frontend/frontend`.
-3. Tạo cấu hình mẫu không chứa secret và hướng dẫn chạy local.
-4. Thêm test và CI tương ứng với tính năng thực sự triển khai.
-
-Đọc [hợp đồng API](../backend/docs/04-hop-dong-api.md) trước khi tích hợp với BE.
-Quy tắc code frontend sẽ được nhóm FE bổ sung riêng.
-HTTP và WebSocket phải khớp endpoint, enum và luồng session đã thống nhất.
-=======
 # MODULE CLIENT
 
 > Frontend React cho hệ thống nhắn tin trực tuyến. Client giao tiếp với backend bằng REST API và WebSocket raw.
@@ -33,14 +16,14 @@ Client chịu trách nhiệm:
 
 ## ⚙️ CÔNG NGHỆ SỬ DỤNG
 
-| Thành phần | Công nghệ |
-| --- | --- |
-| Ngôn ngữ | TypeScript |
-| Runtime và build tool | Node.js, pnpm, Vite |
-| Framework giao diện | React 19 |
-| Thư viện chính | Axios, TanStack Query, React Hook Form, Zustand, Zod |
-| Giao thức | HTTP/REST, WebSocket raw JSON |
-| Giao diện | Tailwind CSS, shadcn/ui (Radix UI), Lucide React |
+| Thành phần            | Công nghệ                                            |
+| --------------------- | ---------------------------------------------------- |
+| Ngôn ngữ              | TypeScript                                           |
+| Runtime và build tool | Node.js, pnpm, Vite                                  |
+| Framework giao diện   | React 19                                             |
+| Thư viện chính        | Axios, TanStack Query, React Hook Form, Zustand, Zod |
+| Giao thức             | HTTP/REST, WebSocket raw JSON                        |
+| Giao diện             | Tailwind CSS, shadcn/ui (Radix UI), Lucide React     |
 
 ---
 
@@ -156,4 +139,3 @@ pnpm build
 - Client local mặc định: `http://localhost:3001`.
 - Backend cần cho phép origin `http://localhost:3001` và khởi động endpoint WebSocket `/ws`.
 - Khi `VITE_WS_URL` không được cấu hình, client tự suy ra `ws(s)://<host-client>/ws`; Vite sẽ proxy endpoint này trong development.
->>>>>>> frontend
