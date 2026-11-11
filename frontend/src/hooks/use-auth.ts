@@ -42,6 +42,7 @@ export const logoutSession = async (queryClient: QueryClient) => {
   wsClient.disconnect()
   useWebSocketStore.getState().reset()
   useAuthStore.getState().logout()
+  await queryClient.cancelQueries()
   queryClient.clear()
 }
 

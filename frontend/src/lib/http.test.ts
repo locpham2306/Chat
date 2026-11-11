@@ -1,6 +1,6 @@
 import { AxiosError, AxiosHeaders, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
-import { describe, expect, it, vi } from 'vitest'
-import { createHttpClient } from './http'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createHttpClient, setUnauthorizedHandler } from './http'
 
 const rejectWithStatus = (status: number) => (config: InternalAxiosRequestConfig) => {
   const response: AxiosResponse = {
@@ -13,6 +13,10 @@ const rejectWithStatus = (status: number) => (config: InternalAxiosRequestConfig
   return Promise.reject(new AxiosError('Request failed', 'ERR_BAD_RESPONSE', config, undefined, response))
 }
 
+afterEach(() => {
+  setUnauthorizedHandler(null)
+})
+
 describe('HTTP session handling', () => {
   it('redirects a protected request to login after a 401 response', async () => {
     const replace = vi.fn()
@@ -22,6 +26,27 @@ describe('HTTP session handling', () => {
       response: { status: 401 }
     })
     expect(replace).toHaveBeenCalledWith('/login')
+  })
+
+  it('prefers registered unauthorized handler over location replace', async () => {
+    const replace = vi.fn()
+    const handler = vi.fn()
+    setUnauthorizedHandler(handler)
+    const client = createHttpClient({ timeout: 1000, location: { pathname: '/chat', replace } })
+
+    await expect(client.get('/api/users/me', { adapter: rejectWithStatus(401) })).rejects.toMatchObject({
+      response: { status: 401 }
+    })
+    expect(handler).toHaveBeenCalled()
+    expect(replace).not.toHaveBeenCalled()
+  })
+
+  it('does not redirect on logout 401 failures', async () => {
+    const replace = vi.fn()
+    const client = createHttpClient({ timeout: 1000, location: { pathname: '/chat', replace } })
+
+    await expect(client.post('/api/auth/logout', {}, { adapter: rejectWithStatus(401) })).rejects.toBeTruthy()
+    expect(replace).not.toHaveBeenCalled()
   })
 
   it('does not redirect login failures or forbidden responses', async () => {
