@@ -320,7 +320,7 @@ class ChatApplicationTests {
         assertThat(ownerDownload.getBody()).isEqualTo(content);
         assertThat(ownerDownload.getHeaders().getContentType()).isEqualTo(MediaType.IMAGE_PNG);
         assertThat(ownerDownload.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
-                .contains("attachment", "avatar.png");
+                .contains("inline", "avatar.png");
         assertThat(ownerDownload.getHeaders().getFirst("X-Content-Type-Options")).isEqualTo("nosniff");
 
         var forbidden = restTemplate.exchange("/api/files/" + fileId, HttpMethod.GET,
