@@ -72,4 +72,22 @@ describe('ProtectedRoute session states', () => {
 
     expect(refetch).toHaveBeenCalledOnce()
   })
+
+  it('provides a login navigation button when session check fails', async () => {
+    profileQueryMock.mockReturnValue({
+      isPending: false,
+      isError: true,
+      error: new Error('network error'),
+      data: undefined,
+      refetch: vi.fn()
+    })
+
+    renderRoute()
+    const loginLink = screen.getByRole('link', { name: 'Đăng nhập' })
+    expect(loginLink).toBeInTheDocument()
+    expect(loginLink).toHaveAttribute('href', '/login')
+
+    await userEvent.click(loginLink)
+    expect(screen.getByText('Màn hình đăng nhập')).toBeInTheDocument()
+  })
 })
