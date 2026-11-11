@@ -6,20 +6,19 @@ Repository chung cho ứng dụng chat: backend và frontend được phát tri�
 
 ```text
 Chat/
-├── backend/       # Spring Boot, đang review entity/schema chat
+├── backend/       # Spring Boot REST API, WebSocket và persistence
 │   └── docs/      # Quy tắc BE và hợp đồng API
-└── frontend/      # Frontend (chưa dựng base)
+└── frontend/      # React client cho chat cá nhân/nhóm
 ```
 
-Backend có khung Java 21 / Spring Boot 3.5.16 / Maven và health check.
-Đã thêm xử lý lỗi HTTP và Bean Validation dùng message bundle.
-Cấu trúc common theo QLCC có `BaseResponse`, `PageResponse`, package exception và utils.
-Cấu hình persistence dùng MySQL, JPA và Flyway; có schema/entity chat, repository user/session,
-API register/login/logout, xem/cập nhật `/api/users/me` và session cookie hạn 365 ngày.
-Đã có API hội thoại/thành viên/file, lịch sử/mốc đọc và raw WebSocket `/ws` để gửi tin,
-typing, read receipt và presence.
-Lịch sử tin nhắn theo cursor và cập nhật mốc đọc vẫn chưa triển khai.
-Framework frontend chưa chốt.
+Backend dùng Java 21, Spring Boot 3.5.16, Maven, MySQL, JPA và Flyway. Module cung cấp
+xác thực bằng session cookie, hồ sơ người dùng, hội thoại/thành viên, tệp đính kèm,
+lịch sử tin nhắn theo cursor, mốc đọc và raw WebSocket `/ws` cho tin nhắn, typing,
+read receipt và presence.
+
+Frontend dùng TypeScript, React 19, Vite và pnpm. Client tích hợp REST/WebSocket của
+backend và cung cấp các luồng đăng ký/đăng nhập, chat cá nhân/nhóm, quản lý nhóm,
+hồ sơ, tệp đính kèm và đồng bộ thời gian thực.
 
 BE phát triển trên nhánh `backend`, code nằm trong `backend/`.
 `main` dành cho bản tích hợp hoàn thiện; khi BE sẵn sàng mới gộp từ `backend` vào `main`.
