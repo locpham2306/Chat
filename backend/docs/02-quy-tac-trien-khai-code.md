@@ -5,8 +5,9 @@
 - Endpoint dùng `/api/...` và đúng GET/POST/PUT/DELETE trong tài liệu Chat.
 - Chọn một nơi quản lý prefix `/api`, tránh khai báo lặp trong context-path và controller.
 - Input/output dùng DTO; không trả entity, password/hash hoặc session token trong JSON.
-- Response thành công trả object/array trực tiếp; 204 không có body.
-  Không tự thêm `BaseResponse<T>`, `/api/v1`, Core/CMS hay chuyển mọi API sang POST.
+- Response thành công dùng `BaseResponse<T>` với `code`, `strCode`, `message`, `content`;
+  204 không có body. Danh sách phân trang đặt `PageResponse<T>` trong `content`.
+- Không tự thêm `/api/v1`, Core/CMS hay chuyển mọi API sang POST.
 - Validate request bằng Bean Validation; validation nghiệp vụ nằm trong service.
 - Dùng PUT theo schema đã công bố, phân biệt field thiếu và null.
 - Enum ghi rõ dạng `type: 'DIRECT' | 'GROUP'` trong docs; JSON ví dụ chỉ chứa một giá trị hợp lệ.
@@ -33,13 +34,23 @@
 - Không trả stack trace, SQL, credential hoặc nội dung nội bộ ra client.
 - Message có thể quản lý bằng resource bundle; code lỗi là key ổn định để FE xử lý.
 - Không tạo enum lỗi chỉ để chứa message; có thể dùng `*ErrorConstants` cho key.
+- Base hiện dùng `BusinessException(HttpStatus, messageKey, args)` cho lỗi 4xx.
+  Code FE được ánh xạ theo HTTP status qua `ErrorConstants`, message tra trong bundle.
+- `@Valid` trên request DTO và message như `{validation.notBlank}` dùng chung
+  `messages.properties` / `messages_en.properties`; mặc định tiếng Việt.
+- Lỗi cũng dùng `BaseResponse`; `strCode` là mã ổn định cho FE. `content` chứa
+  `timestamp`, `status`, `path`, `fieldErrors`.
+  Không đưa giá trị bị reject hoặc query string vào response lỗi.
+- Lỗi giao thức Spring MVC giữ status/header gốc (ví dụ 405 + Allow);
+  lỗi 4xx không có code riêng dùng `VALIDATION_ERROR`.
+- Filter session chuyển lỗi qua MVC advice để giữ nguyên Error model; lỗi WS xử lý riêng.
 
 ## Session và phân quyền
 
-- Một session token ngẫu nhiên; server lưu hash, userId, expiresAt và trạng thái thu hồi.
-- Hạn cố định 365 ngày; cookie `token` do backend đặt, HttpOnly,
+- Dùng một session token ngẫu nhiên; server lưu hash, userId, expiresAt và trạng thái thu hồi.
+- Session hạn cố định 365 ngày; cookie `token` do backend đặt, HttpOnly,
   Secure trên HTTPS, Path=/; SameSite theo deployment đã thống nhất.
-- Không access/refresh token; không trả token trong JSON hoặc URL.
+- Không trả session token trong JSON hoặc URL.
 - Request kiểm tra phiên còn hạn/chưa thu hồi và quyền trên tài nguyên.
 - Logout hỗ trợ cookie hoặc body; nếu cả hai khác nhau trả 400.
   Thu hồi server-side, xóa cookie và đóng WS của phiên.
@@ -50,9 +61,11 @@
 ## Database, cấu hình và kiểm thử
 
 - Mỗi thay đổi schema phải có migration; không dùng JPA tự sửa schema production.
+- MySQL 8.4; JPA `ddl-auto=validate`, `open-in-view=false`; Flyway quản lý schema.
+  Xem [database và migration](05-database-va-migration.md).
 - Secret lấy từ env hoặc secret store; cấu hình mẫu chỉ có placeholder.
 - Không thêm dependency/base abstraction khi chưa có nhu cầu.
 - Test nghiệp vụ quan trọng: phân quyền, session hết hạn/thu hồi, logout,
   lookup không tạo hội thoại, tin đầu rollback, gửi đồng thời và retry không tạo trùng.
 - Khi đã có build tool, chạy compile/test phù hợp và ghi kết quả thực tế trong PR.
-  Hiện chưa dựng base nên chưa có lệnh kiểm thử ứng dụng.
+  Chạy `.\mvnw.cmd clean verify` từ `backend/` trên Windows; Linux/macOS dùng `sh mvnw clean verify`.
