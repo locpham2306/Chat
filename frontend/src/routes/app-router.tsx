@@ -1,4 +1,6 @@
-import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter, Route, Routes, Navigate, useNavigate } from 'react-router-dom'
+import { setUnauthorizedHandler } from '~/lib/http'
 import { AuthLayout } from '~/layouts/auth-layout'
 import { MainLayout } from '~/layouts/main-layout'
 import { ProtectedRoute } from '~/routes/protected-route'
@@ -7,9 +9,26 @@ import { LoginPage } from '~/pages/login-page'
 import { RegisterPage } from '~/pages/register-page'
 import { NotFoundPage } from '~/pages/not-found-page'
 
+const AuthSessionBridge = () => {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      navigate('/login', { replace: true })
+    })
+
+    return () => {
+      setUnauthorizedHandler(null)
+    }
+  }, [navigate])
+
+  return null
+}
+
 const AppRouter = () => {
   return (
     <BrowserRouter>
+      <AuthSessionBridge />
       <Routes>
         {/* Public auth routes */}
         <Route element={<AuthLayout />}>

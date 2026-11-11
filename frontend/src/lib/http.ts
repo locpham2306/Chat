@@ -1,7 +1,7 @@
 import axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
 
 const DEFAULT_TIMEOUT = 10_000
-const LOGIN_ENDPOINT = '/api/auth/login'
+const AUTH_ENDPOINTS = ['/api/auth/login', '/api/auth/logout', '/api/auth/register']
 
 type HttpLocation = {
   pathname: string
@@ -14,11 +14,19 @@ type CreateHttpClientOptions = {
   location?: HttpLocation
 }
 
-const isLoginRequest = (instance: AxiosInstance, config?: InternalAxiosRequestConfig) => {
-  if (!config || config.method?.toUpperCase() !== 'POST') return false
+export type UnauthorizedHandler = () => void
+let globalUnauthorizedHandler: UnauthorizedHandler | null = null
+
+export const setUnauthorizedHandler = (handler: UnauthorizedHandler | null) => {
+  globalUnauthorizedHandler = handler
+}
+
+const isAuthRequest = (instance: AxiosInstance, config?: InternalAxiosRequestConfig) => {
+  if (!config) return false
 
   try {
-    return new URL(instance.getUri(config), 'http://localhost').pathname === LOGIN_ENDPOINT
+    const pathname = new URL(instance.getUri(config), 'http://localhost').pathname
+    return AUTH_ENDPOINTS.includes(pathname)
   } catch {
     return false
   }
@@ -47,10 +55,14 @@ export const createHttpClient = ({ baseURL, timeout, location }: CreateHttpClien
     (response) => response,
     (error: AxiosError) => {
       const shouldRedirect =
-        error.response?.status === 401 && !isLoginRequest(instance, error.config) && location?.pathname !== '/login'
+        error.response?.status === 401 && !isAuthRequest(instance, error.config) && location?.pathname !== '/login'
 
       if (shouldRedirect) {
-        location?.replace('/login')
+        if (globalUnauthorizedHandler) {
+          globalUnauthorizedHandler()
+        } else {
+          location?.replace('/login')
+        }
       }
 
       return Promise.reject(error)
