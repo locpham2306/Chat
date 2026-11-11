@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -21,6 +22,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 @RestControllerAdvice
@@ -34,7 +36,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Object> handleBusinessException(BusinessException exception, WebRequest request) {
-        var status = exception.getStatus();
+        HttpStatus status = exception.getStatus();
         String strCode = ErrorConstants.forStatus(status.value());
         String detail = messages.getMessage(exception.getMessageKey(), exception.getArguments());
         if (detail.equals(exception.getMessageKey())) {
@@ -55,14 +57,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         List<FieldErrorResponse> fields = List.of();
         if (exception instanceof MethodArgumentNotValidException validationException) {
-            fields = validationException.getBindingResult().getAllErrors().stream()
-                    .map(error -> new FieldErrorResponse(
-                            error instanceof FieldError fieldError ? fieldError.getField() : error.getObjectName(),
-                            error.getDefaultMessage() == null
-                                    ? messages.getMessage(ErrorConstants.VALIDATION_ERROR) : error.getDefaultMessage()))
-                    .toList();
+            fields = new ArrayList<>();
+            for (ObjectError error : validationException.getBindingResult().getAllErrors()) {
+                String field = error.getObjectName();
+                if (error instanceof FieldError fieldError) {
+                    field = fieldError.getField();
+                }
+                String message = error.getDefaultMessage();
+                if (message == null) {
+                    message = messages.getMessage(ErrorConstants.VALIDATION_ERROR);
+                }
+                fields.add(new FieldErrorResponse(field, message));
+            }
         }
-        var status = HttpStatus.valueOf(statusCode.value());
+        HttpStatus status = HttpStatus.valueOf(statusCode.value());
         String strCode = ErrorConstants.forStatus(status.value());
         return response(status, headers, strCode, messages.getMessage(strCode), fields, request);
     }
@@ -80,8 +88,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             List<FieldErrorResponse> fields, WebRequest request) {
         String path = request instanceof ServletWebRequest servletRequest
                 ? servletRequest.getRequest().getRequestURI() : "";
-        var detail = new ErrorDetailResponse(Instant.now(), status.value(), path, fields);
-        var response = BaseResponse.error(StatusCode.from(status), strCode, message, detail);
+        ErrorDetailResponse detail = new ErrorDetailResponse(Instant.now(), status.value(), path, fields);
+        BaseResponse<ErrorDetailResponse> response = BaseResponse.error(
+                StatusCode.from(status), strCode, message, detail);
         return new ResponseEntity<>(response, headers, status);
     }
 }

@@ -3,6 +3,7 @@ package com.chat.modules.auth.security;
 import com.chat.common.constant.ErrorConstants;
 import com.chat.exception.BusinessException;
 import com.chat.modules.auth.service.SessionCookieService;
+import com.chat.modules.auth.service.SessionIdentity;
 import com.chat.modules.auth.service.SessionService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -44,7 +45,8 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
         try {
-            var identity = sessions.findActive(cookies.read(request)).orElseThrow(this::unauthenticated);
+            SessionIdentity identity = sessions.findActive(cookies.read(request))
+                    .orElseThrow(this::unauthenticated);
             request.setAttribute(SESSION_ATTRIBUTE, identity);
         } catch (BusinessException exception) {
             exceptionResolver.resolveException(request, response, null,

@@ -3,6 +3,7 @@ package com.chat.modules.user.service.impl;
 import com.chat.common.constant.ErrorConstants;
 import com.chat.common.dto.response.PageResponse;
 import com.chat.exception.BusinessException;
+import com.chat.modules.file.entity.FileEntity;
 import com.chat.modules.file.repository.FileRepository;
 import com.chat.modules.user.dto.request.UpdateProfileRequest;
 import com.chat.modules.user.dto.response.UserResponse;
@@ -15,6 +16,7 @@ import com.chat.modules.user.service.UserService;
 import com.chat.utils.PageableUtils;
 import com.chat.utils.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,16 +50,16 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public UserResponse getCurrentUser(UUID userId) {
-        var user = currentUser(userId);
+        UserEntity user = currentUser(userId);
         return userMapper.toResponse(user, presence.status(user.getId()));
     }
 
     @Override
     @Transactional
     public UserResponse updateCurrentUser(UUID userId, UpdateProfileRequest request) {
-        var user = currentUser(userId);
+        UserEntity user = currentUser(userId);
         if (request.avatarFileId() != null) {
-            var avatar = files.findById(request.avatarFileId())
+            FileEntity avatar = files.findById(request.avatarFileId())
                     .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
             boolean allowed = userId.equals(avatar.getUploaderId())
                     && avatar.getConversationId() == null
@@ -78,8 +80,8 @@ public class UserServiceImpl implements UserService {
         if (resolvedKeyword == null) {
             resolvedKeyword = "";
         }
-        var sort = Sort.by(Sort.Order.asc("username"), Sort.Order.asc("id"));
-        var usersPage = users.searchPublicProfiles(
+        Sort sort = Sort.by(Sort.Order.asc("username"), Sort.Order.asc("id"));
+        Page<UserEntity> usersPage = users.searchPublicProfiles(
                 currentUserId, resolvedKeyword, PageableUtils.of(page, size, sort));
         return PageableUtils.toResponse(
                 usersPage, user -> userMapper.toResponse(user, presence.status(user.getId())));

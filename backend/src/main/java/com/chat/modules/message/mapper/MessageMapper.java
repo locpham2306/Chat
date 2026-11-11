@@ -15,7 +15,7 @@ public class MessageMapper {
 
     public MessageResponse toResponse(
             MessageEntity message, UserEntity sender, List<FileEntity> attachments) {
-        var files = attachments.stream()
+        List<FileResponse> files = attachments.stream()
                 .map(file -> new FileResponse(
                         file.getId(), file.getName(), file.getContentType(), file.getSize(),
                         "/api/files/" + file.getId()))

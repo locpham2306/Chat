@@ -25,15 +25,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -49,7 +49,7 @@ public class MessageServiceImpl implements MessageService {
     @Override
     @Transactional
     public MessageDelivery send(MessageSendCommand rawCommand) {
-        var command = validate(rawCommand);
+        MessageSendCommand command = validate(rawCommand);
         ConversationEntity conversation;
         MessageEntity existing;
         UserEntity sender;
@@ -86,12 +86,12 @@ public class MessageServiceImpl implements MessageService {
             requireActiveMember(conversation.getId(), command.senderId());
         }
 
-        var orderedFiles = resolveAndBindFiles(
+        List<FileEntity> orderedFiles = resolveAndBindFiles(
                 command.senderId(), conversation.getId(), command.attachmentIds());
-        var message = messages.saveAndFlush(new MessageEntity(
+        MessageEntity message = messages.saveAndFlush(new MessageEntity(
                 conversation.getId(), command.senderId(), command.clientMessageId(), command.content()));
         if (!orderedFiles.isEmpty()) {
-            var links = new ArrayList<MessageAttachmentEntity>(orderedFiles.size());
+            ArrayList<MessageAttachmentEntity> links = new ArrayList<>(orderedFiles.size());
             for (int index = 0; index < orderedFiles.size(); index++) {
                 links.add(new MessageAttachmentEntity(message.getId(), orderedFiles.get(index).getId(), index));
             }
@@ -120,7 +120,7 @@ public class MessageServiceImpl implements MessageService {
         if (content != null && content.isBlank()) {
             content = null;
         }
-        var attachmentIds = command.attachmentIds();
+        List<UUID> attachmentIds = command.attachmentIds();
         if (attachmentIds.stream().anyMatch(Objects::isNull)
                 || new LinkedHashSet<>(attachmentIds).size() != attachmentIds.size()) {
             throw invalid();
@@ -138,8 +138,8 @@ public class MessageServiceImpl implements MessageService {
 
     private UserEntity lockDirectUsers(UUID firstUserId, UUID secondUserId) {
         boolean firstIsLow = firstUserId.toString().compareTo(secondUserId.toString()) < 0;
-        var lowUser = lockUser(firstIsLow ? firstUserId : secondUserId);
-        var highUser = lockUser(firstIsLow ? secondUserId : firstUserId);
+        UserEntity lowUser = lockUser(firstIsLow ? firstUserId : secondUserId);
+        UserEntity highUser = lockUser(firstIsLow ? secondUserId : firstUserId);
         return firstIsLow ? lowUser : highUser;
     }
 
@@ -149,8 +149,9 @@ public class MessageServiceImpl implements MessageService {
     }
 
     private ConversationEntity createDirect(UUID senderId, UUID recipientId) {
-        var conversation = conversations.saveAndFlush(ConversationEntity.direct(senderId, recipientId));
-        var joinedAt = clock.instant();
+        ConversationEntity conversation = conversations.saveAndFlush(
+                ConversationEntity.direct(senderId, recipientId));
+        Instant joinedAt = clock.instant();
         members.saveAllAndFlush(List.of(
                 new ConversationMemberEntity(conversation.getId(), senderId, MemberRoleEnum.MEMBER, joinedAt),
                 new ConversationMemberEntity(conversation.getId(), recipientId, MemberRoleEnum.MEMBER, joinedAt)));
@@ -168,19 +169,24 @@ public class MessageServiceImpl implements MessageService {
         if (attachmentIds.isEmpty()) {
             return List.of();
         }
-        Map<UUID, FileEntity> filesById = files.findAllByIdForUpdate(attachmentIds).stream()
-                .collect(Collectors.toMap(FileEntity::getId, Function.identity()));
+        Map<UUID, FileEntity> filesById = new HashMap<>();
+        for (FileEntity file : files.findAllByIdForUpdate(attachmentIds)) {
+            filesById.put(file.getId(), file);
+        }
         if (filesById.size() != attachmentIds.size()) {
             throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
-        var orderedFiles = attachmentIds.stream().map(filesById::get).toList();
-        for (var file : orderedFiles) {
+
+        List<FileEntity> orderedFiles = new ArrayList<>(attachmentIds.size());
+        for (UUID attachmentId : attachmentIds) {
+            FileEntity file = filesById.get(attachmentId);
             if (!senderId.equals(file.getUploaderId())
                     || (file.getConversationId() != null
                     && !conversationId.equals(file.getConversationId()))) {
                 throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
             }
             file.bindToConversation(conversationId);
+            orderedFiles.add(file);
         }
         files.saveAllAndFlush(orderedFiles);
         return orderedFiles;
@@ -188,20 +194,26 @@ public class MessageServiceImpl implements MessageService {
 
     private MessageDelivery retry(
             MessageEntity existing, MessageSendCommand command, UserEntity sender) {
-        var links = attachments.findByMessageIdOrderByPositionAsc(existing.getId());
-        var storedAttachmentIds = links.stream().map(MessageAttachmentEntity::getFileId).toList();
+        List<MessageAttachmentEntity> links =
+                attachments.findByMessageIdOrderByPositionAsc(existing.getId());
+        List<UUID> storedAttachmentIds = links.stream()
+                .map(MessageAttachmentEntity::getFileId).toList();
         if (!Objects.equals(existing.getContent(), command.content())
                 || !storedAttachmentIds.equals(command.attachmentIds())) {
             throw conflict();
         }
-        Map<UUID, FileEntity> filesById = files.findAllById(storedAttachmentIds).stream()
-                .collect(Collectors.toMap(FileEntity::getId, Function.identity()));
-        var orderedFiles = storedAttachmentIds.stream()
-                .map(filesById::get)
-                .filter(Objects::nonNull)
-                .toList();
-        if (orderedFiles.size() != storedAttachmentIds.size()) {
-            throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
+        Map<UUID, FileEntity> filesById = new HashMap<>();
+        for (FileEntity file : files.findAllById(storedAttachmentIds)) {
+            filesById.put(file.getId(), file);
+        }
+
+        List<FileEntity> orderedFiles = new ArrayList<>(storedAttachmentIds.size());
+        for (UUID attachmentId : storedAttachmentIds) {
+            FileEntity file = filesById.get(attachmentId);
+            if (file == null) {
+                throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
+            }
+            orderedFiles.add(file);
         }
         return delivery(existing, sender, orderedFiles, List.of(), false);
     }
@@ -212,7 +224,7 @@ public class MessageServiceImpl implements MessageService {
             Collection<FileEntity> attachedFiles,
             List<UUID> activeMemberIds,
             boolean newlyCreated) {
-        var fileResponses = attachedFiles.stream()
+        List<FileResponse> fileResponses = attachedFiles.stream()
                 .map(file -> new FileResponse(
                         file.getId(), file.getName(), file.getContentType(), file.getSize(),
                         "/api/files/" + file.getId()))

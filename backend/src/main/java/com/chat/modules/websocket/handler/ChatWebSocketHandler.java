@@ -5,6 +5,7 @@ import com.chat.exception.BusinessException;
 import com.chat.modules.auth.service.SessionIdentity;
 import com.chat.modules.auth.service.SessionService;
 import com.chat.modules.message.dto.response.MessageSenderResponse;
+import com.chat.modules.message.service.MessageDelivery;
 import com.chat.modules.message.service.MessageSendCommand;
 import com.chat.modules.message.service.MessageService;
 import com.chat.modules.websocket.config.WebSocketHandshakeInterceptor;
@@ -14,6 +15,8 @@ import com.chat.modules.websocket.dto.SendMessageFrameData;
 import com.chat.modules.websocket.dto.TypingFrameData;
 import com.chat.modules.websocket.dto.WebSocketErrorData;
 import com.chat.modules.websocket.service.RealtimeConversationService;
+import com.chat.modules.websocket.service.PresenceChange;
+import com.chat.modules.websocket.service.TypingChange;
 import com.chat.modules.websocket.service.WebSocketSessionRegistry;
 import com.chat.utils.MessageUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -63,7 +66,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
-        var identity = identity(session);
+        SessionIdentity identity = identity(session);
         if (identity == null) {
             try {
                 session.close(CloseStatus.POLICY_VIOLATION);
@@ -72,14 +75,14 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             }
             return;
         }
-        var registration = registry.register(session, identity);
+        WebSocketSessionRegistry.Registration registration = registry.register(session, identity);
         if (!sessions.isActive(identity.sessionId())) {
             registry.closeConnection(session.getId(), CloseStatus.POLICY_VIOLATION);
             return;
         }
         if (registration.firstForUser()) {
             registry.runIfOnline(identity.userId(), () -> {
-                var change = realtime.connected(identity.userId());
+                PresenceChange change = realtime.connected(identity.userId());
                 registry.broadcast(change.audienceUserIds(), PRESENCE_CHANGED, change.data());
             });
         }
@@ -89,7 +92,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
         String clientMessageId = null;
         try {
-            var identity = requireIdentity(session);
+            SessionIdentity identity = requireIdentity(session);
             if (!sessions.isActive(identity.sessionId())) {
                 sendError(session, null, ErrorConstants.UNAUTHENTICATED,
                         messageUtils.getMessage(ErrorConstants.UNAUTHENTICATED));
@@ -127,11 +130,11 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        var disconnection = registry.unregister(session.getId());
+        WebSocketSessionRegistry.Disconnection disconnection = registry.unregister(session.getId());
         if (disconnection != null && disconnection.lastForUser()) {
             try {
                 registry.runIfOffline(disconnection.userId(), () -> {
-                    var change = realtime.disconnected(disconnection.userId());
+                    PresenceChange change = realtime.disconnected(disconnection.userId());
                     registry.broadcast(change.audienceUserIds(), PRESENCE_CHANGED, change.data());
                 });
             } catch (BusinessException exception) {
@@ -147,8 +150,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     private void handleSendMessage(
             WebSocketSession session, SessionIdentity identity, JsonNode data) throws JsonProcessingException {
-        var request = objectMapper.treeToValue(data, SendMessageFrameData.class);
-        var delivery = messages.send(new MessageSendCommand(
+        SendMessageFrameData request = objectMapper.treeToValue(data, SendMessageFrameData.class);
+        MessageDelivery delivery = messages.send(new MessageSendCommand(
                 identity.userId(), request.recipientId(), request.conversationId(),
                 request.clientMessageId(), request.content(), request.attachmentIds()));
         registry.sendToConnection(session.getId(), MESSAGE_ACK, new MessageAckData(
@@ -165,11 +168,11 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void handleTyping(SessionIdentity identity, JsonNode data) throws JsonProcessingException {
-        var request = objectMapper.treeToValue(data, TypingFrameData.class);
+        TypingFrameData request = objectMapper.treeToValue(data, TypingFrameData.class);
         if (request.conversationId() == null || request.isTyping() == null) {
             throw invalid();
         }
-        var change = realtime.typing(
+        TypingChange change = realtime.typing(
                 identity.userId(), request.conversationId(), request.isTyping());
         registry.broadcast(change.audienceUserIds(), TYPING, change.data());
     }
@@ -181,7 +184,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     }
 
     private SessionIdentity requireIdentity(WebSocketSession session) {
-        var identity = identity(session);
+        SessionIdentity identity = identity(session);
         if (identity == null) {
             throw BusinessException.unauthenticated(ErrorConstants.UNAUTHENTICATED);
         }
@@ -189,7 +192,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     }
 
     private SessionIdentity identity(WebSocketSession session) {
-        var value = session.getAttributes().get(WebSocketHandshakeInterceptor.IDENTITY_ATTRIBUTE);
+        Object value = session.getAttributes().get(WebSocketHandshakeInterceptor.IDENTITY_ATTRIBUTE);
         return value instanceof SessionIdentity identity ? identity : null;
     }
 

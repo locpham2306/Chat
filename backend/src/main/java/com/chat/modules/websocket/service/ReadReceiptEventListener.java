@@ -1,6 +1,7 @@
 package com.chat.modules.websocket.service;
 
 import com.chat.modules.message.service.MessageReadEvent;
+import com.chat.modules.message.dto.response.ConversationReadResponse;
 import com.chat.modules.websocket.dto.ReadReceiptData;
 import com.chat.modules.websocket.handler.ChatWebSocketHandler;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +16,7 @@ public class ReadReceiptEventListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publish(MessageReadEvent event) {
-        var response = event.response();
+        ConversationReadResponse response = event.response();
         webSocketSessions.broadcast(
                 event.activeMemberIds(),
                 ChatWebSocketHandler.READ_RECEIPT,

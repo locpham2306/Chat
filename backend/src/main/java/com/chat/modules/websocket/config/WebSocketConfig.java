@@ -37,7 +37,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Bean
     public static ServletServerContainerFactoryBean webSocketContainer() {
-        var container = new ServletServerContainerFactoryBean();
+        ServletServerContainerFactoryBean container = new ServletServerContainerFactoryBean();
         container.setMaxTextMessageBufferSize(64 * 1024);
         container.setMaxBinaryMessageBufferSize(8 * 1024);
         container.setMaxSessionIdleTimeout(90_000L);
@@ -46,7 +46,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Bean(name = "webSocketTaskScheduler")
     public static ThreadPoolTaskScheduler webSocketTaskScheduler() {
-        var scheduler = new ThreadPoolTaskScheduler();
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
         scheduler.setPoolSize(2);
         scheduler.setThreadNamePrefix("chat-ws-");
         scheduler.setWaitForTasksToCompleteOnShutdown(true);

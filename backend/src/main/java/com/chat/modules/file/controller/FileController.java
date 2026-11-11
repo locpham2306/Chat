@@ -4,6 +4,7 @@ import com.chat.common.wrapper.BaseResponse;
 import com.chat.modules.auth.security.SessionAuthenticationFilter;
 import com.chat.modules.auth.service.SessionIdentity;
 import com.chat.modules.file.dto.response.FileResponse;
+import com.chat.modules.file.service.FileDownload;
 import com.chat.modules.file.service.FileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
@@ -42,9 +43,9 @@ public class FileController {
     public ResponseEntity<org.springframework.core.io.Resource> download(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id) {
-        var file = files.download(session.userId(), id);
-        var contentType = MediaType.parseMediaType(file.contentType());
-        var disposition = isInline(contentType)
+        FileDownload file = files.download(session.userId(), id);
+        MediaType contentType = MediaType.parseMediaType(file.contentType());
+        ContentDisposition.Builder disposition = isInline(contentType)
                 ? ContentDisposition.inline()
                 : ContentDisposition.attachment();
         return ResponseEntity.ok()

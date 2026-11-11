@@ -18,7 +18,7 @@ public class SessionFilterConfig {
             SessionCookieService cookies,
             SessionService sessions,
             @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
-        var registration = new FilterRegistrationBean<>(
+        FilterRegistrationBean<SessionAuthenticationFilter> registration = new FilterRegistrationBean<>(
                 new SessionAuthenticationFilter(cookies, sessions, exceptionResolver));
         registration.addUrlPatterns("/api/*", "/ws");
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);

@@ -23,6 +23,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -46,14 +47,14 @@ public class FileServiceImpl implements FileService {
         String contentType = normalizeContentType(file.getContentType());
         String storageKey = UUID.randomUUID().toString();
 
-        try (var input = file.getInputStream()) {
+        try (InputStream input = file.getInputStream()) {
             storage.store(storageKey, input);
         } catch (IOException exception) {
             throw new IllegalStateException("Cannot read uploaded file", exception);
         }
         deleteStoredFileAfterRollback(storageKey);
 
-        var saved = files.saveAndFlush(
+        FileEntity saved = files.saveAndFlush(
                 new FileEntity(uploaderId, name, storageKey, contentType, file.getSize()));
         return new FileResponse(saved.getId(), saved.getName(), saved.getContentType(),
                 saved.getSize(), "/api/files/" + saved.getId());
@@ -62,7 +63,7 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional(readOnly = true)
     public FileDownload download(UUID userId, UUID fileId) {
-        var file = files.findById(fileId)
+        FileEntity file = files.findById(fileId)
                 .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
         if (!canRead(userId, file)) {
             throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
@@ -96,7 +97,8 @@ public class FileServiceImpl implements FileService {
 
     private String normalizeContentType(String rawContentType) {
         try {
-            var mediaType = MediaType.parseMediaType(rawContentType == null ? "" : rawContentType);
+            MediaType mediaType = MediaType.parseMediaType(
+                    rawContentType == null ? "" : rawContentType);
             return (mediaType.getType() + "/" + mediaType.getSubtype()).toLowerCase(Locale.ROOT);
         } catch (InvalidMediaTypeException exception) {
             return MediaType.APPLICATION_OCTET_STREAM_VALUE;

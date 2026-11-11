@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -33,8 +35,8 @@ public class RealtimeConversationService {
         if (!members.existsByConversationIdAndUserIdAndLeftAtIsNull(conversationId, userId)) {
             throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
-        var user = findUser(userId);
-        var audience = members.findActiveUserIds(conversationId).stream()
+        UserEntity user = findUser(userId);
+        List<UUID> audience = members.findActiveUserIds(conversationId).stream()
                 .filter(candidate -> !candidate.equals(userId))
                 .toList();
         return new TypingChange(
@@ -48,7 +50,7 @@ public class RealtimeConversationService {
 
     @Transactional(readOnly = true)
     public PresenceChange connected(UUID userId) {
-        var user = findUser(userId);
+        UserEntity user = findUser(userId);
         return new PresenceChange(
                 new PresenceChangedData(
                         userId, toRealtimeUser(user),
@@ -58,8 +60,8 @@ public class RealtimeConversationService {
 
     @Transactional
     public PresenceChange disconnected(UUID userId) {
-        var user = findUser(userId);
-        var lastSeen = clock.instant();
+        UserEntity user = findUser(userId);
+        Instant lastSeen = clock.instant();
         user.markLastSeen(lastSeen);
         return new PresenceChange(
                 new PresenceChangedData(

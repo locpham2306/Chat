@@ -4,6 +4,8 @@ Thư mục dành cho toàn bộ source, build, cấu hình và test của backen
 Đã dựng entity/schema, API register/login/logout, filter session, xem/cập nhật `/api/users/me`,
 tìm kiếm user và upload/download file có phân quyền. Raw WebSocket `/ws` dùng cookie session
 đã hỗ trợ gửi tin, retry idempotent, typing, read receipt, presence và lỗi frame.
+`ConversationService` xử lý bản thân hội thoại; `ConversationMemberService` tách riêng nghiệp vụ
+danh sách, tìm ứng viên, thêm và xóa thành viên để mỗi service có một trách nhiệm rõ ràng.
 HTTP lịch sử tin nhắn dùng cursor; HTTP mốc đọc chỉ tiến và phát receipt sau commit.
 Lookup hội thoại DIRECT đã có và không tạo dữ liệu khi hai user chưa từng nhắn tin;
 API tạo nhóm tạo OWNER/MEMBER trong cùng transaction. Danh sách hội thoại chỉ trả

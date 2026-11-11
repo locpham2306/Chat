@@ -28,7 +28,7 @@ public final class PageableUtils {
     }
 
     public static <E, R> PageResponse<List<R>> toResponse(Page<E> page, Function<E, R> mapper) {
-        var data = page.getContent().stream().map(mapper).toList();
+        List<R> data = page.getContent().stream().map(mapper).toList();
         return PageResponse.of(data, page.getTotalPages(), page.getTotalElements());
     }
 }
