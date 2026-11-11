@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
-import { AlertCircle, LoaderCircle, RefreshCw } from 'lucide-react'
-import { Navigate, Outlet } from 'react-router-dom'
+import { AlertCircle, LoaderCircle, LogIn, RefreshCw } from 'lucide-react'
+import { Link, Navigate, Outlet } from 'react-router-dom'
 import { Button } from '~/components/ui/button'
 import { useProfileQuery } from '~/hooks/use-auth'
 import { useWebSocketLifecycle } from '~/hooks/use-websocket'
@@ -43,10 +43,18 @@ export const ProtectedRoute = () => {
           <p className='text-sm font-medium'>Không thể kiểm tra phiên đăng nhập</p>
           <p className='mt-1 text-xs text-muted-foreground'>Vui lòng kiểm tra kết nối và thử lại.</p>
         </div>
-        <Button variant='outline' size='sm' onClick={() => profileQuery.refetch()}>
-          <RefreshCw className='h-4 w-4' aria-hidden='true' />
-          Thử lại
-        </Button>
+        <div className='flex items-center gap-2'>
+          <Button variant='outline' size='sm' onClick={() => profileQuery.refetch()}>
+            <RefreshCw className='h-4 w-4' aria-hidden='true' />
+            Thử lại
+          </Button>
+          <Button size='sm' asChild>
+            <Link to='/login'>
+              <LogIn className='h-4 w-4' aria-hidden='true' />
+              Đăng nhập
+            </Link>
+          </Button>
+        </div>
       </div>
     )
   }
