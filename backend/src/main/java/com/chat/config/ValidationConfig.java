@@ -15,14 +15,14 @@ public class ValidationConfig {
 
     @Bean
     public LocalValidatorFactoryBean validator(MessageSource messageSource) {
-        var validator = new LocalValidatorFactoryBean();
+        LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.setValidationMessageSource(messageSource);
         return validator;
     }
 
     @Bean
     public LocaleResolver localeResolver() {
-        var resolver = new AcceptHeaderLocaleResolver();
+        AcceptHeaderLocaleResolver resolver = new AcceptHeaderLocaleResolver();
         resolver.setDefaultLocale(Locale.forLanguageTag("vi"));
         resolver.setSupportedLocales(List.of(Locale.forLanguageTag("vi"), Locale.ENGLISH));
         return resolver;

@@ -8,8 +8,10 @@ entity trong modules user/auth/conversation/message/file, repository user/auth/f
 filter xác thực session và UserController cho xem/cập nhật hồ sơ, tìm kiếm user.
 FileController/Service xử lý upload, download và phân quyền; local storage nằm sau
 adapter `integration.storage` để có thể thay implementation mà không đổi nghiệp vụ.
-ConversationController/Service hiện có lookup DIRECT chỉ đọc, tạo GROUP kèm membership
-trong một transaction, danh sách, chi tiết, cập nhật GROUP và quản lý thành viên.
+ConversationController dùng `ConversationService` cho lookup DIRECT, tạo/list/chi tiết/cập nhật
+hội thoại và `ConversationMemberService` cho danh sách, tìm ứng viên, thêm/xóa thành viên.
+Hai service giữ transaction theo từng use case; phần dựng message response kèm sender/attachment
+dùng chung `MessageResponseLoader` để không lặp query và mapping.
 Module websocket cung cấp raw endpoint `/ws`; MessageService lưu tin đầu DIRECT hoặc tin
 trong hội thoại hiện có trước khi handler ACK/broadcast. Registry kết nối quản lý heartbeat,
 phiên, fan-out và presence runtime.

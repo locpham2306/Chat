@@ -6,6 +6,7 @@ import com.chat.modules.auth.config.SessionCookieProperties;
 import com.chat.modules.auth.security.SessionTokenGenerator;
 import com.chat.modules.auth.service.IssuedSession;
 import com.chat.modules.auth.service.SessionCookieService;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +30,7 @@ public class SessionCookieServiceImpl implements SessionCookieService {
         if (!tokens.isValidFormat(session.getRawToken())) {
             throw new IllegalArgumentException("Invalid session token format");
         }
-        var remaining = Duration.between(clock.instant(), session.getExpiresAt());
+        Duration remaining = Duration.between(clock.instant(), session.getExpiresAt());
         if (remaining.isNegative() || remaining.isZero()) {
             throw new IllegalArgumentException("Cannot set an expired session cookie");
         }
@@ -47,7 +48,7 @@ public class SessionCookieServiceImpl implements SessionCookieService {
     public String read(HttpServletRequest request) {
         String token = null;
         if (request.getCookies() != null) {
-            for (var candidate : request.getCookies()) {
+            for (Cookie candidate : request.getCookies()) {
                 if (COOKIE_NAME.equals(candidate.getName())) {
                     // Ambiguous same-name cookies must not select an arbitrary session.
                     if (token != null) {
@@ -62,11 +63,11 @@ public class SessionCookieServiceImpl implements SessionCookieService {
 
     @Override
     public String resolveLogoutToken(HttpServletRequest request, String bodyToken) {
-        var cookieToken = read(request);
+        String cookieToken = read(request);
         if (cookieToken != null && bodyToken != null && !cookieToken.equals(bodyToken)) {
             throw invalidRequest();
         }
-        var token = cookieToken != null ? cookieToken : bodyToken;
+        String token = cookieToken != null ? cookieToken : bodyToken;
         if (!tokens.isValidFormat(token)) {
             throw invalidRequest();
         }

@@ -47,7 +47,7 @@ public class ConversationEntity extends BaseEntity {
         if (firstUserId.equals(secondUserId)) {
             throw new IllegalArgumentException("A direct conversation requires two different users");
         }
-        var conversation = new ConversationEntity();
+        ConversationEntity conversation = new ConversationEntity();
         conversation.type = ConversationTypeEnum.DIRECT;
         // Canonical UUID strings sort in the same unsigned byte order as MySQL BINARY(16).
         boolean firstIsLow = firstUserId.toString().compareTo(secondUserId.toString()) < 0;
@@ -57,7 +57,7 @@ public class ConversationEntity extends BaseEntity {
     }
 
     public static ConversationEntity group(UUID ownerId, String name, UUID avatarFileId) {
-        var conversation = new ConversationEntity();
+        ConversationEntity conversation = new ConversationEntity();
         conversation.type = ConversationTypeEnum.GROUP;
         conversation.ownerId = Objects.requireNonNull(ownerId);
         conversation.name = Objects.requireNonNull(name);

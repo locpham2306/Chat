@@ -13,6 +13,7 @@ import com.chat.modules.conversation.dto.response.ConversationListItemResponse;
 import com.chat.modules.conversation.dto.response.ConversationMemberResponse;
 import com.chat.modules.conversation.dto.response.DirectConversationLookupResponse;
 import com.chat.modules.conversation.dto.response.GroupConversationResponse;
+import com.chat.modules.conversation.service.ConversationMemberService;
 import com.chat.modules.conversation.service.ConversationService;
 import com.chat.modules.message.dto.request.MarkConversationReadRequest;
 import com.chat.modules.message.dto.response.ConversationReadResponse;
@@ -44,6 +45,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ConversationController {
     private final ConversationService conversations;
+    private final ConversationMemberService conversationMembers;
     private final ConversationMessageService conversationMessages;
 
     @GetMapping
@@ -74,7 +76,7 @@ public class ConversationController {
             @Min(value = 1, message = "{validation.min}")
             @Max(value = 100, message = "{validation.max}") Integer size) {
         return BaseResponse.success(
-                conversations.getConversationMembers(session.userId(), id, page, size));
+                conversationMembers.getMembers(session.userId(), id, page, size));
     }
 
     @GetMapping("/{id}/messages")
@@ -104,7 +106,7 @@ public class ConversationController {
             @PathVariable UUID id,
             @Valid @RequestBody AddConversationMembersRequest request) {
         return BaseResponse.success(
-                conversations.addConversationMembers(session.userId(), id, request));
+                conversationMembers.addMembers(session.userId(), id, request));
     }
 
     @DeleteMapping("/{id}/members/{userId}")
@@ -112,7 +114,7 @@ public class ConversationController {
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id,
             @PathVariable UUID userId) {
-        conversations.removeConversationMember(session.userId(), id, userId);
+        conversationMembers.removeMember(session.userId(), id, userId);
         return ResponseEntity.noContent().build();
     }
 
@@ -127,7 +129,7 @@ public class ConversationController {
             @Min(value = 1, message = "{validation.min}")
             @Max(value = 100, message = "{validation.max}") Integer size) {
         return BaseResponse.success(
-                conversations.getAvailableGroupMembers(session.userId(), id, keyword, page, size));
+                conversationMembers.getAvailableMembers(session.userId(), id, keyword, page, size));
     }
 
     @PutMapping("/{id}")

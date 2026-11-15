@@ -46,10 +46,10 @@ public class WebSocketSessionRegistry implements UserPresence {
     }
 
     public synchronized Registration register(WebSocketSession session, SessionIdentity identity) {
-        var decorated = new ConcurrentWebSocketSessionDecorator(
+        ConcurrentWebSocketSessionDecorator decorated = new ConcurrentWebSocketSessionDecorator(
                 session, SEND_TIME_LIMIT_MILLIS, BUFFER_SIZE_LIMIT_BYTES);
         boolean firstForUser = !connectionIdsByUser.containsKey(identity.userId());
-        var connection = new Connection(decorated, identity.userId(), identity.sessionId());
+        Connection connection = new Connection(decorated, identity.userId(), identity.sessionId());
         connections.put(session.getId(), connection);
         connectionIdsByUser.computeIfAbsent(identity.userId(), ignored -> new LinkedHashSet<>())
                 .add(session.getId());
@@ -61,7 +61,7 @@ public class WebSocketSessionRegistry implements UserPresence {
     }
 
     public synchronized Disconnection unregister(String connectionId) {
-        var connection = connections.remove(connectionId);
+        Connection connection = connections.remove(connectionId);
         if (connection == null) {
             return null;
         }
@@ -74,14 +74,14 @@ public class WebSocketSessionRegistry implements UserPresence {
     }
 
     public void sendToConnection(String connectionId, String event, Object data) {
-        var connection = connection(connectionId);
+        Connection connection = connection(connectionId);
         if (connection != null) {
             send(connection, event, data);
         }
     }
 
     public void broadcast(Collection<UUID> userIds, String event, Object data) {
-        for (var connection : connectionsFor(userIds)) {
+        for (Connection connection : connectionsFor(userIds)) {
             send(connection, event, data);
         }
     }
@@ -95,7 +95,7 @@ public class WebSocketSessionRegistry implements UserPresence {
     }
 
     public void closeConnection(String connectionId, CloseStatus status) {
-        var connection = connection(connectionId);
+        Connection connection = connection(connectionId);
         if (connection == null) {
             return;
         }
@@ -143,7 +143,7 @@ public class WebSocketSessionRegistry implements UserPresence {
 
     private void send(Connection connection, String event, Object data) {
         try {
-            var payload = objectMapper.writeValueAsString(new WebSocketFrame<>(event, data));
+            String payload = objectMapper.writeValueAsString(new WebSocketFrame<>(event, data));
             connection.session.sendMessage(new TextMessage(payload));
         } catch (JsonProcessingException exception) {
             LOG.error("Could not serialize WebSocket event {}", event);
@@ -157,13 +157,13 @@ public class WebSocketSessionRegistry implements UserPresence {
     }
 
     private synchronized List<Connection> connectionsFor(Collection<UUID> userIds) {
-        var ids = new LinkedHashSet<String>();
-        for (var userId : userIds) {
+        LinkedHashSet<String> ids = new LinkedHashSet<>();
+        for (UUID userId : userIds) {
             ids.addAll(connectionIdsByUser.getOrDefault(userId, Set.of()));
         }
-        var result = new ArrayList<Connection>(ids.size());
+        ArrayList<Connection> result = new ArrayList<>(ids.size());
         ids.forEach(id -> {
-            var connection = connections.get(id);
+            Connection connection = connections.get(id);
             if (connection != null) {
                 result.add(connection);
             }
@@ -172,7 +172,7 @@ public class WebSocketSessionRegistry implements UserPresence {
     }
 
     private static void remove(Map<UUID, Set<String>> index, UUID key, String connectionId) {
-        var ids = index.get(key);
+        Set<String> ids = index.get(key);
         if (ids == null) {
             return;
         }

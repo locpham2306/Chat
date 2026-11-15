@@ -33,7 +33,7 @@ public class WebSocketHandshakeInterceptor implements HandshakeInterceptor {
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return false;
         }
-        var identity = servletRequest.getServletRequest()
+        Object identity = servletRequest.getServletRequest()
                 .getAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE);
         if (!(identity instanceof SessionIdentity sessionIdentity)) {
             response.setStatusCode(HttpStatus.UNAUTHORIZED);

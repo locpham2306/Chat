@@ -34,13 +34,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Transactional
     public UserResponse register(RegisterRequest request) {
         validatePasswordLength(request.password());
-        var username = StringUtils.trim(request.username());
-        var fullName = StringUtils.trim(request.fullName());
+        String username = StringUtils.trim(request.username());
+        String fullName = StringUtils.trim(request.fullName());
         if (users.existsByUsername(username)) {
             throw usernameExists();
         }
         try {
-            var user = users.saveAndFlush(
+            UserEntity user = users.saveAndFlush(
                     new UserEntity(username, passwordEncoder.encode(request.password()), fullName));
             return userMapper.toResponse(user, UserStatusEnum.OFFLINE);
         } catch (DataIntegrityViolationException exception) {
@@ -53,7 +53,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Transactional
     public IssuedSession login(LoginRequest request) {
         validatePasswordLength(request.password());
-        var user = users.findByUsername(StringUtils.trim(request.username()))
+        UserEntity user = users.findByUsername(StringUtils.trim(request.username()))
                 .orElseThrow(this::invalidCredentials);
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw invalidCredentials();

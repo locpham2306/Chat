@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,9 +35,9 @@ public class SessionServiceImpl implements SessionService {
         if (userId == null || !users.existsById(userId)) {
             throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
-        var now = clock.instant().truncatedTo(ChronoUnit.MICROS);
-        var rawToken = tokens.generate();
-        var session = sessions.saveAndFlush(
+        Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
+        String rawToken = tokens.generate();
+        SessionEntity session = sessions.saveAndFlush(
                 new SessionEntity(userId, tokens.hash(rawToken), now, now.plus(LIFETIME)));
         return new IssuedSession(session.getId(), session.getExpiresAt(), rawToken);
     }
