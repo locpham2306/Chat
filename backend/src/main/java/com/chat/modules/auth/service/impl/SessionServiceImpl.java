@@ -24,31 +24,32 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SessionServiceImpl implements SessionService {
     private static final Duration LIFETIME = Duration.ofDays(365);
-    private final SessionRepository sessions;
-    private final UserRepository users;
-    private final SessionTokenGenerator tokens;
+    private final SessionRepository sessionRepository;
+    private final UserRepository userRepository;
+    private final SessionTokenGenerator sessionTokenGenerator;
     private final Clock clock;
 
     @Override
     @Transactional
     public IssuedSession create(UUID userId) {
-        if (userId == null || !users.existsById(userId)) {
+        if (userId == null || !userRepository.existsById(userId)) {
             throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
         Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
-        String rawToken = tokens.generate();
-        SessionEntity session = sessions.saveAndFlush(
-                new SessionEntity(userId, tokens.hash(rawToken), now, now.plus(LIFETIME)));
+        String rawToken = sessionTokenGenerator.generate();
+        SessionEntity session = sessionRepository.saveAndFlush(
+                new SessionEntity(userId, sessionTokenGenerator.hash(rawToken), now, now.plus(LIFETIME)));
         return new IssuedSession(session.getId(), session.getExpiresAt(), rawToken);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<SessionIdentity> findActive(String rawToken) {
-        if (!tokens.isValidFormat(rawToken)) {
+        if (!sessionTokenGenerator.isValidFormat(rawToken)) {
             return Optional.empty();
         }
-        return sessions.findByTokenHashAndRevokedAtIsNullAndExpiresAtAfter(tokens.hash(rawToken), clock.instant())
+        return sessionRepository.findByTokenHashAndRevokedAtIsNullAndExpiresAtAfter(
+                        sessionTokenGenerator.hash(rawToken), clock.instant())
                 .map(session -> new SessionIdentity(session.getId(), session.getUserId(), session.getExpiresAt()));
     }
 
@@ -56,14 +57,15 @@ public class SessionServiceImpl implements SessionService {
     @Transactional(readOnly = true)
     public boolean isActive(UUID sessionId) {
         return sessionId != null
-                && sessions.existsByIdAndRevokedAtIsNullAndExpiresAtAfter(sessionId, clock.instant());
+                && sessionRepository.existsByIdAndRevokedAtIsNullAndExpiresAtAfter(sessionId, clock.instant());
     }
 
     @Override
     @Transactional
     public void revoke(String rawToken) {
-        if (tokens.isValidFormat(rawToken)) {
-            sessions.revokeByTokenHash(tokens.hash(rawToken), clock.instant().truncatedTo(ChronoUnit.MICROS));
+        if (sessionTokenGenerator.isValidFormat(rawToken)) {
+            sessionRepository.revokeByTokenHash(
+                    sessionTokenGenerator.hash(rawToken), clock.instant().truncatedTo(ChronoUnit.MICROS));
         }
     }
 }

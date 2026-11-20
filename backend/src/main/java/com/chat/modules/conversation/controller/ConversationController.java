@@ -44,9 +44,9 @@ import java.util.UUID;
 @RequestMapping("/api/conversations")
 @RequiredArgsConstructor
 public class ConversationController {
-    private final ConversationService conversations;
-    private final ConversationMemberService conversationMembers;
-    private final ConversationMessageService conversationMessages;
+    private final ConversationService conversationService;
+    private final ConversationMemberService conversationMemberService;
+    private final ConversationMessageService conversationMessageService;
 
     @GetMapping
     public BaseResponse<PageResponse<List<ConversationListItemResponse>>> getConversations(
@@ -56,14 +56,14 @@ public class ConversationController {
             @RequestParam(defaultValue = "20")
             @Min(value = 1, message = "{validation.min}")
             @Max(value = 100, message = "{validation.max}") Integer size) {
-        return BaseResponse.success(conversations.getConversations(session.userId(), page, size));
+        return BaseResponse.success(conversationService.getConversations(session.userId(), page, size));
     }
 
     @GetMapping("/{id}")
     public BaseResponse<ConversationDetailResponse> getConversation(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id) {
-        return BaseResponse.success(conversations.getConversation(session.userId(), id));
+        return BaseResponse.success(conversationService.getConversation(session.userId(), id));
     }
 
     @GetMapping("/{id}/members")
@@ -76,7 +76,7 @@ public class ConversationController {
             @Min(value = 1, message = "{validation.min}")
             @Max(value = 100, message = "{validation.max}") Integer size) {
         return BaseResponse.success(
-                conversationMembers.getMembers(session.userId(), id, page, size));
+                conversationMemberService.getMembers(session.userId(), id, page, size));
     }
 
     @GetMapping("/{id}/messages")
@@ -88,7 +88,7 @@ public class ConversationController {
             @Min(value = 1, message = "{validation.min}")
             @Max(value = 100, message = "{validation.max}") Integer limit) {
         return BaseResponse.success(
-                conversationMessages.getHistory(session.userId(), id, before, limit));
+                conversationMessageService.getHistory(session.userId(), id, before, limit));
     }
 
     @PutMapping("/{id}/read")
@@ -96,7 +96,7 @@ public class ConversationController {
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id,
             @Valid @RequestBody MarkConversationReadRequest request) {
-        return BaseResponse.success(conversationMessages.markRead(
+        return BaseResponse.success(conversationMessageService.markRead(
                 session.userId(), id, request.lastReadMessageId()));
     }
 
@@ -106,7 +106,7 @@ public class ConversationController {
             @PathVariable UUID id,
             @Valid @RequestBody AddConversationMembersRequest request) {
         return BaseResponse.success(
-                conversationMembers.addMembers(session.userId(), id, request));
+                conversationMemberService.addMembers(session.userId(), id, request));
     }
 
     @DeleteMapping("/{id}/members/{userId}")
@@ -114,7 +114,7 @@ public class ConversationController {
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id,
             @PathVariable UUID userId) {
-        conversationMembers.removeMember(session.userId(), id, userId);
+        conversationMemberService.removeMember(session.userId(), id, userId);
         return ResponseEntity.noContent().build();
     }
 
@@ -129,7 +129,7 @@ public class ConversationController {
             @Min(value = 1, message = "{validation.min}")
             @Max(value = 100, message = "{validation.max}") Integer size) {
         return BaseResponse.success(
-                conversationMembers.getAvailableMembers(session.userId(), id, keyword, page, size));
+                conversationMemberService.getAvailableMembers(session.userId(), id, keyword, page, size));
     }
 
     @PutMapping("/{id}")
@@ -137,14 +137,14 @@ public class ConversationController {
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id,
             @Valid @RequestBody UpdateConversationRequest request) {
-        return BaseResponse.success(conversations.updateConversation(session.userId(), id, request));
+        return BaseResponse.success(conversationService.updateConversation(session.userId(), id, request));
     }
 
     @GetMapping("/direct")
     public BaseResponse<DirectConversationLookupResponse> findDirectConversation(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @RequestParam UUID recipientId) {
-        return BaseResponse.success(conversations.findDirectConversation(session.userId(), recipientId));
+        return BaseResponse.success(conversationService.findDirectConversation(session.userId(), recipientId));
     }
 
     @PostMapping("/group")
@@ -152,6 +152,6 @@ public class ConversationController {
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @Valid @RequestBody CreateGroupRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(BaseResponse.created(conversations.createGroup(session.userId(), request)));
+                .body(BaseResponse.created(conversationService.createGroup(session.userId(), request)));
     }
 }

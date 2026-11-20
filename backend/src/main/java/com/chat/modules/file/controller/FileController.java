@@ -29,21 +29,21 @@ import java.util.UUID;
 @RequestMapping("/api/files")
 @RequiredArgsConstructor
 public class FileController {
-    private final FileService files;
+    private final FileService fileService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BaseResponse<FileResponse>> upload(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @RequestParam("file") MultipartFile file) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(BaseResponse.created(files.upload(session.userId(), file)));
+                .body(BaseResponse.created(fileService.upload(session.userId(), file)));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<org.springframework.core.io.Resource> download(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id) {
-        FileDownload file = files.download(session.userId(), id);
+        FileDownload file = fileService.download(session.userId(), id);
         MediaType contentType = MediaType.parseMediaType(file.contentType());
         ContentDisposition.Builder disposition = isInline(contentType)
                 ? ContentDisposition.inline()

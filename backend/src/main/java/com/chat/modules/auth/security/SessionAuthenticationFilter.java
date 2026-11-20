@@ -21,16 +21,16 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
     private static final Set<String> PUBLIC_PATHS = Set.of(
             "/api/auth/register", "/api/auth/login", "/api/auth/logout");
 
-    private final SessionCookieService cookies;
-    private final SessionService sessions;
-    private final HandlerExceptionResolver exceptionResolver;
+    private final SessionCookieService sessionCookieService;
+    private final SessionService sessionService;
+    private final HandlerExceptionResolver exceptionResolver; //Filter chạy trước Controller nên lỗi ném trong filter không tự động đi vào GlobalExceptionHandler như lỗi Controlle
 
     public SessionAuthenticationFilter(
-            SessionCookieService cookies,
-            SessionService sessions,
+            SessionCookieService sessionCookieService,
+            SessionService sessionService,
             HandlerExceptionResolver exceptionResolver) {
-        this.cookies = cookies;
-        this.sessions = sessions;
+        this.sessionCookieService = sessionCookieService;
+        this.sessionService = sessionService;
         this.exceptionResolver = exceptionResolver;
     }
 
@@ -45,8 +45,10 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
         try {
-            SessionIdentity identity = sessions.findActive(cookies.read(request))
+            // lấy identity ra
+            SessionIdentity identity = sessionService.findActive(sessionCookieService.read(request))
                     .orElseThrow(this::unauthenticated);
+            // gắn vào request
             request.setAttribute(SESSION_ATTRIBUTE, identity);
         } catch (BusinessException exception) {
             exceptionResolver.resolveException(request, response, null,

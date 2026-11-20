@@ -1,23 +1,23 @@
-package com.chat.modules.websocket.handler;
+package com.chat.integration.websocket.handler;
 
 import com.chat.common.constant.ErrorConstants;
+import com.chat.config.WebSocketHandshakeInterceptor;
 import com.chat.exception.BusinessException;
+import com.chat.integration.websocket.dto.MessageAckData;
+import com.chat.integration.websocket.dto.NewMessageData;
+import com.chat.integration.websocket.dto.SendMessageFrameData;
+import com.chat.integration.websocket.dto.TypingFrameData;
+import com.chat.integration.websocket.dto.WebSocketErrorData;
+import com.chat.integration.websocket.service.PresenceChange;
+import com.chat.integration.websocket.service.RealtimeConversationService;
+import com.chat.integration.websocket.service.TypingChange;
+import com.chat.integration.websocket.service.WebSocketSessionRegistry;
 import com.chat.modules.auth.service.SessionIdentity;
 import com.chat.modules.auth.service.SessionService;
 import com.chat.modules.message.dto.response.MessageSenderResponse;
 import com.chat.modules.message.service.MessageDelivery;
 import com.chat.modules.message.service.MessageSendCommand;
 import com.chat.modules.message.service.MessageService;
-import com.chat.modules.websocket.config.WebSocketHandshakeInterceptor;
-import com.chat.modules.websocket.dto.MessageAckData;
-import com.chat.modules.websocket.dto.NewMessageData;
-import com.chat.modules.websocket.dto.SendMessageFrameData;
-import com.chat.modules.websocket.dto.TypingFrameData;
-import com.chat.modules.websocket.dto.WebSocketErrorData;
-import com.chat.modules.websocket.service.RealtimeConversationService;
-import com.chat.modules.websocket.service.PresenceChange;
-import com.chat.modules.websocket.service.TypingChange;
-import com.chat.modules.websocket.service.WebSocketSessionRegistry;
 import com.chat.utils.MessageUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -30,12 +30,13 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+
 @Component
 public class ChatWebSocketHandler extends TextWebSocketHandler {
     public static final String SEND_MESSAGE = "SEND_MESSAGE";
+    public static final String TYPING = "TYPING";
     public static final String MESSAGE_ACK = "MESSAGE_ACK";
     public static final String NEW_MESSAGE = "NEW_MESSAGE";
-    public static final String TYPING = "TYPING";
     public static final String READ_RECEIPT = "READ_RECEIPT";
     public static final String PRESENCE_CHANGED = "PRESENCE_CHANGED";
     public static final String ERROR = "ERROR";
@@ -43,30 +44,35 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private static final Logger LOG = LoggerFactory.getLogger(ChatWebSocketHandler.class);
 
     private final ObjectMapper objectMapper;
-    private final SessionService sessions;
-    private final MessageService messages;
-    private final RealtimeConversationService realtime;
-    private final WebSocketSessionRegistry registry;
+    private final SessionService sessionService;
+    private final MessageService messageService;
+    private final RealtimeConversationService realtimeConversationService;
+    private final WebSocketSessionRegistry webSocketSessionRegistry;
     private final MessageUtils messageUtils;
 
+    // Nhận các thành phần dùng để đọc JSON, kiểm tra session, xử lý tin và gửi event lên FE.
     public ChatWebSocketHandler(
             ObjectMapper objectMapper,
-            SessionService sessions,
-            MessageService messages,
-            RealtimeConversationService realtime,
-            WebSocketSessionRegistry registry,
+            SessionService sessionService,
+            MessageService messageService,
+            RealtimeConversationService realtimeConversationService,
+            WebSocketSessionRegistry webSocketSessionRegistry,
             MessageUtils messageUtils) {
         this.objectMapper = objectMapper;
-        this.sessions = sessions;
-        this.messages = messages;
-        this.realtime = realtime;
-        this.registry = registry;
+        this.sessionService = sessionService;
+        this.messageService = messageService;
+        this.realtimeConversationService = realtimeConversationService;
+        this.webSocketSessionRegistry = webSocketSessionRegistry;
         this.messageUtils = messageUtils;
     }
 
+    // Chạy ngay sau khi handshake thành công.
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
+        // Lấy danh tính người đăng nhập
         SessionIdentity identity = identity(session);
+
+        // Handshake bình thường đã gắn identity; nếu thiếu thì đóng connection để tránh truy cập ẩn danh.
         if (identity == null) {
             try {
                 session.close(CloseStatus.POLICY_VIOLATION);
@@ -75,30 +81,42 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             }
             return;
         }
-        WebSocketSessionRegistry.Registration registration = registry.register(session, identity);
-        if (!sessions.isActive(identity.sessionId())) {
-            registry.closeConnection(session.getId(), CloseStatus.POLICY_VIOLATION);
+
+        WebSocketSessionRegistry.Registration registration = webSocketSessionRegistry.register(session, identity);
+
+        // Session có thể vừa hết hạn/đăng xuất giữa lúc handshake và lúc đăng ký
+        if (!sessionService.isActive(identity.sessionId())) {
+            webSocketSessionRegistry.closeConnection(session.getId(), CloseStatus.POLICY_VIOLATION);
             return;
         }
+
+        // Một user có thể mở nhiều tab; chỉ tab đầu tiên mới làm trạng thái chuyển sang ONLINE
         if (registration.firstForUser()) {
-            registry.runIfOnline(identity.userId(), () -> {
-                PresenceChange change = realtime.connected(identity.userId());
-                registry.broadcast(change.audienceUserIds(), PRESENCE_CHANGED, change.data());
+            webSocketSessionRegistry.runIfOnline(identity.userId(), () -> {
+                PresenceChange change = realtimeConversationService.connected(identity.userId());
+                // gửi tin ai oneline den nhwng nguoi co cuoc hoi thoai cung
+                webSocketSessionRegistry.broadcast(change.audienceUserIds(), PRESENCE_CHANGED, change.data());
             });
         }
     }
 
+    // Nhận từng text frame FE gửi xuống BE, kiểm tra event/data rồi chuyển tới hàm xử lý.
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+        // Giữ lại clientMessageId để event ERROR chỉ đúng tin nào của FE bị lỗi.
         String clientMessageId = null;
         try {
             SessionIdentity identity = requireIdentity(session);
-            if (!sessions.isActive(identity.sessionId())) {
+
+            // Connection đang mở nhưng session app đã hết hạn/thu hồi thì báo lỗi và đóng ngay.
+            if (!sessionService.isActive(identity.sessionId())) {
                 sendError(session, null, ErrorConstants.UNAUTHENTICATED,
                         messageUtils.getMessage(ErrorConstants.UNAUTHENTICATED));
-                registry.closeConnection(session.getId(), CloseStatus.POLICY_VIOLATION);
+                webSocketSessionRegistry.closeConnection(session.getId(), CloseStatus.POLICY_VIOLATION);
                 return;
             }
+
+            // Frame hợp lệ phải có dạng { "event": "...", "data": { ... } }.
             JsonNode root = objectMapper.readTree(message.getPayload());
             JsonNode data = root == null ? null : root.get("data");
             JsonNode event = root == null ? null : root.get("event");
@@ -106,12 +124,15 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 throw invalid();
             }
             clientMessageId = textOrNull(data.get("clientMessageId"));
+
+            // Mỗi event được chuyển sang một hàm riêng; event lạ bị coi là request không hợp lệ.
             switch (event.textValue()) {
                 case SEND_MESSAGE -> handleSendMessage(session, identity, data);
                 case TYPING -> handleTyping(identity, data);
                 default -> throw invalid();
             }
         } catch (BusinessException exception) {
+            // Lỗi nghiệp vụ giữ đúng code/message như HTTP rồi được gửi lên FE qua event ERROR.
             String code = ErrorConstants.forStatus(exception.getStatus().value());
             String detail = messageUtils.getMessage(exception.getMessageKey(), exception.getArguments());
             if (detail.equals(exception.getMessageKey())) {
@@ -128,14 +149,17 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+    // Chạy khi một connection bị đóng.
+    // Chỉ khi user hết connection mới cập nhật lastSeen và gửi OFFLINE lên FE.
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        WebSocketSessionRegistry.Disconnection disconnection = registry.unregister(session.getId());
+        WebSocketSessionRegistry.Disconnection disconnection = webSocketSessionRegistry.unregister(session.getId());
         if (disconnection != null && disconnection.lastForUser()) {
             try {
-                registry.runIfOffline(disconnection.userId(), () -> {
-                    PresenceChange change = realtime.disconnected(disconnection.userId());
-                    registry.broadcast(change.audienceUserIds(), PRESENCE_CHANGED, change.data());
+                webSocketSessionRegistry.runIfOffline(disconnection.userId(), () -> {
+                    PresenceChange change = realtimeConversationService.disconnected(disconnection.userId());
+                    webSocketSessionRegistry.broadcast(
+                            change.audienceUserIds(), PRESENCE_CHANGED, change.data());
                 });
             } catch (BusinessException exception) {
                 LOG.debug("Could not update presence for disconnected user {}", disconnection.userId());
@@ -145,19 +169,22 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) {
-        registry.closeConnection(session.getId(), CloseStatus.SERVER_ERROR);
+        webSocketSessionRegistry.closeConnection(session.getId(), CloseStatus.SERVER_ERROR);
     }
 
-    private void handleSendMessage(
-            WebSocketSession session, SessionIdentity identity, JsonNode data) throws JsonProcessingException {
+    private void handleSendMessage(WebSocketSession session, SessionIdentity identity, JsonNode data) throws JsonProcessingException {
         SendMessageFrameData request = objectMapper.treeToValue(data, SendMessageFrameData.class);
-        MessageDelivery delivery = messages.send(new MessageSendCommand(
+
+        MessageDelivery delivery = messageService.send(new MessageSendCommand(
                 identity.userId(), request.recipientId(), request.conversationId(),
                 request.clientMessageId(), request.content(), request.attachmentIds()));
-        registry.sendToConnection(session.getId(), MESSAGE_ACK, new MessageAckData(
+        // Gửi ACK lên FE người gửi
+        webSocketSessionRegistry.sendToConnection(session.getId(), MESSAGE_ACK, new MessageAckData(
                 delivery.clientMessageId(), delivery.conversationId(), delivery.id(), delivery.createdAt()));
+
+        // Broadcast NEW_MESSAGE
         if (delivery.newlyCreated()) {
-            registry.broadcast(delivery.activeMemberIds(), NEW_MESSAGE, new NewMessageData(
+            webSocketSessionRegistry.broadcast(delivery.activeMemberIds(), NEW_MESSAGE, new NewMessageData(
                     delivery.id(), delivery.conversationId(), delivery.senderId(),
                     new MessageSenderResponse(
                             delivery.senderId(), delivery.senderFullName(),
@@ -167,19 +194,19 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+    // Kiểm tra TYPING FE gửi xuống BE và tìm các thành viên cần được gửi event lên FE.
     private void handleTyping(SessionIdentity identity, JsonNode data) throws JsonProcessingException {
         TypingFrameData request = objectMapper.treeToValue(data, TypingFrameData.class);
         if (request.conversationId() == null || request.isTyping() == null) {
             throw invalid();
         }
-        TypingChange change = realtime.typing(
+        TypingChange change = realtimeConversationService.typing(
                 identity.userId(), request.conversationId(), request.isTyping());
-        registry.broadcast(change.audienceUserIds(), TYPING, change.data());
+        webSocketSessionRegistry.broadcast(change.audienceUserIds(), TYPING, change.data());
     }
 
-    private void sendError(
-            WebSocketSession session, String clientMessageId, String code, String detail) {
-        registry.sendToConnection(session.getId(), ERROR,
+    private void sendError(WebSocketSession session, String clientMessageId, String code, String detail) {
+        webSocketSessionRegistry.sendToConnection(session.getId(), ERROR,
                 new WebSocketErrorData(clientMessageId, code, detail));
     }
 
@@ -191,11 +218,13 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         return identity;
     }
 
+    // Đọc identity đã được WebSocketHandshakeInterceptor gắn vào attributes lúc handshake.
     private SessionIdentity identity(WebSocketSession session) {
         Object value = session.getAttributes().get(WebSocketHandshakeInterceptor.IDENTITY_ATTRIBUTE);
         return value instanceof SessionIdentity identity ? identity : null;
     }
 
+    // Chỉ lấy text từ JsonNode; node thiếu hoặc sai kiểu thì trả null.
     private String textOrNull(JsonNode node) {
         return node != null && node.isTextual() ? node.textValue() : null;
     }

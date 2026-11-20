@@ -42,7 +42,6 @@ public class UserEntity extends BaseEntity {
     protected UserEntity() {
     }
 
-    /** passwordHash must already be encoded by the authentication service. */
     public UserEntity(String username, String passwordHash, String fullName) {
         this.username = username;
         this.passwordHash = passwordHash;

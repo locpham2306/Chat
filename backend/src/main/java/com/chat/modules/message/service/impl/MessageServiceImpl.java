@@ -38,12 +38,12 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class MessageServiceImpl implements MessageService {
-    private final ConversationRepository conversations;
-    private final ConversationMemberRepository members;
-    private final MessageRepository messages;
-    private final MessageAttachmentRepository attachments;
-    private final FileRepository files;
-    private final UserRepository users;
+    private final ConversationRepository conversationRepository;
+    private final ConversationMemberRepository conversationMemberRepository;
+    private final MessageRepository messageRepository;
+    private final MessageAttachmentRepository messageAttachmentRepository;
+    private final FileRepository fileRepository;
+    private final UserRepository userRepository;
     private final Clock clock;
 
     @Override
@@ -56,9 +56,9 @@ public class MessageServiceImpl implements MessageService {
 
         if (command.recipientId() != null) {
             sender = lockDirectUsers(command.senderId(), command.recipientId());
-            conversation = conversations.findDirectBetweenUsers(
+            conversation = conversationRepository.findDirectBetweenUsers(
                     ConversationTypeEnum.DIRECT, command.senderId(), command.recipientId()).orElse(null);
-            existing = messages.findBySenderIdAndClientMessageId(
+            existing = messageRepository.findBySenderIdAndClientMessageId(
                     command.senderId(), command.clientMessageId()).orElse(null);
             if (existing != null) {
                 if (conversation == null || !conversation.getId().equals(existing.getConversationId())) {
@@ -73,7 +73,7 @@ public class MessageServiceImpl implements MessageService {
             }
         } else {
             sender = lockUser(command.senderId());
-            existing = messages.findBySenderIdAndClientMessageId(
+            existing = messageRepository.findBySenderIdAndClientMessageId(
                     command.senderId(), command.clientMessageId()).orElse(null);
             if (existing != null) {
                 if (!command.conversationId().equals(existing.getConversationId())) {
@@ -81,25 +81,25 @@ public class MessageServiceImpl implements MessageService {
                 }
                 return retry(existing, command, sender);
             }
-            conversation = conversations.findByIdForUpdate(command.conversationId())
+            conversation = conversationRepository.findByIdForUpdate(command.conversationId())
                     .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
             requireActiveMember(conversation.getId(), command.senderId());
         }
 
         List<FileEntity> orderedFiles = resolveAndBindFiles(
                 command.senderId(), conversation.getId(), command.attachmentIds());
-        MessageEntity message = messages.saveAndFlush(new MessageEntity(
+        MessageEntity message = messageRepository.saveAndFlush(new MessageEntity(
                 conversation.getId(), command.senderId(), command.clientMessageId(), command.content()));
         if (!orderedFiles.isEmpty()) {
             ArrayList<MessageAttachmentEntity> links = new ArrayList<>(orderedFiles.size());
             for (int index = 0; index < orderedFiles.size(); index++) {
                 links.add(new MessageAttachmentEntity(message.getId(), orderedFiles.get(index).getId(), index));
             }
-            attachments.saveAllAndFlush(links);
+            messageAttachmentRepository.saveAllAndFlush(links);
         }
         return delivery(
                 message, sender, orderedFiles,
-                members.findActiveUserIds(conversation.getId()), true);
+                conversationMemberRepository.findActiveUserIds(conversation.getId()), true);
     }
 
     private MessageSendCommand validate(MessageSendCommand command) {
@@ -144,22 +144,23 @@ public class MessageServiceImpl implements MessageService {
     }
 
     private UserEntity lockUser(UUID userId) {
-        return users.findByIdForUpdate(userId)
+        return userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
     }
 
     private ConversationEntity createDirect(UUID senderId, UUID recipientId) {
-        ConversationEntity conversation = conversations.saveAndFlush(
+        ConversationEntity conversation = conversationRepository.saveAndFlush(
                 ConversationEntity.direct(senderId, recipientId));
         Instant joinedAt = clock.instant();
-        members.saveAllAndFlush(List.of(
+        conversationMemberRepository.saveAllAndFlush(List.of(
                 new ConversationMemberEntity(conversation.getId(), senderId, MemberRoleEnum.MEMBER, joinedAt),
                 new ConversationMemberEntity(conversation.getId(), recipientId, MemberRoleEnum.MEMBER, joinedAt)));
         return conversation;
     }
 
     private void requireActiveMember(UUID conversationId, UUID userId) {
-        if (!members.existsByConversationIdAndUserIdAndLeftAtIsNull(conversationId, userId)) {
+        if (!conversationMemberRepository.existsByConversationIdAndUserIdAndLeftAtIsNull(
+                conversationId, userId)) {
             throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
     }
@@ -170,7 +171,7 @@ public class MessageServiceImpl implements MessageService {
             return List.of();
         }
         Map<UUID, FileEntity> filesById = new HashMap<>();
-        for (FileEntity file : files.findAllByIdForUpdate(attachmentIds)) {
+        for (FileEntity file : fileRepository.findAllByIdForUpdate(attachmentIds)) {
             filesById.put(file.getId(), file);
         }
         if (filesById.size() != attachmentIds.size()) {
@@ -188,14 +189,14 @@ public class MessageServiceImpl implements MessageService {
             file.bindToConversation(conversationId);
             orderedFiles.add(file);
         }
-        files.saveAllAndFlush(orderedFiles);
+        fileRepository.saveAllAndFlush(orderedFiles);
         return orderedFiles;
     }
 
     private MessageDelivery retry(
             MessageEntity existing, MessageSendCommand command, UserEntity sender) {
         List<MessageAttachmentEntity> links =
-                attachments.findByMessageIdOrderByPositionAsc(existing.getId());
+                messageAttachmentRepository.findByMessageIdOrderByPositionAsc(existing.getId());
         List<UUID> storedAttachmentIds = links.stream()
                 .map(MessageAttachmentEntity::getFileId).toList();
         if (!Objects.equals(existing.getContent(), command.content())
@@ -203,7 +204,7 @@ public class MessageServiceImpl implements MessageService {
             throw conflict();
         }
         Map<UUID, FileEntity> filesById = new HashMap<>();
-        for (FileEntity file : files.findAllById(storedAttachmentIds)) {
+        for (FileEntity file : fileRepository.findAllById(storedAttachmentIds)) {
             filesById.put(file.getId(), file);
         }
 

@@ -4,8 +4,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
 
+// Đọc nhóm cấu hình app.cors.
 @ConfigurationProperties(prefix = "app.cors")
 public record CorsProperties(List<String> allowedOrigins, long maxAgeSeconds) {
+
+    // Làm sạch danh sách origin và chặn cấu hình CORS không an toàn.
     public CorsProperties {
         allowedOrigins = allowedOrigins == null
                 ? List.of()

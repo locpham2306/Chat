@@ -28,9 +28,9 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 public class MessageResponseLoader {
-    private final MessageAttachmentRepository attachments;
-    private final FileRepository files;
-    private final UserRepository users;
+    private final MessageAttachmentRepository messageAttachmentRepository;
+    private final FileRepository fileRepository;
+    private final UserRepository userRepository;
     private final MessageMapper messageMapper;
 
     public Map<UUID, MessageResponse> load(Collection<MessageEntity> messages) {
@@ -46,12 +46,12 @@ public class MessageResponseLoader {
         }
 
         Map<UUID, UserEntity> sendersById = new HashMap<>();
-        for (UserEntity sender : users.findAllById(senderIds)) {
+        for (UserEntity sender : userRepository.findAllById(senderIds)) {
             sendersById.put(sender.getId(), sender);
         }
 
         List<MessageAttachmentEntity> attachmentLinks =
-                attachments.findByMessageIdInOrderByMessageIdAscPositionAsc(messageIds);
+                messageAttachmentRepository.findByMessageIdInOrderByMessageIdAscPositionAsc(messageIds);
         LinkedHashSet<UUID> fileIds = new LinkedHashSet<>();
         for (MessageAttachmentEntity link : attachmentLinks) {
             fileIds.add(link.getFileId());
@@ -59,7 +59,7 @@ public class MessageResponseLoader {
 
         Map<UUID, FileEntity> filesById = new HashMap<>();
         if (!fileIds.isEmpty()) {
-            for (FileEntity file : files.findAllById(fileIds)) {
+            for (FileEntity file : fileRepository.findAllById(fileIds)) {
                 filesById.put(file.getId(), file);
             }
         }

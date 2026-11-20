@@ -31,12 +31,12 @@ import java.util.UUID;
 public class ConversationMessageServiceImpl implements ConversationMessageService {
     private static final int MAX_HISTORY_LIMIT = 100;
 
-    private final ConversationRepository conversations;
-    private final ConversationMemberRepository members;
-    private final ConversationReadStateRepository readStates;
-    private final MessageRepository messages;
-    private final MessageResponseLoader messageResponses;
-    private final ApplicationEventPublisher events;
+    private final ConversationRepository conversationRepository;
+    private final ConversationMemberRepository conversationMemberRepository;
+    private final ConversationReadStateRepository conversationReadStateRepository;
+    private final MessageRepository messageRepository;
+    private final MessageResponseLoader messageResponseLoader;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -50,18 +50,18 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         PageRequest page = PageRequest.of(0, limit + 1);
         List<MessageEntity> result;
         if (before == null) {
-            result = messages.findByConversationIdOrderByCreatedAtDescIdDesc(conversationId, page);
+            result = messageRepository.findByConversationIdOrderByCreatedAtDescIdDesc(conversationId, page);
         } else {
-            MessageEntity cursor = messages.findById(before)
+            MessageEntity cursor = messageRepository.findById(before)
                     .filter(message -> conversationId.equals(message.getConversationId()))
                     .orElseThrow(this::invalidCursor);
-            result = messages.findHistoryBefore(
+            result = messageRepository.findHistoryBefore(
                     conversationId, cursor.getCreatedAt(), cursor.getId(), page);
         }
 
         boolean hasMore = result.size() > limit;
         List<MessageEntity> pageMessages = hasMore ? result.subList(0, limit) : result;
-        Map<UUID, MessageResponse> mapped = messageResponses.load(pageMessages);
+        Map<UUID, MessageResponse> mapped = messageResponseLoader.load(pageMessages);
         List<MessageResponse> data = pageMessages.stream()
                 .map(message -> mapped.get(message.getId())).toList();
         UUID nextCursor = hasMore && !pageMessages.isEmpty()
@@ -73,48 +73,50 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
     @Transactional
     public ConversationReadResponse markRead(
             UUID currentUserId, UUID conversationId, UUID lastReadMessageId) {
-        if (!conversations.existsById(conversationId)) {
+        if (!conversationRepository.existsById(conversationId)) {
             throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
-        ConversationMemberEntity membership = members.findActiveForUpdate(conversationId, currentUserId)
+        ConversationMemberEntity membership = conversationMemberRepository
+                .findActiveForUpdate(conversationId, currentUserId)
                 .orElseThrow(() -> BusinessException.forbidden(ErrorConstants.FORBIDDEN));
-        MessageEntity requestedMessage = messages.findById(lastReadMessageId)
+        MessageEntity requestedMessage = messageRepository.findById(lastReadMessageId)
                 .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
         if (!conversationId.equals(requestedMessage.getConversationId())) {
             throw BusinessException.badRequest(ErrorConstants.VALIDATION_ERROR);
         }
 
-        ConversationReadStateEntity readState = readStates.findById(membership.getId()).orElse(null);
+        ConversationReadStateEntity readState = conversationReadStateRepository
+                .findById(membership.getId()).orElse(null);
         MessageEntity actualMessage = requestedMessage;
         if (readState == null) {
             readState = new ConversationReadStateEntity(membership.getId(), requestedMessage.getId());
-            readStates.saveAndFlush(readState);
+            conversationReadStateRepository.saveAndFlush(readState);
         } else {
-            MessageEntity storedMessage = messages.findById(readState.getLastReadMessageId())
+            MessageEntity storedMessage = messageRepository.findById(readState.getLastReadMessageId())
                     .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
             if (isAfter(requestedMessage, storedMessage)) {
                 readState.advanceTo(requestedMessage.getId());
-                readStates.saveAndFlush(readState);
+                conversationReadStateRepository.saveAndFlush(readState);
             } else {
                 actualMessage = storedMessage;
             }
         }
 
-        List<ConversationCountProjection> unreadCounts = messages.countUnreadByConversationIds(
+        List<ConversationCountProjection> unreadCounts = messageRepository.countUnreadByConversationIds(
                 currentUserId, List.of(conversationId));
         long unreadCount = unreadCounts.isEmpty() ? 0L : unreadCounts.get(0).getTotal();
         ConversationReadResponse response = new ConversationReadResponse(
                 conversationId, currentUserId, actualMessage.getId(), unreadCount);
-        events.publishEvent(new MessageReadEvent(
-                response, members.findActiveUserIds(conversationId)));
+        applicationEventPublisher.publishEvent(new MessageReadEvent(
+                response, conversationMemberRepository.findActiveUserIds(conversationId)));
         return response;
     }
 
     private void requireConversationAndMembership(UUID currentUserId, UUID conversationId) {
-        if (!conversations.existsById(conversationId)) {
+        if (!conversationRepository.existsById(conversationId)) {
             throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
-        if (!members.existsByConversationIdAndUserIdAndLeftAtIsNull(
+        if (!conversationMemberRepository.existsByConversationIdAndUserIdAndLeftAtIsNull(
                 conversationId, currentUserId)) {
             throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }

@@ -1,9 +1,9 @@
-package com.chat.modules.websocket.service;
+package com.chat.integration.websocket.service;
 
+import com.chat.integration.websocket.dto.WebSocketFrame;
 import com.chat.modules.auth.service.SessionIdentity;
 import com.chat.modules.user.enums.UserStatusEnum;
 import com.chat.modules.user.service.UserPresence;
-import com.chat.modules.websocket.dto.WebSocketFrame;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -28,26 +28,48 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ScheduledFuture;
 
+// File này quản lý toàn bộ connection WebSocket đang mở của backend.
+// Bộ nhớ runtime quản lý toàn bộ connection WebSocket đang mở trên instance backend này.
+// Registry thực sự gửi event lên FE, tính ONLINE/OFFLINE và đóng connection khi session hết hạn.
 @Component
 public class WebSocketSessionRegistry implements UserPresence {
     private static final Logger LOG = LoggerFactory.getLogger(WebSocketSessionRegistry.class);
+
+    // Ngăn một lần gửi chiếm luồng quá lâu hoặc buffer của connection tăng không
+    // giới hạn.
     private static final int SEND_TIME_LIMIT_MILLIS = 10_000;
     private static final int BUFFER_SIZE_LIMIT_BYTES = 256 * 1024;
 
     private final ObjectMapper objectMapper;
-    private final TaskScheduler scheduler;
+    private final TaskScheduler webSocketTaskScheduler;
+
+    // connectionId -> thông tin connection thật.
     private final Map<String, Connection> connections = new HashMap<>();
+
+    // userId -> các connection của user; một user có thể mở nhiều tab/thiết bị.
     private final Map<UUID, Set<String>> connectionIdsByUser = new HashMap<>();
+
+    // sessionId trong bảng sessions -> các connection dùng session đó, phục vụ đóng
+    // WS khi logout.
     private final Map<UUID, Set<String>> connectionIdsByAppSession = new HashMap<>();
 
+    // Dùng ObjectMapper để tạo JSON và scheduler để hẹn đóng connection đúng lúc
+    // session hết hạn.
     public WebSocketSessionRegistry(ObjectMapper objectMapper, TaskScheduler webSocketTaskScheduler) {
         this.objectMapper = objectMapper;
-        this.scheduler = webSocketTaskScheduler;
+        this.webSocketTaskScheduler = webSocketTaskScheduler;
     }
 
+    // Đăng ký một connection mới vào cả ba map.
+    // synchronized để hai connection mở cùng lúc không làm hỏng các map không
+    // thread-safe.
     public synchronized Registration register(WebSocketSession session, SessionIdentity identity) {
+        // Decorator đảm bảo nhiều luồng không ghi đồng thời trực tiếp lên cùng
+        // WebSocketSession.
         ConcurrentWebSocketSessionDecorator decorated = new ConcurrentWebSocketSessionDecorator(
                 session, SEND_TIME_LIMIT_MILLIS, BUFFER_SIZE_LIMIT_BYTES);
+
+        // Dùng kết quả này để chỉ gửi ONLINE lên FE khi user mở connection đầu tiên.
         boolean firstForUser = !connectionIdsByUser.containsKey(identity.userId());
         Connection connection = new Connection(decorated, identity.userId(), identity.sessionId());
         connections.put(session.getId(), connection);
@@ -55,7 +77,8 @@ public class WebSocketSessionRegistry implements UserPresence {
                 .add(session.getId());
         connectionIdsByAppSession.computeIfAbsent(identity.sessionId(), ignored -> new LinkedHashSet<>())
                 .add(session.getId());
-        connection.expiryTask = scheduler.schedule(
+
+        connection.expiryTask = webSocketTaskScheduler.schedule(
                 () -> closeConnection(session.getId(), CloseStatus.POLICY_VIOLATION), identity.expiresAt());
         return new Registration(firstForUser);
     }
@@ -73,6 +96,7 @@ public class WebSocketSessionRegistry implements UserPresence {
         return new Disconnection(connection.userId, !connectionIdsByUser.containsKey(connection.userId));
     }
 
+    // dùng cho MESSAGE_ACK và ERROR.
     public void sendToConnection(String connectionId, String event, Object data) {
         Connection connection = connection(connectionId);
         if (connection != null) {
@@ -106,10 +130,12 @@ public class WebSocketSessionRegistry implements UserPresence {
         }
     }
 
+    // User được coi là ONLINE nếu registry còn ít nhất một connection của user đó.
     @Override
     public synchronized UserStatusEnum status(UUID userId) {
         return connectionIdsByUser.containsKey(userId)
-                ? UserStatusEnum.ONLINE : UserStatusEnum.OFFLINE;
+                ? UserStatusEnum.ONLINE
+                : UserStatusEnum.OFFLINE;
     }
 
     public synchronized void runIfOnline(UUID userId, Runnable action) {
@@ -118,12 +144,14 @@ public class WebSocketSessionRegistry implements UserPresence {
         }
     }
 
+    // Chỉ chạy action nếu user hết connection trước khi gửi OFFLINE lên FE.
     public synchronized void runIfOffline(UUID userId, Runnable action) {
         if (!connectionIdsByUser.containsKey(userId)) {
             action.run();
         }
     }
 
+    // Định kỳ gửi Ping lên FE để phát hiện connection đã chết.
     @Scheduled(fixedDelayString = "${app.websocket.heartbeat-interval:30000}")
     public void heartbeat() {
         List<Connection> snapshot;
@@ -133,6 +161,7 @@ public class WebSocketSessionRegistry implements UserPresence {
         snapshot.forEach(this::ping);
     }
 
+    // Gửi một Ping frame lên FE; gửi thất bại thì đóng connection.
     private void ping(Connection connection) {
         try {
             connection.session.sendMessage(new PingMessage());
@@ -141,6 +170,8 @@ public class WebSocketSessionRegistry implements UserPresence {
         }
     }
 
+    // Bọc event/data thành WebSocketFrame, đổi sang JSON rồi gửi lên FE qua
+    // connection.
     private void send(Connection connection, String event, Object data) {
         try {
             String payload = objectMapper.writeValueAsString(new WebSocketFrame<>(event, data));
@@ -152,10 +183,14 @@ public class WebSocketSessionRegistry implements UserPresence {
         }
     }
 
+    // Lấy connection theo id trong vùng synchronized để tránh đọc map đồng thời lúc
+    // đang sửa.
     private synchronized Connection connection(String connectionId) {
         return connections.get(connectionId);
     }
 
+    // Từ danh sách user, gom mọi connection tương ứng và loại connectionId bị
+    // trùng.
     private synchronized List<Connection> connectionsFor(Collection<UUID> userIds) {
         LinkedHashSet<String> ids = new LinkedHashSet<>();
         for (UUID userId : userIds) {
@@ -171,6 +206,8 @@ public class WebSocketSessionRegistry implements UserPresence {
         return result;
     }
 
+    // Xóa connectionId khỏi một index; user/session không còn connection thì xóa
+    // luôn key rỗng.
     private static void remove(Map<UUID, Set<String>> index, UUID key, String connectionId) {
         Set<String> ids = index.get(key);
         if (ids == null) {
@@ -182,18 +219,25 @@ public class WebSocketSessionRegistry implements UserPresence {
         }
     }
 
+    // firstForUser cho biết connection vừa đăng ký có làm user chuyển OFFLINE ->
+    // ONLINE hay không.
     public record Registration(boolean firstForUser) {
     }
 
+    // lastForUser cho biết connection vừa đóng có làm user chuyển ONLINE -> OFFLINE
+    // hay không.
     public record Disconnection(UUID userId, boolean lastForUser) {
     }
 
+    // Dữ liệu nội bộ gắn một WebSocket connection với user, session đăng nhập và
+    // lịch hết hạn.
     private static final class Connection {
         private final WebSocketSession session;
         private final UUID userId;
         private final UUID appSessionId;
         private ScheduledFuture<?> expiryTask;
 
+        // Mỗi connection luôn thuộc đúng một user và một session đăng nhập.
         private Connection(WebSocketSession session, UUID userId, UUID appSessionId) {
             this.session = session;
             this.userId = userId;

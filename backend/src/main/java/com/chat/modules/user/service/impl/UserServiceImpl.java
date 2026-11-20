@@ -26,50 +26,54 @@ import java.util.UUID;
 
 @Service
 public class UserServiceImpl implements UserService {
-    private final UserRepository users;
-    private final FileRepository files;
+    private final UserRepository userRepository;
+    private final FileRepository fileRepository;
     private final UserMapper userMapper;
-    private final UserPresence presence;
+    private final UserPresence userPresence;
 
     @Autowired
     public UserServiceImpl(
-            UserRepository users,
-            FileRepository files,
+            UserRepository userRepository,
+            FileRepository fileRepository,
             UserMapper userMapper,
-            UserPresence presence) {
-        this.users = users;
-        this.files = files;
+            UserPresence userPresence) {
+        this.userRepository = userRepository;
+        this.fileRepository = fileRepository;
         this.userMapper = userMapper;
-        this.presence = presence;
+        this.userPresence = userPresence;
     }
 
-    public UserServiceImpl(UserRepository users, FileRepository files, UserMapper userMapper) {
-        this(users, files, userMapper, ignored -> UserStatusEnum.OFFLINE);
+    public UserServiceImpl(
+            UserRepository userRepository,
+            FileRepository fileRepository,
+            UserMapper userMapper) {
+        this(userRepository, fileRepository, userMapper, ignored -> UserStatusEnum.OFFLINE);
     }
 
     @Override
     @Transactional(readOnly = true)
     public UserResponse getCurrentUser(UUID userId) {
         UserEntity user = currentUser(userId);
-        return userMapper.toResponse(user, presence.status(user.getId()));
+        return userMapper.toResponse(user, userPresence.status(user.getId()));
     }
 
     @Override
     @Transactional
     public UserResponse updateCurrentUser(UUID userId, UpdateProfileRequest request) {
-        UserEntity user = currentUser(userId);
+        UserEntity user = this.currentUser(userId);
         if (request.avatarFileId() != null) {
-            FileEntity avatar = files.findById(request.avatarFileId())
+            FileEntity avatar = fileRepository.findById(request.avatarFileId())
                     .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
-            boolean allowed = userId.equals(avatar.getUploaderId())
-                    && avatar.getConversationId() == null
-                    && StringUtils.isImageContentType(avatar.getContentType());
+            boolean allowed = userId.equals(avatar.getUploaderId()) // File do chính user upload
+                    && avatar.getConversationId() == null // File không thuộc hội thoại
+                    && StringUtils.isImageContentType(avatar.getContentType());  // File phải là ảnh
             if (!allowed) {
                 throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
             }
         }
         user.updateProfile(StringUtils.trim(request.fullName()), request.avatarFileId());
-        return userMapper.toResponse(user, presence.status(user.getId()));
+        userRepository.save(user);
+        return userMapper.toResponse(user, userPresence.status(user.getId()));
     }
 
     @Override
@@ -81,14 +85,14 @@ public class UserServiceImpl implements UserService {
             resolvedKeyword = "";
         }
         Sort sort = Sort.by(Sort.Order.asc("username"), Sort.Order.asc("id"));
-        Page<UserEntity> usersPage = users.searchPublicProfiles(
+        Page<UserEntity> usersPage = userRepository.searchPublicProfiles(
                 currentUserId, resolvedKeyword, PageableUtils.of(page, size, sort));
         return PageableUtils.toResponse(
-                usersPage, user -> userMapper.toResponse(user, presence.status(user.getId())));
+                usersPage, user -> userMapper.toResponse(user, userPresence.status(user.getId())));
     }
 
     private UserEntity currentUser(UUID userId) {
-        return users.findById(userId)
+        return userRepository.findById(userId)
                 .orElseThrow(() -> BusinessException.unauthenticated(ErrorConstants.UNAUTHENTICATED));
     }
 }

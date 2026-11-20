@@ -12,7 +12,7 @@ ConversationController dùng `ConversationService` cho lookup DIRECT, tạo/list
 hội thoại và `ConversationMemberService` cho danh sách, tìm ứng viên, thêm/xóa thành viên.
 Hai service giữ transaction theo từng use case; phần dựng message response kèm sender/attachment
 dùng chung `MessageResponseLoader` để không lặp query và mapping.
-Module websocket cung cấp raw endpoint `/ws`; MessageService lưu tin đầu DIRECT hoặc tin
+Integration websocket cung cấp raw endpoint `/ws`; MessageService lưu tin đầu DIRECT hoặc tin
 trong hội thoại hiện có trước khi handler ACK/broadcast. Registry kết nối quản lý heartbeat,
 phiên, fan-out và presence runtime.
 Tham khảo cách tổ chức của QLCC; không mang nghiệp vụ chung cư, Core/CMS,
@@ -48,8 +48,9 @@ integration/
   <technology>/
 ```
 
-Feature hiện có auth, user, conversation, message, file và websocket; chỉ tạo package khi có code.
-WebSocket handler chỉ xử lý frame/kết nối và gọi service nghiệp vụ ở module message/conversation.
+Feature hiện có auth, user, conversation, message và file; chỉ tạo package khi có code.
+WebSocket nằm trong `integration.websocket`; handler chỉ xử lý frame/kết nối và gọi service
+nghiệp vụ ở module message/conversation.
 
 ## Tên và trách nhiệm
 

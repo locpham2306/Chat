@@ -10,9 +10,11 @@ import org.springframework.web.servlet.i18n.AcceptHeaderLocaleResolver;
 import java.util.List;
 import java.util.Locale;
 
+// Cấu hình message validation và ngôn ngữ trả về cho FE.
 @Configuration
 public class ValidationConfig {
 
+    // Cho @Valid lấy message từ messages.properties/messages_en.properties.
     @Bean
     public LocalValidatorFactoryBean validator(MessageSource messageSource) {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
@@ -20,6 +22,7 @@ public class ValidationConfig {
         return validator;
     }
 
+    // Đọc Accept-Language để chọn tiếng Việt/Anh, mặc định là tiếng Việt.
     @Bean
     public LocaleResolver localeResolver() {
         AcceptHeaderLocaleResolver resolver = new AcceptHeaderLocaleResolver();

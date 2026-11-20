@@ -39,13 +39,13 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class ConversationMemberServiceImpl implements ConversationMemberService {
-    private final ConversationRepository conversations;
-    private final ConversationMemberRepository members;
-    private final UserRepository users;
-    private final ConversationMemberMapper memberMapper;
+public class  ConversationMemberServiceImpl implements ConversationMemberService {
+    private final ConversationRepository conversationRepository;
+    private final ConversationMemberRepository conversationMemberRepository;
+    private final UserRepository userRepository;
+    private final ConversationMemberMapper conversationMemberMapper;
     private final UserMapper userMapper;
-    private final UserPresence presence;
+    private final UserPresence userPresence;
     private final Clock clock;
 
     @Override
@@ -56,7 +56,8 @@ public class ConversationMemberServiceImpl implements ConversationMemberService 
         requireActiveMemberExists(conversationId, currentUserId);
 
         Sort sort = Sort.by(Sort.Order.asc("joinedAt"), Sort.Order.asc("id"));
-        Page<ConversationMemberEntity> membershipsPage = members.findByConversationIdAndLeftAtIsNull(
+        Page<ConversationMemberEntity> membershipsPage = conversationMemberRepository
+                .findByConversationIdAndLeftAtIsNull(
                 conversationId, PageableUtils.of(page, size, sort));
         if (membershipsPage.isEmpty()) {
             return PageResponse.of(
@@ -67,7 +68,7 @@ public class ConversationMemberServiceImpl implements ConversationMemberService 
                 .map(ConversationMemberEntity::getUserId)
                 .toList();
         Map<UUID, UserEntity> usersById = new HashMap<>();
-        for (UserEntity user : users.findAllById(userIds)) {
+        for (UserEntity user : userRepository.findAllById(userIds)) {
             usersById.put(user.getId(), user);
         }
 
@@ -78,7 +79,7 @@ public class ConversationMemberServiceImpl implements ConversationMemberService 
             if (user == null) {
                 throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
             }
-            data.add(memberMapper.toResponse(membership, user, presence.status(userId)));
+            data.add(conversationMemberMapper.toResponse(membership, user, userPresence.status(userId)));
         }
         return PageResponse.of(
                 data, membershipsPage.getTotalPages(), membershipsPage.getTotalElements());
@@ -98,13 +99,13 @@ public class ConversationMemberServiceImpl implements ConversationMemberService 
 
         String resolvedKeyword = Optional.ofNullable(StringUtils.trim(keyword)).orElse("");
         Sort sort = Sort.by(Sort.Order.asc("username"), Sort.Order.asc("id"));
-        Page<UserEntity> usersPage = users.searchAvailableGroupMembers(
+        Page<UserEntity> usersPage = userRepository.searchAvailableGroupMembers(
                 currentUserId,
                 conversationId,
                 resolvedKeyword,
                 PageableUtils.of(page, size, sort));
         return PageableUtils.toResponse(
-                usersPage, user -> userMapper.toResponse(user, presence.status(user.getId())));
+                usersPage, user -> userMapper.toResponse(user, userPresence.status(user.getId())));
     }
 
     @Override
@@ -113,19 +114,20 @@ public class ConversationMemberServiceImpl implements ConversationMemberService 
             UUID currentUserId,
             UUID conversationId,
             AddConversationMembersRequest request) {
-        ConversationEntity conversation = conversations.findByIdForUpdate(conversationId)
+        ConversationEntity conversation = conversationRepository.findByIdForUpdate(conversationId)
                 .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
         requireGroup(conversation, "conversation.membersGroupOnly");
         requireOwner(conversation, conversationId, currentUserId);
 
         LinkedHashSet<UUID> requestedUserIds = new LinkedHashSet<>(request.memberIds());
-        if (users.countByIdIn(requestedUserIds) != requestedUserIds.size()) {
+        if (userRepository.countByIdIn(requestedUserIds) != requestedUserIds.size()) {
             throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
 
         Map<UUID, ConversationMemberEntity> membershipsByUserId = new HashMap<>();
         List<ConversationMemberEntity> currentMemberships =
-                members.findByConversationIdAndUserIdIn(conversationId, requestedUserIds);
+                conversationMemberRepository.findByConversationIdAndUserIdIn(
+                        conversationId, requestedUserIds);
         for (ConversationMemberEntity membership : currentMemberships) {
             membershipsByUserId.put(membership.getUserId(), membership);
         }
@@ -151,7 +153,7 @@ public class ConversationMemberServiceImpl implements ConversationMemberService 
         }
 
         if (!membershipsToSave.isEmpty()) {
-            members.saveAllAndFlush(membershipsToSave);
+            conversationMemberRepository.saveAllAndFlush(membershipsToSave);
         }
         return new AddConversationMembersResponse(
                 List.copyOf(addedUserIds), List.copyOf(existingUserIds));
@@ -160,7 +162,7 @@ public class ConversationMemberServiceImpl implements ConversationMemberService 
     @Override
     @Transactional
     public void removeMember(UUID currentUserId, UUID conversationId, UUID userId) {
-        ConversationEntity conversation = conversations.findByIdForUpdate(conversationId)
+        ConversationEntity conversation = conversationRepository.findByIdForUpdate(conversationId)
                 .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
         requireGroup(conversation, "conversation.membersGroupOnly");
 
@@ -183,7 +185,7 @@ public class ConversationMemberServiceImpl implements ConversationMemberService 
         }
 
         Optional<ConversationMemberEntity> targetMembership =
-                members.findByConversationIdAndUserId(conversationId, userId)
+                conversationMemberRepository.findByConversationIdAndUserId(conversationId, userId)
                 .filter(membership -> membership.getLeftAt() == null);
         if (targetMembership.isEmpty()) {
             return;
@@ -195,23 +197,25 @@ public class ConversationMemberServiceImpl implements ConversationMemberService 
     }
 
     private ConversationEntity requireConversation(UUID conversationId) {
-        return conversations.findById(conversationId)
+        return conversationRepository.findById(conversationId)
                 .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
     }
 
     private void requireConversationExists(UUID conversationId) {
-        if (!conversations.existsById(conversationId)) {
+        if (!conversationRepository.existsById(conversationId)) {
             throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
     }
 
     private ConversationMemberEntity requireActiveMember(UUID conversationId, UUID userId) {
-        return members.findByConversationIdAndUserIdAndLeftAtIsNull(conversationId, userId)
+        return conversationMemberRepository.findByConversationIdAndUserIdAndLeftAtIsNull(
+                        conversationId, userId)
                 .orElseThrow(() -> BusinessException.forbidden(ErrorConstants.FORBIDDEN));
     }
 
     private void requireActiveMemberExists(UUID conversationId, UUID userId) {
-        if (!members.existsByConversationIdAndUserIdAndLeftAtIsNull(conversationId, userId)) {
+        if (!conversationMemberRepository.existsByConversationIdAndUserIdAndLeftAtIsNull(
+                conversationId, userId)) {
             throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
     }
@@ -232,6 +236,6 @@ public class ConversationMemberServiceImpl implements ConversationMemberService 
 
     private void leave(ConversationMemberEntity membership) {
         membership.leave(clock.instant());
-        members.saveAndFlush(membership);
+        conversationMemberRepository.saveAndFlush(membership);
     }
 }

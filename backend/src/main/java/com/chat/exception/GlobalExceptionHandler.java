@@ -25,72 +25,88 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+// biến lỗi đó thành response gửi cho FE.
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
-    private final MessageUtils messages;
+    private final MessageUtils messageUtils;
 
-    public GlobalExceptionHandler(MessageUtils messages) {
-        this.messages = messages;
+    public GlobalExceptionHandler(MessageUtils messageUtils) {
+        this.messageUtils = messageUtils;
     }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Object> handleBusinessException(BusinessException exception, WebRequest request) {
         HttpStatus status = exception.getStatus();
-        String strCode = ErrorConstants.forStatus(status.value());
-        String detail = messages.getMessage(exception.getMessageKey(), exception.getArguments());
+        String strCode = ErrorConstants.forStatus(status.value()); // Đổi status thành mã lỗi cho FE
+        String detail = messageUtils.getMessage(exception.getMessageKey(), exception.getArguments()); // Dịch message
         if (detail.equals(exception.getMessageKey())) {
-            detail = messages.getMessage(strCode);
+            detail = messageUtils.getMessage(strCode);
         }
         return response(status, HttpHeaders.EMPTY, strCode, detail, List.of(), request);
     }
 
+    // Hàm này xử lý các lỗi do Spring MVC phát hiện trong quá trình đọc và kiểm tra request.
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(
             Exception exception, Object body, HttpHeaders headers,
             HttpStatusCode statusCode, WebRequest request) {
+        // Kiểm tra response đã được gửi chư
         if (request instanceof ServletWebRequest servletRequest
                 && servletRequest.getResponse() != null
                 && servletRequest.getResponse().isCommitted()) {
             return null;
         }
-
+        // Mặc định không có lỗi theo field
         List<FieldErrorResponse> fields = List.of();
+        // Kiểm tra có phải lỗi @Valid không
         if (exception instanceof MethodArgumentNotValidException validationException) {
             fields = new ArrayList<>();
+            // Lấy toàn bộ lỗi validation
             for (ObjectError error : validationException.getBindingResult().getAllErrors()) {
+                // Xác định field bị lỗi
                 String field = error.getObjectName();
                 if (error instanceof FieldError fieldError) {
                     field = fieldError.getField();
                 }
+                // Lấy message validation
                 String message = error.getDefaultMessage();
                 if (message == null) {
-                    message = messages.getMessage(ErrorConstants.VALIDATION_ERROR);
+                    // dùng message validation chung làm phương án dự phòng.
+                    message = messageUtils.getMessage(ErrorConstants.VALIDATION_ERROR);
                 }
                 fields.add(new FieldErrorResponse(field, message));
             }
         }
+        // Giữ nguyên HTTP status của Spring
         HttpStatus status = HttpStatus.valueOf(statusCode.value());
+        // Đổi status thành strCode
         String strCode = ErrorConstants.forStatus(status.value());
-        return response(status, headers, strCode, messages.getMessage(strCode), fields, request);
+        return response(status, headers, strCode, messageUtils.getMessage(strCode), fields, request);
     }
 
+    // Lỗi bất ngờ mà dự án không dự kiến, bắt mọi Exception chưa có handler cụ thể hơn.
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleUnexpectedException(Exception exception, WebRequest request) {
         LOG.error("Unhandled exception type: {}", exception.getClass().getName());
+        // Trả lỗi 500 an toàn
         return response(HttpStatus.INTERNAL_SERVER_ERROR, HttpHeaders.EMPTY,
-                ErrorConstants.INTERNAL_ERROR, messages.getMessage(ErrorConstants.INTERNAL_ERROR),
+                ErrorConstants.INTERNAL_ERROR, messageUtils.getMessage(ErrorConstants.INTERNAL_ERROR),
                 List.of(), request);
     }
 
     private ResponseEntity<Object> response(
             HttpStatus status, HttpHeaders headers, String strCode, String message,
             List<FieldErrorResponse> fields, WebRequest request) {
+        // Lấy đường dẫn request
         String path = request instanceof ServletWebRequest servletRequest
                 ? servletRequest.getRequest().getRequestURI() : "";
+        // Tạo chi tiết lỗi
         ErrorDetailResponse detail = new ErrorDetailResponse(Instant.now(), status.value(), path, fields);
+
         BaseResponse<ErrorDetailResponse> response = BaseResponse.error(
                 StatusCode.from(status), strCode, message, detail);
+
         return new ResponseEntity<>(response, headers, status);
     }
 }

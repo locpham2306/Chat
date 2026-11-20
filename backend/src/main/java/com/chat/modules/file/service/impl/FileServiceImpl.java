@@ -33,11 +33,11 @@ public class FileServiceImpl implements FileService {
     private static final int MAX_FILE_NAME_LENGTH = 255;
     private static final Logger LOG = LoggerFactory.getLogger(FileServiceImpl.class);
 
-    private final FileRepository files;
-    private final UserRepository users;
-    private final ConversationMemberRepository members;
-    private final FileStorage storage;
-    private final FileProperties properties;
+    private final FileRepository fileRepository;
+    private final UserRepository userRepository;
+    private final ConversationMemberRepository conversationMemberRepository;
+    private final FileStorage fileStorage;
+    private final FileProperties fileProperties;
 
     @Override
     @Transactional
@@ -48,13 +48,13 @@ public class FileServiceImpl implements FileService {
         String storageKey = UUID.randomUUID().toString();
 
         try (InputStream input = file.getInputStream()) {
-            storage.store(storageKey, input);
+            fileStorage.store(storageKey, input);
         } catch (IOException exception) {
             throw new IllegalStateException("Cannot read uploaded file", exception);
         }
         deleteStoredFileAfterRollback(storageKey);
 
-        FileEntity saved = files.saveAndFlush(
+        FileEntity saved = fileRepository.saveAndFlush(
                 new FileEntity(uploaderId, name, storageKey, contentType, file.getSize()));
         return new FileResponse(saved.getId(), saved.getName(), saved.getContentType(),
                 saved.getSize(), "/api/files/" + saved.getId());
@@ -63,20 +63,20 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional(readOnly = true)
     public FileDownload download(UUID userId, UUID fileId) {
-        FileEntity file = files.findById(fileId)
+        FileEntity file = fileRepository.findById(fileId)
                 .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
         if (!canRead(userId, file)) {
             throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
         return new FileDownload(file.getName(), file.getContentType(), file.getSize(),
-                storage.load(file.getStorageKey()));
+                fileStorage.load(file.getStorageKey()));
     }
 
     private void validate(MultipartFile file) {
         if (file == null || file.isEmpty() || file.getSize() < 1) {
             throw BusinessException.badRequest("file.empty");
         }
-        if (file.getSize() > properties.maxSize().toBytes()) {
+        if (file.getSize() > fileProperties.maxSize().toBytes()) {
             throw BusinessException.payloadTooLarge("file.tooLarge");
         }
         fileName(file.getOriginalFilename());
@@ -106,15 +106,17 @@ public class FileServiceImpl implements FileService {
     }
 
     private boolean canRead(UUID userId, FileEntity file) {
-        if (userId.equals(file.getUploaderId()) || users.existsByAvatarFileId(file.getId())) {
+        if (userId.equals(file.getUploaderId()) || userRepository.existsByAvatarFileId(file.getId())) {
             return true;
         }
         if (file.getConversationId() == null
-                && members.countActiveMembershipsForConversationAvatar(userId, file.getId()) > 0) {
+                && conversationMemberRepository.countActiveMembershipsForConversationAvatar(
+                        userId, file.getId()) > 0) {
             return true;
         }
         return file.getConversationId() != null
-                && members.existsByConversationIdAndUserIdAndLeftAtIsNull(file.getConversationId(), userId);
+                && conversationMemberRepository.existsByConversationIdAndUserIdAndLeftAtIsNull(
+                        file.getConversationId(), userId);
     }
 
     private void deleteStoredFileAfterRollback(String storageKey) {
@@ -126,7 +128,7 @@ public class FileServiceImpl implements FileService {
             public void afterCompletion(int status) {
                 if (status != STATUS_COMMITTED) {
                     try {
-                        storage.delete(storageKey);
+                        fileStorage.delete(storageKey);
                     } catch (RuntimeException exception) {
                         LOG.warn("Cannot remove stored file after transaction rollback");
                     }

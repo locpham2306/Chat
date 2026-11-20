@@ -1,7 +1,7 @@
 package com.chat.modules.auth;
 
 import com.chat.exception.BusinessException;
-import com.chat.modules.auth.config.SessionCookieProperties;
+import com.chat.config.SessionCookieProperties;
 import com.chat.modules.auth.entity.SessionEntity;
 import com.chat.modules.auth.repository.SessionRepository;
 import com.chat.modules.auth.security.SessionTokenGenerator;

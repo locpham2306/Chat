@@ -25,10 +25,10 @@ import java.nio.charset.StandardCharsets;
 @RequiredArgsConstructor
 public class AuthenticationServiceImpl implements AuthenticationService {
     private static final int BCRYPT_MAX_PASSWORD_BYTES = 72;
-    private final UserRepository users;
+    private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
-    private final SessionService sessions;
+    private final SessionService sessionService;
 
     @Override
     @Transactional
@@ -36,15 +36,14 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         validatePasswordLength(request.password());
         String username = StringUtils.trim(request.username());
         String fullName = StringUtils.trim(request.fullName());
-        if (users.existsByUsername(username)) {
+        if (userRepository.existsByUsername(username)) {
             throw usernameExists();
         }
         try {
-            UserEntity user = users.saveAndFlush(
+            UserEntity user = userRepository.saveAndFlush(
                     new UserEntity(username, passwordEncoder.encode(request.password()), fullName));
             return userMapper.toResponse(user, UserStatusEnum.OFFLINE);
         } catch (DataIntegrityViolationException exception) {
-            // The database unique key is authoritative under concurrent registration.
             throw usernameExists();
         }
     }
@@ -53,12 +52,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Transactional
     public IssuedSession login(LoginRequest request) {
         validatePasswordLength(request.password());
-        UserEntity user = users.findByUsername(StringUtils.trim(request.username()))
+        UserEntity user = userRepository.findByUsername(StringUtils.trim(request.username()))
                 .orElseThrow(this::invalidCredentials);
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw invalidCredentials();
         }
-        return sessions.create(user.getId());
+        return sessionService.create(user.getId());
     }
 
     private void validatePasswordLength(String password) {

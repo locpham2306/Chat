@@ -1,6 +1,5 @@
-package com.chat.modules.websocket.config;
+package com.chat.config;
 
-import com.chat.config.CorsProperties;
 import com.chat.modules.auth.security.SessionAuthenticationFilter;
 import com.chat.modules.auth.service.SessionIdentity;
 import org.springframework.http.HttpStatus;
@@ -13,21 +12,25 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
 
 import java.util.Map;
 
+// Kiểm tra session và origin trước khi cho phép mở kết nối WebSocket.
 @Component
 public class WebSocketHandshakeInterceptor implements HandshakeInterceptor {
     public static final String IDENTITY_ATTRIBUTE = "com.chat.websocket.sessionIdentity";
 
-    private final CorsProperties cors;
+    private final CorsProperties corsProperties;
 
-    public WebSocketHandshakeInterceptor(CorsProperties cors) {
-        this.cors = cors;
+    // Dùng chung danh sách origin đã khai báo trong cấu hình CORS.
+    public WebSocketHandshakeInterceptor(CorsProperties corsProperties) {
+        this.corsProperties = corsProperties;
     }
 
+    // Chặn handshake nếu thiếu session hoặc origin không hợp lệ.
+    // Hợp lệ thì chuyển danh tính người dùng sang WebSocket session.
     @Override
     public boolean beforeHandshake(
             ServerHttpRequest request,
             ServerHttpResponse response,
-            WebSocketHandler wsHandler,
+            WebSocketHandler webSocketHandler,
             Map<String, Object> attributes) {
         if (!(request instanceof ServletServerHttpRequest servletRequest)) {
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
@@ -40,7 +43,7 @@ public class WebSocketHandshakeInterceptor implements HandshakeInterceptor {
             return false;
         }
         String origin = request.getHeaders().getOrigin();
-        if (origin == null || !cors.allowedOrigins().contains(origin)) {
+        if (origin == null || !corsProperties.allowedOrigins().contains(origin)) {
             response.setStatusCode(HttpStatus.FORBIDDEN);
             return false;
         }
@@ -48,11 +51,12 @@ public class WebSocketHandshakeInterceptor implements HandshakeInterceptor {
         return true;
     }
 
+    // Không cần làm gì sau handshake, nhưng interface bắt buộc phải có hàm này.
     @Override
     public void afterHandshake(
             ServerHttpRequest request,
             ServerHttpResponse response,
-            WebSocketHandler wsHandler,
+            WebSocketHandler webSocketHandler,
             Exception exception) {
     }
 }

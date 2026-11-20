@@ -60,14 +60,14 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 public class ConversationServiceImpl implements ConversationService {
-    private final ConversationRepository conversations;
-    private final ConversationMemberRepository members;
-    private final UserRepository users;
-    private final FileRepository files;
-    private final MessageRepository messages;
+    private final ConversationRepository conversationRepository;
+    private final ConversationMemberRepository conversationMemberRepository;
+    private final UserRepository userRepository;
+    private final FileRepository fileRepository;
+    private final MessageRepository messageRepository;
     private final ConversationMapper conversationMapper;
-    private final MessageResponseLoader messageResponses;
-    private final UserPresence presence;
+    private final MessageResponseLoader messageResponseLoader;
+    private final UserPresence userPresence;
     private final Clock clock;
     private ConversationMemberService compatibilityMemberService;
 
@@ -75,28 +75,30 @@ public class ConversationServiceImpl implements ConversationService {
      * Keeps source compatibility for callers that still construct the old combined service.
      */
     public ConversationServiceImpl(
-            ConversationRepository conversations,
-            ConversationMemberRepository members,
-            UserRepository users,
-            FileRepository files,
-            MessageRepository messages,
-            MessageAttachmentRepository attachments,
+            ConversationRepository conversationRepository,
+            ConversationMemberRepository conversationMemberRepository,
+            UserRepository userRepository,
+            FileRepository fileRepository,
+            MessageRepository messageRepository,
+            MessageAttachmentRepository messageAttachmentRepository,
             ConversationMapper conversationMapper,
-            ConversationMemberMapper memberMapper,
+            ConversationMemberMapper conversationMemberMapper,
             MessageMapper messageMapper,
             UserMapper userMapper,
             Clock clock) {
-        this.conversations = conversations;
-        this.members = members;
-        this.users = users;
-        this.files = files;
-        this.messages = messages;
+        this.conversationRepository = conversationRepository;
+        this.conversationMemberRepository = conversationMemberRepository;
+        this.userRepository = userRepository;
+        this.fileRepository = fileRepository;
+        this.messageRepository = messageRepository;
         this.conversationMapper = conversationMapper;
-        this.messageResponses = new MessageResponseLoader(attachments, files, users, messageMapper);
-        this.presence = ignored -> UserStatusEnum.OFFLINE;
+        this.messageResponseLoader = new MessageResponseLoader(
+                messageAttachmentRepository, fileRepository, userRepository, messageMapper);
+        this.userPresence = ignored -> UserStatusEnum.OFFLINE;
         this.clock = clock;
         this.compatibilityMemberService = new ConversationMemberServiceImpl(
-                conversations, members, users, memberMapper, userMapper, presence, clock);
+                conversationRepository, conversationMemberRepository, userRepository,
+                conversationMemberMapper, userMapper, userPresence, clock);
     }
 
     @Override
@@ -105,14 +107,14 @@ public class ConversationServiceImpl implements ConversationService {
         if (currentUserId.equals(recipientId)) {
             throw BusinessException.badRequest("conversation.recipientIsCurrentUser");
         }
-        UserEntity recipient = users.findById(recipientId)
+        UserEntity recipient = userRepository.findById(recipientId)
                 .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
-        DirectConversationResponse conversation = conversations.findDirectBetweenUsers(
+        DirectConversationResponse conversation = conversationRepository.findDirectBetweenUsers(
                         ConversationTypeEnum.DIRECT, currentUserId, recipientId)
                 .map(conversationMapper::toDirectResponse)
                 .orElse(null);
         return new DirectConversationLookupResponse(
-                conversation, conversationMapper.toPeerResponse(recipient, presence.status(recipientId)));
+                conversation, conversationMapper.toPeerResponse(recipient, userPresence.status(recipientId)));
     }
 
     @Override
@@ -123,12 +125,12 @@ public class ConversationServiceImpl implements ConversationService {
         if (memberIds.isEmpty()) {
             throw BusinessException.badRequest("conversation.groupRequiresMember");
         }
-        if (users.countByIdIn(memberIds) != memberIds.size()) {
+        if (userRepository.countByIdIn(memberIds) != memberIds.size()) {
             throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
         validateGroupAvatar(currentUserId, request.avatarFileId());
 
-        ConversationEntity conversation = conversations.saveAndFlush(ConversationEntity.group(
+        ConversationEntity conversation = conversationRepository.saveAndFlush(ConversationEntity.group(
                 currentUserId, StringUtils.trim(request.name()), request.avatarFileId()));
         Instant joinedAt = clock.instant();
         ArrayList<ConversationMemberEntity> memberships =
@@ -139,7 +141,7 @@ public class ConversationServiceImpl implements ConversationService {
             memberships.add(new ConversationMemberEntity(
                     conversation.getId(), memberId, MemberRoleEnum.MEMBER, joinedAt));
         }
-        members.saveAllAndFlush(memberships);
+        conversationMemberRepository.saveAllAndFlush(memberships);
 
         return conversationMapper.toGroupResponse(conversation, memberships.size());
     }
@@ -148,7 +150,7 @@ public class ConversationServiceImpl implements ConversationService {
     @Transactional(readOnly = true)
     public PageResponse<List<ConversationListItemResponse>> getConversations(
             UUID currentUserId, Integer page, Integer size) {
-        Page<ConversationEntity> conversationsPage = conversations.findActiveForUser(
+        Page<ConversationEntity> conversationsPage = conversationRepository.findActiveForUser(
                 currentUserId, PageableUtils.of(page, size));
         if (conversationsPage.isEmpty()) {
             return PageResponse.of(List.of(), conversationsPage.getTotalPages(), conversationsPage.getTotalElements());
@@ -160,15 +162,15 @@ public class ConversationServiceImpl implements ConversationService {
         Map<UUID, UserEntity> peersById = loadDirectPeers(
                 conversationsPage.getContent(), currentUserId);
         Map<UUID, Long> memberCounts = toCountMap(
-                members.countActiveMembersByConversationIds(conversationIds));
+                conversationMemberRepository.countActiveMembersByConversationIds(conversationIds));
         Map<UUID, Long> unreadCounts = toCountMap(
-                messages.countUnreadByConversationIds(currentUserId, conversationIds));
+                messageRepository.countUnreadByConversationIds(currentUserId, conversationIds));
 
         Map<UUID, MessageEntity> latestMessages = new HashMap<>();
-        for (MessageEntity message : messages.findLatestByConversationIds(conversationIds)) {
+        for (MessageEntity message : messageRepository.findLatestByConversationIds(conversationIds)) {
             latestMessages.putIfAbsent(message.getConversationId(), message);
         }
-        Map<UUID, MessageResponse> lastMessageResponses = messageResponses.load(latestMessages.values());
+        Map<UUID, MessageResponse> lastMessageResponses = messageResponseLoader.load(latestMessages.values());
 
         List<ConversationListItemResponse> data = new ArrayList<>();
         for (ConversationEntity conversation : conversationsPage.getContent()) {
@@ -192,14 +194,15 @@ public class ConversationServiceImpl implements ConversationService {
     @Override
     @Transactional(readOnly = true)
     public ConversationDetailResponse getConversation(UUID currentUserId, UUID conversationId) {
-        ConversationEntity conversation = conversations.findById(conversationId)
+        ConversationEntity conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
-        if (!members.existsByConversationIdAndUserIdAndLeftAtIsNull(conversationId, currentUserId)) {
+        if (!conversationMemberRepository.existsByConversationIdAndUserIdAndLeftAtIsNull(
+                conversationId, currentUserId)) {
             throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
-        long memberCount = members.countByConversationIdAndLeftAtIsNull(conversationId);
+        long memberCount = conversationMemberRepository.countByConversationIdAndLeftAtIsNull(conversationId);
         ConversationPeerResponse peer = conversation.getType() == ConversationTypeEnum.DIRECT
-                ? mapPeer(users.findById(directPeerId(conversation, currentUserId))
+                ? mapPeer(userRepository.findById(directPeerId(conversation, currentUserId))
                         .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND)))
                 : null;
         return conversationMapper.toDetailResponse(conversation, memberCount, peer);
@@ -209,12 +212,13 @@ public class ConversationServiceImpl implements ConversationService {
     @Transactional
     public ConversationDetailResponse updateConversation(
             UUID currentUserId, UUID conversationId, UpdateConversationRequest request) {
-        ConversationEntity conversation = conversations.findById(conversationId)
+        ConversationEntity conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
         if (conversation.getType() != ConversationTypeEnum.GROUP) {
             throw BusinessException.conflict("conversation.directCannotBeUpdated");
         }
-        ConversationMemberEntity membership = members.findByConversationIdAndUserIdAndLeftAtIsNull(
+        ConversationMemberEntity membership = conversationMemberRepository
+                .findByConversationIdAndUserIdAndLeftAtIsNull(
                         conversationId, currentUserId)
                 .orElseThrow(() -> BusinessException.forbidden(ErrorConstants.FORBIDDEN));
         if (membership.getRole() != MemberRoleEnum.OWNER
@@ -224,7 +228,7 @@ public class ConversationServiceImpl implements ConversationService {
         validateGroupAvatar(currentUserId, request.avatarFileId());
 
         conversation.updateGroup(StringUtils.trim(request.name()), request.avatarFileId());
-        long memberCount = members.countByConversationIdAndLeftAtIsNull(conversationId);
+        long memberCount = conversationMemberRepository.countByConversationIdAndLeftAtIsNull(conversationId);
         return conversationMapper.toDetailResponse(conversation, memberCount, null);
     }
 
@@ -261,7 +265,7 @@ public class ConversationServiceImpl implements ConversationService {
         }
 
         Map<UUID, UserEntity> peersById = new HashMap<>();
-        for (UserEntity user : users.findAllById(peerIds)) {
+        for (UserEntity user : userRepository.findAllById(peerIds)) {
             peersById.put(user.getId(), user);
         }
         return peersById;
@@ -295,7 +299,7 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     private ConversationPeerResponse mapPeer(UserEntity user) {
-        return conversationMapper.toPeerResponse(user, presence.status(user.getId()));
+        return conversationMapper.toPeerResponse(user, userPresence.status(user.getId()));
     }
 
     private UUID directPeerId(ConversationEntity conversation, UUID currentUserId) {
@@ -312,7 +316,7 @@ public class ConversationServiceImpl implements ConversationService {
         if (avatarFileId == null) {
             return;
         }
-        FileEntity avatar = files.findById(avatarFileId)
+        FileEntity avatar = fileRepository.findById(avatarFileId)
                 .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
         boolean allowed = currentUserId.equals(avatar.getUploaderId())
                 && avatar.getConversationId() == null

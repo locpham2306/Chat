@@ -6,7 +6,6 @@ import lombok.Getter;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Internal service result; controllers must never use this as a response DTO. */
 @Getter
 public final class IssuedSession {
     private final UUID sessionId;

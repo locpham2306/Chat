@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 
 import java.util.Objects;
 
+// khuôn chứa lỗi nghiệp vụ chung, module nào cũng có thể sử dụng
 public class BusinessException extends RuntimeException {
     private final HttpStatus status;
     private final String messageKey;
