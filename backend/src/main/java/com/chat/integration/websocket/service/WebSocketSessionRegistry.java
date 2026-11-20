@@ -43,14 +43,20 @@ public class WebSocketSessionRegistry implements UserPresence {
     private final ObjectMapper objectMapper;
     private final TaskScheduler webSocketTaskScheduler;
 
-    // connectionId -> thông tin connection thật.
+    // connectionId -> connection WebSocket thật cùng userId và session đăng nhập.
+    // Ví dụ WS_1 -> Connection(tab laptop, USER_NAM, SESSION_LAPTOP).
+    // Dùng để gửi dữ liệu hoặc đóng chính xác một connection khi đã biết connectionId.
     private final Map<String, Connection> connections = new HashMap<>();
 
-    // userId -> các connection của user; một user có thể mở nhiều tab/thiết bị.
+    // userId -> tất cả connectionId của user đó.
+    // Ví dụ Nam mở hai tab laptop và một app điện thoại:
+    // USER_NAM -> [WS_1, WS_2, WS_3].
+    // Dùng để gửi event lên mọi tab/thiết bị và kiểm tra user còn ONLINE hay không.
     private final Map<UUID, Set<String>> connectionIdsByUser = new HashMap<>();
 
-    // sessionId trong bảng sessions -> các connection dùng session đó, phục vụ đóng
-    // WS khi logout.
+    // sessionId trong bảng sessions -> các connectionId dùng chung phiên đăng nhập đó.
+    // Ví dụ SESSION_LAPTOP -> [WS_1, WS_2], SESSION_PHONE -> [WS_3].
+    // Khi logout laptop, backend chỉ đóng WS_1 và WS_2; WS_3 trên điện thoại vẫn hoạt động.
     private final Map<UUID, Set<String>> connectionIdsByAppSession = new HashMap<>();
 
     // Dùng ObjectMapper để tạo JSON và scheduler để hẹn đóng connection đúng lúc

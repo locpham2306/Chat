@@ -17,10 +17,12 @@ import com.chat.utils.PageableUtils;
 import com.chat.utils.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -85,10 +87,20 @@ public class UserServiceImpl implements UserService {
             resolvedKeyword = "";
         }
         Sort sort = Sort.by(Sort.Order.asc("username"), Sort.Order.asc("id"));
-        Page<UserEntity> usersPage = userRepository.searchPublicProfiles(
-                currentUserId, resolvedKeyword, PageableUtils.of(page, size, sort));
-        return PageableUtils.toResponse(
-                usersPage, user -> userMapper.toResponse(user, userPresence.status(user.getId())));
+
+        Pageable pageable = PageableUtils.of(page, size, sort);
+
+        Page<UserEntity> usersPage = userRepository.searchPublicProfiles(currentUserId, resolvedKeyword, pageable);
+
+        List<UserResponse> userResponses = new ArrayList<>();
+
+        for (UserEntity user : usersPage.getContent()) {
+            UserStatusEnum status = userPresence.status(user.getId());
+            UserResponse userResponse = userMapper.toResponse(user, status);
+            userResponses.add(userResponse);
+        }
+
+        return PageResponse.of(userResponses, usersPage.getTotalPages(), usersPage.getTotalElements());
     }
 
     private UserEntity currentUser(UUID userId) {

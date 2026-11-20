@@ -30,8 +30,7 @@ public class UserController {
     public BaseResponse<PageResponse<List<UserResponse>>> searchUsers(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @Valid @ModelAttribute SearchRequest request) {
-        return BaseResponse.success(userService.searchUsers(
-                session.userId(), request.keyword(), request.page(), request.size()));
+        return BaseResponse.success(userService.searchUsers(session.userId(), request.keyword(), request.page(), request.size()));
     }
 
     @GetMapping("/me")
