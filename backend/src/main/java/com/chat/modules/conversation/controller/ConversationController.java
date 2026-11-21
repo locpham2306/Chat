@@ -1,11 +1,14 @@
 package com.chat.modules.conversation.controller;
 
+import com.chat.common.dto.request.PaginationRequest;
 import com.chat.common.dto.response.PageResponse;
 import com.chat.common.wrapper.BaseResponse;
 import com.chat.modules.auth.security.SessionAuthenticationFilter;
 import com.chat.modules.auth.service.SessionIdentity;
 import com.chat.modules.conversation.dto.request.AddConversationMembersRequest;
+import com.chat.modules.conversation.dto.request.AvailableMembersRequest;
 import com.chat.modules.conversation.dto.request.CreateGroupRequest;
+import com.chat.modules.conversation.dto.request.DirectConversationRequest;
 import com.chat.modules.conversation.dto.request.UpdateConversationRequest;
 import com.chat.modules.conversation.dto.response.AddConversationMembersResponse;
 import com.chat.modules.conversation.dto.response.ConversationDetailResponse;
@@ -16,25 +19,24 @@ import com.chat.modules.conversation.dto.response.GroupConversationResponse;
 import com.chat.modules.conversation.service.ConversationMemberService;
 import com.chat.modules.conversation.service.ConversationService;
 import com.chat.modules.message.dto.request.MarkConversationReadRequest;
+import com.chat.modules.message.dto.request.MessageHistoryRequest;
 import com.chat.modules.message.dto.response.ConversationReadResponse;
 import com.chat.modules.message.dto.response.MessageHistoryResponse;
 import com.chat.modules.message.service.ConversationMessageService;
 import com.chat.modules.user.dto.response.UserResponse;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -51,12 +53,9 @@ public class ConversationController {
     @GetMapping
     public BaseResponse<PageResponse<List<ConversationListItemResponse>>> getConversations(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
-            @RequestParam(defaultValue = "0")
-            @Min(value = 0, message = "{validation.min}") Integer page,
-            @RequestParam(defaultValue = "20")
-            @Min(value = 1, message = "{validation.min}")
-            @Max(value = 100, message = "{validation.max}") Integer size) {
-        return BaseResponse.success(conversationService.getConversations(session.userId(), page, size));
+            @Valid @ModelAttribute PaginationRequest request) {
+        return BaseResponse.success(conversationService.getConversations(
+                session.userId(), request.page(), request.size()));
     }
 
     @GetMapping("/{id}")
@@ -70,25 +69,20 @@ public class ConversationController {
     public BaseResponse<PageResponse<List<ConversationMemberResponse>>> getConversationMembers(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id,
-            @RequestParam(defaultValue = "0")
-            @Min(value = 0, message = "{validation.min}") Integer page,
-            @RequestParam(defaultValue = "20")
-            @Min(value = 1, message = "{validation.min}")
-            @Max(value = 100, message = "{validation.max}") Integer size) {
+            @Valid @ModelAttribute PaginationRequest request) {
         return BaseResponse.success(
-                conversationMemberService.getMembers(session.userId(), id, page, size));
+                conversationMemberService.getMembers(
+                        session.userId(), id, request.page(), request.size()));
     }
 
     @GetMapping("/{id}/messages")
     public BaseResponse<MessageHistoryResponse> getMessages(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id,
-            @RequestParam(required = false) UUID before,
-            @RequestParam(defaultValue = "30")
-            @Min(value = 1, message = "{validation.min}")
-            @Max(value = 100, message = "{validation.max}") Integer limit) {
+            @Valid @ModelAttribute MessageHistoryRequest request) {
         return BaseResponse.success(
-                conversationMessageService.getHistory(session.userId(), id, before, limit));
+                conversationMessageService.getHistory(
+                        session.userId(), id, request.before(), request.limit()));
     }
 
     @PutMapping("/{id}/read")
@@ -122,14 +116,10 @@ public class ConversationController {
     public BaseResponse<PageResponse<List<UserResponse>>> getAvailableGroupMembers(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id,
-            @RequestParam(defaultValue = "") String keyword,
-            @RequestParam(defaultValue = "0")
-            @Min(value = 0, message = "{validation.min}") Integer page,
-            @RequestParam(defaultValue = "20")
-            @Min(value = 1, message = "{validation.min}")
-            @Max(value = 100, message = "{validation.max}") Integer size) {
+            @Valid @ModelAttribute AvailableMembersRequest request) {
         return BaseResponse.success(
-                conversationMemberService.getAvailableMembers(session.userId(), id, keyword, page, size));
+                conversationMemberService.getAvailableMembers(
+                        session.userId(), id, request.keyword(), request.page(), request.size()));
     }
 
     @PutMapping("/{id}")
@@ -143,8 +133,9 @@ public class ConversationController {
     @GetMapping("/direct")
     public BaseResponse<DirectConversationLookupResponse> findDirectConversation(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
-            @RequestParam UUID recipientId) {
-        return BaseResponse.success(conversationService.findDirectConversation(session.userId(), recipientId));
+            @Valid @ModelAttribute DirectConversationRequest request) {
+        return BaseResponse.success(
+                conversationService.findDirectConversation(session.userId(), request.recipientId()));
     }
 
     @PostMapping("/group")
