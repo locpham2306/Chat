@@ -17,7 +17,8 @@ public class SessionTokenGenerator {
     public String generate() {
         byte[] bytes = new byte[TOKEN_BYTES];
         random.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        Base64.Encoder encoder = Base64.getUrlEncoder().withoutPadding();
+        return encoder.encodeToString(bytes);
     }
 
     public boolean isValidFormat(String token) {
@@ -34,8 +35,10 @@ public class SessionTokenGenerator {
             throw new IllegalArgumentException("Invalid session token format");
         }
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                    .digest(token.getBytes(StandardCharsets.US_ASCII)));
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] tokenBytes = token.getBytes(StandardCharsets.US_ASCII);
+            byte[] hashBytes = digest.digest(tokenBytes);
+            return HexFormat.of().formatHex(hashBytes);
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);
         }

@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -40,8 +41,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw usernameExists();
         }
         try {
-            UserEntity user = userRepository.saveAndFlush(
-                    new UserEntity(username, passwordEncoder.encode(request.password()), fullName));
+            String passwordHash = passwordEncoder.encode(request.password());
+            UserEntity newUser = new UserEntity(username, passwordHash, fullName);
+            UserEntity user = userRepository.saveAndFlush(newUser);
             return userMapper.toResponse(user, UserStatusEnum.OFFLINE);
         } catch (DataIntegrityViolationException exception) {
             throw usernameExists();
@@ -52,12 +54,14 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Transactional
     public IssuedSession login(LoginRequest request) {
         validatePasswordLength(request.password());
-        UserEntity user = userRepository.findByUsername(StringUtils.trim(request.username()))
+        String username = StringUtils.trim(request.username());
+        UserEntity user = userRepository.findByUsername(username)
                 .orElseThrow(this::invalidCredentials);
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw invalidCredentials();
         }
-        return sessionService.create(user.getId());
+        UUID userId = user.getId();
+        return sessionService.create(userId);
     }
 
     private void validatePasswordLength(String password) {

@@ -33,6 +33,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -56,10 +57,17 @@ public class MessageServiceImpl implements MessageService {
 
         if (command.recipientId() != null) {
             sender = lockDirectUsers(command.senderId(), command.recipientId());
-            conversation = conversationRepository.findDirectBetweenUsers(
-                    ConversationTypeEnum.DIRECT, command.senderId(), command.recipientId()).orElse(null);
-            existing = messageRepository.findBySenderIdAndClientMessageId(
-                    command.senderId(), command.clientMessageId()).orElse(null);
+            Optional<ConversationEntity> directConversation =
+                    conversationRepository.findDirectBetweenUsers(
+                            ConversationTypeEnum.DIRECT,
+                            command.senderId(),
+                            command.recipientId());
+            conversation = directConversation.orElse(null);
+
+            Optional<MessageEntity> existingMessage =
+                    messageRepository.findBySenderIdAndClientMessageId(
+                            command.senderId(), command.clientMessageId());
+            existing = existingMessage.orElse(null);
             if (existing != null) {
                 if (conversation == null || !conversation.getId().equals(existing.getConversationId())) {
                     throw conflict();
@@ -73,8 +81,10 @@ public class MessageServiceImpl implements MessageService {
             }
         } else {
             sender = lockUser(command.senderId());
-            existing = messageRepository.findBySenderIdAndClientMessageId(
-                    command.senderId(), command.clientMessageId()).orElse(null);
+            Optional<MessageEntity> existingMessage =
+                    messageRepository.findBySenderIdAndClientMessageId(
+                            command.senderId(), command.clientMessageId());
+            existing = existingMessage.orElse(null);
             if (existing != null) {
                 if (!command.conversationId().equals(existing.getConversationId())) {
                     throw conflict();
@@ -88,12 +98,19 @@ public class MessageServiceImpl implements MessageService {
 
         List<FileEntity> orderedFiles = resolveAndBindFiles(
                 command.senderId(), conversation.getId(), command.attachmentIds());
-        MessageEntity message = messageRepository.saveAndFlush(new MessageEntity(
-                conversation.getId(), command.senderId(), command.clientMessageId(), command.content()));
+        MessageEntity newMessage = new MessageEntity(
+                conversation.getId(),
+                command.senderId(),
+                command.clientMessageId(),
+                command.content());
+        MessageEntity message = messageRepository.saveAndFlush(newMessage);
         if (!orderedFiles.isEmpty()) {
             ArrayList<MessageAttachmentEntity> links = new ArrayList<>(orderedFiles.size());
             for (int index = 0; index < orderedFiles.size(); index++) {
-                links.add(new MessageAttachmentEntity(message.getId(), orderedFiles.get(index).getId(), index));
+                FileEntity file = orderedFiles.get(index);
+                MessageAttachmentEntity link = new MessageAttachmentEntity(
+                        message.getId(), file.getId(), index);
+                links.add(link);
             }
             messageAttachmentRepository.saveAllAndFlush(links);
         }
@@ -111,8 +128,10 @@ public class MessageServiceImpl implements MessageService {
         if (hasRecipient == hasConversation) {
             throw invalid();
         }
-        String clientMessageId = command.clientMessageId() == null
-                ? null : command.clientMessageId().trim();
+        String clientMessageId = command.clientMessageId();
+        if (clientMessageId != null) {
+            clientMessageId = clientMessageId.trim();
+        }
         if (clientMessageId == null || clientMessageId.isEmpty() || clientMessageId.length() > 128) {
             throw invalid();
         }
@@ -121,8 +140,16 @@ public class MessageServiceImpl implements MessageService {
             content = null;
         }
         List<UUID> attachmentIds = command.attachmentIds();
-        if (attachmentIds.stream().anyMatch(Objects::isNull)
-                || new LinkedHashSet<>(attachmentIds).size() != attachmentIds.size()) {
+        boolean containsNullAttachmentId = false;
+        for (UUID attachmentId : attachmentIds) {
+            if (attachmentId == null) {
+                containsNullAttachmentId = true;
+                break;
+            }
+        }
+        boolean containsDuplicateAttachmentId =
+                new LinkedHashSet<>(attachmentIds).size() != attachmentIds.size();
+        if (containsNullAttachmentId || containsDuplicateAttachmentId) {
             throw invalid();
         }
         if (content == null && attachmentIds.isEmpty()) {
@@ -138,9 +165,19 @@ public class MessageServiceImpl implements MessageService {
 
     private UserEntity lockDirectUsers(UUID firstUserId, UUID secondUserId) {
         boolean firstIsLow = firstUserId.toString().compareTo(secondUserId.toString()) < 0;
-        UserEntity lowUser = lockUser(firstIsLow ? firstUserId : secondUserId);
-        UserEntity highUser = lockUser(firstIsLow ? secondUserId : firstUserId);
-        return firstIsLow ? lowUser : highUser;
+        UUID lowUserId = secondUserId;
+        UUID highUserId = firstUserId;
+        if (firstIsLow) {
+            lowUserId = firstUserId;
+            highUserId = secondUserId;
+        }
+
+        UserEntity lowUser = lockUser(lowUserId);
+        UserEntity highUser = lockUser(highUserId);
+        if (firstIsLow) {
+            return lowUser;
+        }
+        return highUser;
     }
 
     private UserEntity lockUser(UUID userId) {
@@ -149,12 +186,36 @@ public class MessageServiceImpl implements MessageService {
     }
 
     private ConversationEntity createDirect(UUID senderId, UUID recipientId) {
-        ConversationEntity conversation = conversationRepository.saveAndFlush(
-                ConversationEntity.direct(senderId, recipientId));
+        if (senderId == null || recipientId == null) {
+            throw new IllegalArgumentException("Sender and recipient are required");
+        }
+        if (senderId.equals(recipientId)) {
+            throw new IllegalArgumentException("A direct conversation requires two different users");
+        }
+
+        // Chuỗi UUID chuẩn có cùng thứ tự byte không dấu với BINARY(16) trong MySQL.
+        boolean senderIsLow = senderId.toString().compareTo(recipientId.toString()) < 0;
+        UUID lowUserId = recipientId;
+        UUID highUserId = senderId;
+        if (senderIsLow) {
+            lowUserId = senderId;
+            highUserId = recipientId;
+        }
+
+        ConversationEntity conversation = new ConversationEntity();
+        conversation.setType(ConversationTypeEnum.DIRECT);
+        conversation.setDirectUserLowId(lowUserId);
+        conversation.setDirectUserHighId(highUserId);
+        conversation = conversationRepository.saveAndFlush(conversation);
+
         Instant joinedAt = clock.instant();
-        conversationMemberRepository.saveAllAndFlush(List.of(
-                new ConversationMemberEntity(conversation.getId(), senderId, MemberRoleEnum.MEMBER, joinedAt),
-                new ConversationMemberEntity(conversation.getId(), recipientId, MemberRoleEnum.MEMBER, joinedAt)));
+        ConversationMemberEntity senderMembership = new ConversationMemberEntity(
+                conversation.getId(), senderId, MemberRoleEnum.MEMBER, joinedAt);
+        ConversationMemberEntity recipientMembership = new ConversationMemberEntity(
+                conversation.getId(), recipientId, MemberRoleEnum.MEMBER, joinedAt);
+        List<ConversationMemberEntity> memberships =
+                List.of(senderMembership, recipientMembership);
+        conversationMemberRepository.saveAllAndFlush(memberships);
         return conversation;
     }
 
@@ -197,8 +258,10 @@ public class MessageServiceImpl implements MessageService {
             MessageEntity existing, MessageSendCommand command, UserEntity sender) {
         List<MessageAttachmentEntity> links =
                 messageAttachmentRepository.findByMessageIdOrderByPositionAsc(existing.getId());
-        List<UUID> storedAttachmentIds = links.stream()
-                .map(MessageAttachmentEntity::getFileId).toList();
+        List<UUID> storedAttachmentIds = new ArrayList<>(links.size());
+        for (MessageAttachmentEntity link : links) {
+            storedAttachmentIds.add(link.getFileId());
+        }
         if (!Objects.equals(existing.getContent(), command.content())
                 || !storedAttachmentIds.equals(command.attachmentIds())) {
             throw conflict();
@@ -225,11 +288,16 @@ public class MessageServiceImpl implements MessageService {
             Collection<FileEntity> attachedFiles,
             List<UUID> activeMemberIds,
             boolean newlyCreated) {
-        List<FileResponse> fileResponses = attachedFiles.stream()
-                .map(file -> new FileResponse(
-                        file.getId(), file.getName(), file.getContentType(), file.getSize(),
-                        "/api/files/" + file.getId()))
-                .toList();
+        List<FileResponse> fileResponses = new ArrayList<>(attachedFiles.size());
+        for (FileEntity file : attachedFiles) {
+            FileResponse response = new FileResponse(
+                    file.getId(),
+                    file.getName(),
+                    file.getContentType(),
+                    file.getSize(),
+                    "/api/files/" + file.getId());
+            fileResponses.add(response);
+        }
         return new MessageDelivery(
                 message.getId(), message.getConversationId(), message.getSenderId(),
                 sender.getFullName(), sender.getAvatarFileId(),

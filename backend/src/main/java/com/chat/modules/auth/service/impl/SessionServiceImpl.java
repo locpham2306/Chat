@@ -37,8 +37,10 @@ public class SessionServiceImpl implements SessionService {
         }
         Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
         String rawToken = sessionTokenGenerator.generate();
-        SessionEntity session = sessionRepository.saveAndFlush(
-                new SessionEntity(userId, sessionTokenGenerator.hash(rawToken), now, now.plus(LIFETIME)));
+        String tokenHash = sessionTokenGenerator.hash(rawToken);
+        Instant expiresAt = now.plus(LIFETIME);
+        SessionEntity newSession = new SessionEntity(userId, tokenHash, now, expiresAt);
+        SessionEntity session = sessionRepository.saveAndFlush(newSession);
         return new IssuedSession(session.getId(), session.getExpiresAt(), rawToken);
     }
 
@@ -48,24 +50,38 @@ public class SessionServiceImpl implements SessionService {
         if (!sessionTokenGenerator.isValidFormat(rawToken)) {
             return Optional.empty();
         }
-        return sessionRepository.findByTokenHashAndRevokedAtIsNullAndExpiresAtAfter(
-                        sessionTokenGenerator.hash(rawToken), clock.instant())
-                .map(session -> new SessionIdentity(session.getId(), session.getUserId(), session.getExpiresAt()));
+
+        String tokenHash = sessionTokenGenerator.hash(rawToken);
+        Optional<SessionEntity> activeSession =
+                sessionRepository.findByTokenHashAndRevokedAtIsNullAndExpiresAtAfter(
+                        tokenHash, clock.instant());
+        if (activeSession.isEmpty()) {
+            return Optional.empty();
+        }
+
+        SessionEntity session = activeSession.get();
+        SessionIdentity identity = new SessionIdentity(
+                session.getId(), session.getUserId(), session.getExpiresAt());
+        return Optional.of(identity);
     }
 
     @Override
     @Transactional(readOnly = true)
     public boolean isActive(UUID sessionId) {
-        return sessionId != null
-                && sessionRepository.existsByIdAndRevokedAtIsNullAndExpiresAtAfter(sessionId, clock.instant());
+        if (sessionId == null) {
+            return false;
+        }
+        return sessionRepository.existsByIdAndRevokedAtIsNullAndExpiresAtAfter(
+                sessionId, clock.instant());
     }
 
     @Override
     @Transactional
     public void revoke(String rawToken) {
         if (sessionTokenGenerator.isValidFormat(rawToken)) {
-            sessionRepository.revokeByTokenHash(
-                    sessionTokenGenerator.hash(rawToken), clock.instant().truncatedTo(ChronoUnit.MICROS));
+            String tokenHash = sessionTokenGenerator.hash(rawToken);
+            Instant revokedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
+            sessionRepository.revokeByTokenHash(tokenHash, revokedAt);
         }
     }
 }

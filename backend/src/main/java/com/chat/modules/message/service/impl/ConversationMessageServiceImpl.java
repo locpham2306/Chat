@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -52,20 +53,32 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         if (before == null) {
             result = messageRepository.findByConversationIdOrderByCreatedAtDescIdDesc(conversationId, page);
         } else {
-            MessageEntity cursor = messageRepository.findById(before)
-                    .filter(message -> conversationId.equals(message.getConversationId()))
-                    .orElseThrow(this::invalidCursor);
+            Optional<MessageEntity> cursorResult = messageRepository.findById(before);
+            if (cursorResult.isEmpty()) {
+                throw invalidCursor();
+            }
+            MessageEntity cursor = cursorResult.get();
+            if (!conversationId.equals(cursor.getConversationId())) {
+                throw invalidCursor();
+            }
             result = messageRepository.findHistoryBefore(
                     conversationId, cursor.getCreatedAt(), cursor.getId(), page);
         }
 
         boolean hasMore = result.size() > limit;
         List<MessageEntity> pageMessages = hasMore ? result.subList(0, limit) : result;
+
         Map<UUID, MessageResponse> mapped = messageResponseLoader.load(pageMessages);
-        List<MessageResponse> data = pageMessages.stream()
-                .map(message -> mapped.get(message.getId())).toList();
-        UUID nextCursor = hasMore && !pageMessages.isEmpty()
-                ? pageMessages.get(pageMessages.size() - 1).getId() : null;
+        List<MessageResponse> data = new java.util.ArrayList<>(pageMessages.size());
+        for (MessageEntity message : pageMessages) {
+            data.add(mapped.get(message.getId()));
+        }
+
+        UUID nextCursor = null;
+        if (hasMore && !pageMessages.isEmpty()) {
+            MessageEntity lastMessage = pageMessages.get(pageMessages.size() - 1);
+            nextCursor = lastMessage.getId();
+        }
         return new MessageHistoryResponse(data, nextCursor, hasMore);
     }
 
@@ -107,8 +120,10 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         long unreadCount = unreadCounts.isEmpty() ? 0L : unreadCounts.get(0).getTotal();
         ConversationReadResponse response = new ConversationReadResponse(
                 conversationId, currentUserId, actualMessage.getId(), unreadCount);
-        applicationEventPublisher.publishEvent(new MessageReadEvent(
-                response, conversationMemberRepository.findActiveUserIds(conversationId)));
+        List<UUID> activeMemberIds =
+                conversationMemberRepository.findActiveUserIds(conversationId);
+        MessageReadEvent event = new MessageReadEvent(response, activeMemberIds);
+        applicationEventPublisher.publishEvent(event);
         return response;
     }
 
@@ -124,9 +139,15 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
 
     private boolean isAfter(MessageEntity candidate, MessageEntity current) {
         int createdAtOrder = candidate.getCreatedAt().compareTo(current.getCreatedAt());
-        return createdAtOrder > 0
-                || (createdAtOrder == 0
-                && candidate.getId().toString().compareTo(current.getId().toString()) > 0);
+        if (createdAtOrder > 0) {
+            return true;
+        }
+        if (createdAtOrder < 0) {
+            return false;
+        }
+
+        int idOrder = candidate.getId().toString().compareTo(current.getId().toString());
+        return idOrder > 0;
     }
 
     private BusinessException invalidCursor() {

@@ -35,15 +35,19 @@ public class FileController {
     public ResponseEntity<BaseResponse<FileResponse>> upload(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @RequestParam("file") MultipartFile file) {
+        UUID currentUserId = session.userId();
+        FileResponse uploadedFile = fileService.upload(currentUserId, file);
+        BaseResponse<FileResponse> response = BaseResponse.created(uploadedFile);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(BaseResponse.created(fileService.upload(session.userId(), file)));
+                .body(response);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<org.springframework.core.io.Resource> download(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id) {
-        FileDownload file = fileService.download(session.userId(), id);
+        UUID currentUserId = session.userId();
+        FileDownload file = fileService.download(currentUserId, id);
         MediaType contentType = MediaType.parseMediaType(file.contentType());
         ContentDisposition.Builder disposition = isInline(contentType)
                 ? ContentDisposition.inline()

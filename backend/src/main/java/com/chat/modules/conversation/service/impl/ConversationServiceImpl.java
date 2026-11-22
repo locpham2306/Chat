@@ -109,12 +109,19 @@ public class ConversationServiceImpl implements ConversationService {
         }
         UserEntity recipient = userRepository.findById(recipientId)
                 .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
-        DirectConversationResponse conversation = conversationRepository.findDirectBetweenUsers(
-                        ConversationTypeEnum.DIRECT, currentUserId, recipientId)
-                .map(conversationMapper::toDirectResponse)
-                .orElse(null);
-        return new DirectConversationLookupResponse(
-                conversation, conversationMapper.toPeerResponse(recipient, userPresence.status(recipientId)));
+        Optional<ConversationEntity> directConversation =
+                conversationRepository.findDirectBetweenUsers(
+                        ConversationTypeEnum.DIRECT, currentUserId, recipientId);
+
+        DirectConversationResponse conversationResponse = null;
+        if (directConversation.isPresent()) {
+            conversationResponse = conversationMapper.toDirectResponse(directConversation.get());
+        }
+
+        UserStatusEnum recipientStatus = userPresence.status(recipientId);
+        ConversationPeerResponse peerResponse =
+                conversationMapper.toPeerResponse(recipient, recipientStatus);
+        return new DirectConversationLookupResponse(conversationResponse, peerResponse);
     }
 
     @Override
@@ -130,16 +137,30 @@ public class ConversationServiceImpl implements ConversationService {
         }
         validateGroupAvatar(currentUserId, request.avatarFileId());
 
-        ConversationEntity conversation = conversationRepository.saveAndFlush(ConversationEntity.group(
-                currentUserId, StringUtils.trim(request.name()), request.avatarFileId()));
+        if (currentUserId == null) {
+            throw new IllegalArgumentException("Current user is required");
+        }
+        String groupName = StringUtils.trim(request.name());
+        if (groupName == null) {
+            throw new IllegalArgumentException("Group name is required");
+        }
+
+        ConversationEntity conversation = new ConversationEntity();
+        conversation.setType(ConversationTypeEnum.GROUP);
+        conversation.setOwnerId(currentUserId);
+        conversation.setName(groupName);
+        conversation.setAvatarFileId(request.avatarFileId());
+        conversation = conversationRepository.saveAndFlush(conversation);
         Instant joinedAt = clock.instant();
         ArrayList<ConversationMemberEntity> memberships =
                 new ArrayList<>(memberIds.size() + 1);
-        memberships.add(new ConversationMemberEntity(
-                conversation.getId(), currentUserId, MemberRoleEnum.OWNER, joinedAt));
+        ConversationMemberEntity ownerMembership = new ConversationMemberEntity(
+                conversation.getId(), currentUserId, MemberRoleEnum.OWNER, joinedAt);
+        memberships.add(ownerMembership);
         for (UUID memberId : memberIds) {
-            memberships.add(new ConversationMemberEntity(
-                    conversation.getId(), memberId, MemberRoleEnum.MEMBER, joinedAt));
+            ConversationMemberEntity memberMembership = new ConversationMemberEntity(
+                    conversation.getId(), memberId, MemberRoleEnum.MEMBER, joinedAt);
+            memberships.add(memberMembership);
         }
         conversationMemberRepository.saveAllAndFlush(memberships);
 
@@ -156,9 +177,10 @@ public class ConversationServiceImpl implements ConversationService {
             return PageResponse.of(List.of(), conversationsPage.getTotalPages(), conversationsPage.getTotalElements());
         }
 
-        List<UUID> conversationIds = conversationsPage.getContent().stream()
-                .map(ConversationEntity::getId)
-                .toList();
+        List<UUID> conversationIds = new ArrayList<>(conversationsPage.getNumberOfElements());
+        for (ConversationEntity conversation : conversationsPage.getContent()) {
+            conversationIds.add(conversation.getId());
+        }
         Map<UUID, UserEntity> peersById = loadDirectPeers(
                 conversationsPage.getContent(), currentUserId);
         Map<UUID, Long> memberCounts = toCountMap(
@@ -176,9 +198,10 @@ public class ConversationServiceImpl implements ConversationService {
         for (ConversationEntity conversation : conversationsPage.getContent()) {
             UUID conversationId = conversation.getId();
             MessageEntity lastMessage = latestMessages.get(conversationId);
-            MessageResponse lastMessageResponse = lastMessage == null
-                    ? null
-                    : lastMessageResponses.get(lastMessage.getId());
+            MessageResponse lastMessageResponse = null;
+            if (lastMessage != null) {
+                lastMessageResponse = lastMessageResponses.get(lastMessage.getId());
+            }
 
             ConversationListItemResponse item = conversationMapper.toListItemResponse(
                     conversation,
@@ -201,10 +224,13 @@ public class ConversationServiceImpl implements ConversationService {
             throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
         long memberCount = conversationMemberRepository.countByConversationIdAndLeftAtIsNull(conversationId);
-        ConversationPeerResponse peer = conversation.getType() == ConversationTypeEnum.DIRECT
-                ? mapPeer(userRepository.findById(directPeerId(conversation, currentUserId))
-                        .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND)))
-                : null;
+        ConversationPeerResponse peer = null;
+        if (conversation.getType() == ConversationTypeEnum.DIRECT) {
+            UUID peerId = directPeerId(conversation, currentUserId);
+            UserEntity peerUser = userRepository.findById(peerId)
+                    .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
+            peer = mapPeer(peerUser);
+        }
         return conversationMapper.toDetailResponse(conversation, memberCount, peer);
     }
 
@@ -227,7 +253,12 @@ public class ConversationServiceImpl implements ConversationService {
         }
         validateGroupAvatar(currentUserId, request.avatarFileId());
 
-        conversation.updateGroup(StringUtils.trim(request.name()), request.avatarFileId());
+        String name = StringUtils.trim(request.name());
+        if (name == null || name.isBlank() || name.length() > 100) {
+            throw new IllegalArgumentException("Invalid group name");
+        }
+        conversation.setName(name);
+        conversation.setAvatarFileId(request.avatarFileId());
         long memberCount = conversationMemberRepository.countByConversationIdAndLeftAtIsNull(conversationId);
         return conversationMapper.toDetailResponse(conversation, memberCount, null);
     }
@@ -294,12 +325,16 @@ public class ConversationServiceImpl implements ConversationService {
             return null;
         }
         UUID peerId = directPeerId(conversation, currentUserId);
-        return mapPeer(Optional.ofNullable(peersById.get(peerId))
-                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND)));
+        UserEntity peer = peersById.get(peerId);
+        if (peer == null) {
+            throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
+        }
+        return mapPeer(peer);
     }
 
     private ConversationPeerResponse mapPeer(UserEntity user) {
-        return conversationMapper.toPeerResponse(user, userPresence.status(user.getId()));
+        UserStatusEnum status = userPresence.status(user.getId());
+        return conversationMapper.toPeerResponse(user, status);
     }
 
     private UUID directPeerId(ConversationEntity conversation, UUID currentUserId) {
@@ -318,9 +353,10 @@ public class ConversationServiceImpl implements ConversationService {
         }
         FileEntity avatar = fileRepository.findById(avatarFileId)
                 .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
-        boolean allowed = currentUserId.equals(avatar.getUploaderId())
-                && avatar.getConversationId() == null
-                && StringUtils.isImageContentType(avatar.getContentType());
+        boolean uploadedByCurrentUser = currentUserId.equals(avatar.getUploaderId());
+        boolean notBoundToConversation = avatar.getConversationId() == null;
+        boolean isImage = StringUtils.isImageContentType(avatar.getContentType());
+        boolean allowed = uploadedByCurrentUser && notBoundToConversation && isImage;
         if (!allowed) {
             throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }

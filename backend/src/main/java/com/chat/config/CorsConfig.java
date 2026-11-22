@@ -37,8 +37,9 @@ public class CorsConfig {
     @Bean
     public FilterRegistrationBean<CorsFilter> corsFilter(
             UrlBasedCorsConfigurationSource corsConfigurationSource) {
+        CorsFilter corsFilter = new CorsFilter(corsConfigurationSource);
         FilterRegistrationBean<CorsFilter> registration =
-                new FilterRegistrationBean<>(new CorsFilter(corsConfigurationSource));
+                new FilterRegistrationBean<>(corsFilter);
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return registration;
     }

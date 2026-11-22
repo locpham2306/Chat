@@ -30,6 +30,7 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.util.UUID;
 
 @Component
 public class ChatWebSocketHandler extends TextWebSocketHandler {
@@ -92,11 +93,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
         // Một user có thể mở nhiều tab; chỉ tab đầu tiên mới làm trạng thái chuyển sang ONLINE
         if (registration.firstForUser()) {
-            webSocketSessionRegistry.runIfOnline(identity.userId(), () -> {
-                PresenceChange change = realtimeConversationService.connected(identity.userId());
-                // gửi tin ai oneline den nhwng nguoi co cuoc hoi thoai cung
-                webSocketSessionRegistry.broadcast(change.audienceUserIds(), PRESENCE_CHANGED, change.data());
-            });
+            webSocketSessionRegistry.runIfOnline(
+                    identity.userId(), () -> broadcastOnline(identity.userId()));
         }
     }
 
@@ -156,11 +154,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         WebSocketSessionRegistry.Disconnection disconnection = webSocketSessionRegistry.unregister(session.getId());
         if (disconnection != null && disconnection.lastForUser()) {
             try {
-                webSocketSessionRegistry.runIfOffline(disconnection.userId(), () -> {
-                    PresenceChange change = realtimeConversationService.disconnected(disconnection.userId());
-                    webSocketSessionRegistry.broadcast(
-                            change.audienceUserIds(), PRESENCE_CHANGED, change.data());
-                });
+                webSocketSessionRegistry.runIfOffline(
+                        disconnection.userId(), () -> broadcastOffline(disconnection.userId()));
             } catch (BusinessException exception) {
                 LOG.debug("Could not update presence for disconnected user {}", disconnection.userId());
             }
@@ -175,22 +170,41 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private void handleSendMessage(WebSocketSession session, SessionIdentity identity, JsonNode data) throws JsonProcessingException {
         SendMessageFrameData request = objectMapper.treeToValue(data, SendMessageFrameData.class);
 
-        MessageDelivery delivery = messageService.send(new MessageSendCommand(
-                identity.userId(), request.recipientId(), request.conversationId(),
-                request.clientMessageId(), request.content(), request.attachmentIds()));
+        MessageSendCommand command = new MessageSendCommand(
+                identity.userId(),
+                request.recipientId(),
+                request.conversationId(),
+                request.clientMessageId(),
+                request.content(),
+                request.attachmentIds());
+        MessageDelivery delivery = messageService.send(command);
+
         // Gửi ACK lên FE người gửi
-        webSocketSessionRegistry.sendToConnection(session.getId(), MESSAGE_ACK, new MessageAckData(
-                delivery.clientMessageId(), delivery.conversationId(), delivery.id(), delivery.createdAt()));
+        MessageAckData acknowledgment = new MessageAckData(
+                delivery.clientMessageId(),
+                delivery.conversationId(),
+                delivery.id(),
+                delivery.createdAt());
+        webSocketSessionRegistry.sendToConnection(
+                session.getId(), MESSAGE_ACK, acknowledgment);
 
         // Broadcast NEW_MESSAGE
         if (delivery.newlyCreated()) {
-            webSocketSessionRegistry.broadcast(delivery.activeMemberIds(), NEW_MESSAGE, new NewMessageData(
-                    delivery.id(), delivery.conversationId(), delivery.senderId(),
-                    new MessageSenderResponse(
-                            delivery.senderId(), delivery.senderFullName(),
-                            delivery.senderAvatarFileId()),
-                    delivery.clientMessageId(), delivery.content(), delivery.attachments(),
-                    delivery.createdAt()));
+            MessageSenderResponse sender = new MessageSenderResponse(
+                    delivery.senderId(),
+                    delivery.senderFullName(),
+                    delivery.senderAvatarFileId());
+            NewMessageData newMessage = new NewMessageData(
+                    delivery.id(),
+                    delivery.conversationId(),
+                    delivery.senderId(),
+                    sender,
+                    delivery.clientMessageId(),
+                    delivery.content(),
+                    delivery.attachments(),
+                    delivery.createdAt());
+            webSocketSessionRegistry.broadcast(
+                    delivery.activeMemberIds(), NEW_MESSAGE, newMessage);
         }
     }
 
@@ -206,8 +220,22 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void sendError(WebSocketSession session, String clientMessageId, String code, String detail) {
-        webSocketSessionRegistry.sendToConnection(session.getId(), ERROR,
-                new WebSocketErrorData(clientMessageId, code, detail));
+        WebSocketErrorData error = new WebSocketErrorData(clientMessageId, code, detail);
+        webSocketSessionRegistry.sendToConnection(session.getId(), ERROR, error);
+    }
+
+    // User vừa có connection đầu tiên: tạo dữ liệu ONLINE và gửi lên các user liên quan.
+    private void broadcastOnline(UUID userId) {
+        PresenceChange change = realtimeConversationService.connected(userId);
+        webSocketSessionRegistry.broadcast(
+                change.audienceUserIds(), PRESENCE_CHANGED, change.data());
+    }
+
+    // User vừa mất connection cuối: lưu lastSeen và gửi trạng thái OFFLINE lên FE.
+    private void broadcastOffline(UUID userId) {
+        PresenceChange change = realtimeConversationService.disconnected(userId);
+        webSocketSessionRegistry.broadcast(
+                change.audienceUserIds(), PRESENCE_CHANGED, change.data());
     }
 
     private SessionIdentity requireIdentity(WebSocketSession session) {

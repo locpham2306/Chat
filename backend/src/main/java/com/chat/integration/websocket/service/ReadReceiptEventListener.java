@@ -18,10 +18,13 @@ public class ReadReceiptEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publish(MessageReadEvent event) {
         ConversationReadResponse response = event.response();
+        ReadReceiptData data = new ReadReceiptData(
+                response.conversationId(),
+                response.userId(),
+                response.lastReadMessageId());
         webSocketSessionRegistry.broadcast(
                 event.activeMemberIds(), // gui cho nhung ai
                 ChatWebSocketHandler.READ_RECEIPT, // ten event
-                new ReadReceiptData(
-                        response.conversationId(), response.userId(), response.lastReadMessageId())); // user da doc den dau
+                data); // user da doc den dau
     }
 }

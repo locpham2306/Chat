@@ -16,6 +16,7 @@ import com.chat.modules.conversation.repository.ConversationRepository;
 import com.chat.modules.conversation.service.ConversationMemberService;
 import com.chat.modules.user.dto.response.UserResponse;
 import com.chat.modules.user.entity.UserEntity;
+import com.chat.modules.user.enums.UserStatusEnum;
 import com.chat.modules.user.mapper.UserMapper;
 import com.chat.modules.user.repository.UserRepository;
 import com.chat.modules.user.service.UserPresence;
@@ -39,7 +40,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class  ConversationMemberServiceImpl implements ConversationMemberService {
+public class ConversationMemberServiceImpl implements ConversationMemberService {
     private final ConversationRepository conversationRepository;
     private final ConversationMemberRepository conversationMemberRepository;
     private final UserRepository userRepository;
@@ -58,15 +59,16 @@ public class  ConversationMemberServiceImpl implements ConversationMemberService
         Sort sort = Sort.by(Sort.Order.asc("joinedAt"), Sort.Order.asc("id"));
         Page<ConversationMemberEntity> membershipsPage = conversationMemberRepository
                 .findByConversationIdAndLeftAtIsNull(
-                conversationId, PageableUtils.of(page, size, sort));
+                        conversationId, PageableUtils.of(page, size, sort));
         if (membershipsPage.isEmpty()) {
             return PageResponse.of(
                     List.of(), membershipsPage.getTotalPages(), membershipsPage.getTotalElements());
         }
 
-        List<UUID> userIds = membershipsPage.getContent().stream()
-                .map(ConversationMemberEntity::getUserId)
-                .toList();
+        List<UUID> userIds = new ArrayList<>(membershipsPage.getNumberOfElements());
+        for (ConversationMemberEntity membership : membershipsPage.getContent()) {
+            userIds.add(membership.getUserId());
+        }
         Map<UUID, UserEntity> usersById = new HashMap<>();
         for (UserEntity user : userRepository.findAllById(userIds)) {
             usersById.put(user.getId(), user);
@@ -79,7 +81,10 @@ public class  ConversationMemberServiceImpl implements ConversationMemberService
             if (user == null) {
                 throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
             }
-            data.add(conversationMemberMapper.toResponse(membership, user, userPresence.status(userId)));
+            UserStatusEnum status = userPresence.status(userId);
+            ConversationMemberResponse response =
+                    conversationMemberMapper.toResponse(membership, user, status);
+            data.add(response);
         }
         return PageResponse.of(
                 data, membershipsPage.getTotalPages(), membershipsPage.getTotalElements());
@@ -97,15 +102,24 @@ public class  ConversationMemberServiceImpl implements ConversationMemberService
         requireGroup(conversation, "conversation.availableMembersGroupOnly");
         requireOwner(conversation, conversationId, currentUserId);
 
-        String resolvedKeyword = Optional.ofNullable(StringUtils.trim(keyword)).orElse("");
+        String resolvedKeyword = StringUtils.trim(keyword);
+        if (resolvedKeyword == null) {
+            resolvedKeyword = "";
+        }
         Sort sort = Sort.by(Sort.Order.asc("username"), Sort.Order.asc("id"));
         Page<UserEntity> usersPage = userRepository.searchAvailableGroupMembers(
                 currentUserId,
                 conversationId,
                 resolvedKeyword,
                 PageableUtils.of(page, size, sort));
-        return PageableUtils.toResponse(
-                usersPage, user -> userMapper.toResponse(user, userPresence.status(user.getId())));
+
+        List<UserResponse> users = new ArrayList<>(usersPage.getNumberOfElements());
+        for (UserEntity user : usersPage.getContent()) {
+            UserStatusEnum status = userPresence.status(user.getId());
+            UserResponse response = userMapper.toResponse(user, status);
+            users.add(response);
+        }
+        return PageResponse.of(users, usersPage.getTotalPages(), usersPage.getTotalElements());
     }
 
     @Override
@@ -167,8 +181,9 @@ public class  ConversationMemberServiceImpl implements ConversationMemberService
         requireGroup(conversation, "conversation.membersGroupOnly");
 
         ConversationMemberEntity currentMembership = requireActiveMember(conversationId, currentUserId);
-        boolean isOwner = currentMembership.getRole() == MemberRoleEnum.OWNER
-                && currentUserId.equals(conversation.getOwnerId());
+        boolean hasOwnerRole = currentMembership.getRole() == MemberRoleEnum.OWNER;
+        boolean isConversationOwner = currentUserId.equals(conversation.getOwnerId());
+        boolean isOwner = hasOwnerRole && isConversationOwner;
         if (currentUserId.equals(conversation.getOwnerId()) && !isOwner) {
             throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
@@ -185,15 +200,18 @@ public class  ConversationMemberServiceImpl implements ConversationMemberService
         }
 
         Optional<ConversationMemberEntity> targetMembership =
-                conversationMemberRepository.findByConversationIdAndUserId(conversationId, userId)
-                .filter(membership -> membership.getLeftAt() == null);
+                conversationMemberRepository.findByConversationIdAndUserId(conversationId, userId);
         if (targetMembership.isEmpty()) {
             return;
         }
-        if (targetMembership.get().getRole() != MemberRoleEnum.MEMBER) {
+        ConversationMemberEntity memberToRemove = targetMembership.get();
+        if (memberToRemove.getLeftAt() != null) {
+            return;
+        }
+        if (memberToRemove.getRole() != MemberRoleEnum.MEMBER) {
             throw BusinessException.conflict("conversation.ownerCannotLeave");
         }
-        leave(targetMembership.get());
+        leave(memberToRemove);
     }
 
     private ConversationEntity requireConversation(UUID conversationId) {

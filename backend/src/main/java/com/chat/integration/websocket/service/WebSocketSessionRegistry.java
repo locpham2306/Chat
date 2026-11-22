@@ -79,10 +79,8 @@ public class WebSocketSessionRegistry implements UserPresence {
         boolean firstForUser = !connectionIdsByUser.containsKey(identity.userId());
         Connection connection = new Connection(decorated, identity.userId(), identity.sessionId());
         connections.put(session.getId(), connection);
-        connectionIdsByUser.computeIfAbsent(identity.userId(), ignored -> new LinkedHashSet<>())
-                .add(session.getId());
-        connectionIdsByAppSession.computeIfAbsent(identity.sessionId(), ignored -> new LinkedHashSet<>())
-                .add(session.getId());
+        addConnectionId(connectionIdsByUser, identity.userId(), session.getId());
+        addConnectionId(connectionIdsByAppSession, identity.sessionId(), session.getId());
 
         connection.expiryTask = webSocketTaskScheduler.schedule(
                 () -> closeConnection(session.getId(), CloseStatus.POLICY_VIOLATION), identity.expiresAt());
@@ -99,7 +97,8 @@ public class WebSocketSessionRegistry implements UserPresence {
         }
         remove(connectionIdsByAppSession, connection.appSessionId, connectionId);
         remove(connectionIdsByUser, connection.userId, connectionId);
-        return new Disconnection(connection.userId, !connectionIdsByUser.containsKey(connection.userId));
+        boolean lastForUser = !connectionIdsByUser.containsKey(connection.userId);
+        return new Disconnection(connection.userId, lastForUser);
     }
 
     // dùng cho MESSAGE_ACK và ERROR.
@@ -170,7 +169,8 @@ public class WebSocketSessionRegistry implements UserPresence {
     // Gửi một Ping frame lên FE; gửi thất bại thì đóng connection.
     private void ping(Connection connection) {
         try {
-            connection.session.sendMessage(new PingMessage());
+            PingMessage ping = new PingMessage();
+            connection.session.sendMessage(ping);
         } catch (IOException | IllegalStateException exception) {
             closeConnection(connection.session.getId(), CloseStatus.SESSION_NOT_RELIABLE);
         }
@@ -180,8 +180,10 @@ public class WebSocketSessionRegistry implements UserPresence {
     // connection.
     private void send(Connection connection, String event, Object data) {
         try {
-            String payload = objectMapper.writeValueAsString(new WebSocketFrame<>(event, data));
-            connection.session.sendMessage(new TextMessage(payload));
+            WebSocketFrame<Object> frame = new WebSocketFrame<>(event, data);
+            String payload = objectMapper.writeValueAsString(frame);
+            TextMessage message = new TextMessage(payload);
+            connection.session.sendMessage(message);
         } catch (JsonProcessingException exception) {
             LOG.error("Could not serialize WebSocket event {}", event);
         } catch (IOException | IllegalStateException exception) {
@@ -203,13 +205,24 @@ public class WebSocketSessionRegistry implements UserPresence {
             ids.addAll(connectionIdsByUser.getOrDefault(userId, Set.of()));
         }
         ArrayList<Connection> result = new ArrayList<>(ids.size());
-        ids.forEach(id -> {
+        for (String id : ids) {
             Connection connection = connections.get(id);
             if (connection != null) {
                 result.add(connection);
             }
-        });
+        }
         return result;
+    }
+
+    // Thêm connectionId vào index user/session, tự tạo Set khi key xuất hiện lần đầu.
+    private static void addConnectionId(
+            Map<UUID, Set<String>> index, UUID key, String connectionId) {
+        Set<String> connectionIds = index.get(key);
+        if (connectionIds == null) {
+            connectionIds = new LinkedHashSet<>();
+            index.put(key, connectionIds);
+        }
+        connectionIds.add(connectionId);
     }
 
     // Xóa connectionId khỏi một index; user/session không còn connection thì xóa

@@ -8,6 +8,7 @@ import com.chat.modules.message.entity.MessageEntity;
 import com.chat.modules.user.entity.UserEntity;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -15,16 +16,23 @@ public class MessageMapper {
 
     public MessageResponse toResponse(
             MessageEntity message, UserEntity sender, List<FileEntity> attachments) {
-        List<FileResponse> files = attachments.stream()
-                .map(file -> new FileResponse(
-                        file.getId(), file.getName(), file.getContentType(), file.getSize(),
-                        "/api/files/" + file.getId()))
-                .toList();
+        List<FileResponse> files = new ArrayList<>(attachments.size());
+        for (FileEntity attachment : attachments) {
+            FileResponse fileResponse = new FileResponse(
+                    attachment.getId(),
+                    attachment.getName(),
+                    attachment.getContentType(),
+                    attachment.getSize(),
+                    "/api/files/" + attachment.getId());
+            files.add(fileResponse);
+        }
+
+        MessageSenderResponse senderResponse = new MessageSenderResponse(
+                sender.getId(), sender.getFullName(), sender.getAvatarFileId());
         return new MessageResponse(
                 message.getId(),
                 message.getConversationId(),
-                new MessageSenderResponse(
-                        sender.getId(), sender.getFullName(), sender.getAvatarFileId()),
+                senderResponse,
                 message.getClientMessageId(),
                 message.getContent(),
                 files,

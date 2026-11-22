@@ -51,7 +51,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleExceptionInternal(
             Exception exception, Object body, HttpHeaders headers,
             HttpStatusCode statusCode, WebRequest request) {
-        // Kiểm tra response đã được gửi chư
+        // Response đã gửi xuống FE thì không thể ghi thêm một response lỗi khác.
         if (request instanceof ServletWebRequest servletRequest
                 && servletRequest.getResponse() != null
                 && servletRequest.getResponse().isCommitted()) {
@@ -82,7 +82,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         HttpStatus status = HttpStatus.valueOf(statusCode.value());
         // Đổi status thành strCode
         String strCode = ErrorConstants.forStatus(status.value());
-        return response(status, headers, strCode, messageUtils.getMessage(strCode), fields, request);
+        String message = messageUtils.getMessage(strCode);
+        return response(status, headers, strCode, message, fields, request);
     }
 
     // Lỗi bất ngờ mà dự án không dự kiến, bắt mọi Exception chưa có handler cụ thể hơn.
@@ -98,11 +99,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private ResponseEntity<Object> response(
             HttpStatus status, HttpHeaders headers, String strCode, String message,
             List<FieldErrorResponse> fields, WebRequest request) {
-        // Lấy đường dẫn request
+        // Lấy đường dẫn request để FE biết request nào đã phát sinh lỗi.
         String path = request instanceof ServletWebRequest servletRequest
                 ? servletRequest.getRequest().getRequestURI() : "";
         // Tạo chi tiết lỗi
-        ErrorDetailResponse detail = new ErrorDetailResponse(Instant.now(), status.value(), path, fields);
+        Instant timestamp = Instant.now();
+        int httpStatus = status.value();
+        ErrorDetailResponse detail = new ErrorDetailResponse(timestamp, httpStatus, path, fields);
 
         BaseResponse<ErrorDetailResponse> response = BaseResponse.error(
                 StatusCode.from(status), strCode, message, detail);

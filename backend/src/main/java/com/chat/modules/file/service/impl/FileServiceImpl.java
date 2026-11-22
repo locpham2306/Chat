@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -54,8 +55,9 @@ public class FileServiceImpl implements FileService {
         }
         deleteStoredFileAfterRollback(storageKey);
 
-        FileEntity saved = fileRepository.saveAndFlush(
-                new FileEntity(uploaderId, name, storageKey, contentType, file.getSize()));
+        long size = file.getSize();
+        FileEntity newFile = new FileEntity(uploaderId, name, storageKey, contentType, size);
+        FileEntity saved = fileRepository.saveAndFlush(newFile);
         return new FileResponse(saved.getId(), saved.getName(), saved.getContentType(),
                 saved.getSize(), "/api/files/" + saved.getId());
     }
@@ -68,8 +70,9 @@ public class FileServiceImpl implements FileService {
         if (!canRead(userId, file)) {
             throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
-        return new FileDownload(file.getName(), file.getContentType(), file.getSize(),
-                fileStorage.load(file.getStorageKey()));
+        Resource resource = fileStorage.load(file.getStorageKey());
+        return new FileDownload(
+                file.getName(), file.getContentType(), file.getSize(), resource);
     }
 
     private void validate(MultipartFile file) {
@@ -97,8 +100,11 @@ public class FileServiceImpl implements FileService {
 
     private String normalizeContentType(String rawContentType) {
         try {
-            MediaType mediaType = MediaType.parseMediaType(
-                    rawContentType == null ? "" : rawContentType);
+            String contentType = rawContentType;
+            if (contentType == null) {
+                contentType = "";
+            }
+            MediaType mediaType = MediaType.parseMediaType(contentType);
             return (mediaType.getType() + "/" + mediaType.getSubtype()).toLowerCase(Locale.ROOT);
         } catch (InvalidMediaTypeException exception) {
             return MediaType.APPLICATION_OCTET_STREAM_VALUE;
@@ -106,17 +112,32 @@ public class FileServiceImpl implements FileService {
     }
 
     private boolean canRead(UUID userId, FileEntity file) {
-        if (userId.equals(file.getUploaderId()) || userRepository.existsByAvatarFileId(file.getId())) {
+        boolean uploadedByCurrentUser = userId.equals(file.getUploaderId());
+        if (uploadedByCurrentUser) {
             return true;
         }
-        if (file.getConversationId() == null
-                && conversationMemberRepository.countActiveMembershipsForConversationAvatar(
-                        userId, file.getId()) > 0) {
+
+        boolean usedAsUserAvatar = userRepository.existsByAvatarFileId(file.getId());
+        if (usedAsUserAvatar) {
             return true;
         }
-        return file.getConversationId() != null
-                && conversationMemberRepository.existsByConversationIdAndUserIdAndLeftAtIsNull(
-                        file.getConversationId(), userId);
+
+        UUID conversationId = file.getConversationId();
+        if (conversationId == null) {
+            long avatarMemberships = conversationMemberRepository
+                    .countActiveMembershipsForConversationAvatar(userId, file.getId());
+            if (avatarMemberships > 0) {
+                return true;
+            }
+            return false;
+        }
+
+        boolean activeConversationMember = conversationMemberRepository
+                .existsByConversationIdAndUserIdAndLeftAtIsNull(conversationId, userId);
+        if (activeConversationMember) {
+            return true;
+        }
+        return false;
     }
 
     private void deleteStoredFileAfterRollback(String storageKey) {

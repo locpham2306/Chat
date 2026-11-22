@@ -6,6 +6,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
@@ -33,7 +34,11 @@ public final class PageableUtils {
 
     // Đổi danh sách entity sang DTO rồi đóng gói cùng thông tin tổng số trang/phần tử.
     public static <E, R> PageResponse<List<R>> toResponse(Page<E> page, Function<E, R> mapper) {
-        List<R> data = page.getContent().stream().map(mapper).toList();
+        List<R> data = new ArrayList<>(page.getNumberOfElements());
+        for (E entity : page.getContent()) {
+            R response = mapper.apply(entity);
+            data.add(response);
+        }
         return PageResponse.of(data, page.getTotalPages(), page.getTotalElements());
     }
 }

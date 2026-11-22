@@ -56,7 +56,8 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public UserResponse getCurrentUser(UUID userId) {
         UserEntity user = currentUser(userId);
-        return userMapper.toResponse(user, userPresence.status(user.getId()));
+        UserStatusEnum status = userPresence.status(user.getId());
+        return userMapper.toResponse(user, status);
     }
 
     @Override
@@ -75,7 +76,8 @@ public class UserServiceImpl implements UserService {
         }
         user.updateProfile(StringUtils.trim(request.fullName()), request.avatarFileId());
         userRepository.save(user);
-        return userMapper.toResponse(user, userPresence.status(user.getId()));
+        UserStatusEnum status = userPresence.status(user.getId());
+        return userMapper.toResponse(user, status);
     }
 
     @Override

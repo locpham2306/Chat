@@ -36,6 +36,7 @@ public class SessionCookieServiceImpl implements SessionCookieService {
         if (remaining.isNegative() || remaining.isZero()) {
             throw new IllegalArgumentException("Cannot set an expired session cookie");
         }
+        // Cookie chỉ nhận số giây nguyên, phần nano còn dư được làm tròn lên một giây.
         long seconds = remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);
         response.addHeader(HttpHeaders.SET_COOKIE,
                 cookie(session.getRawToken()).maxAge(seconds).build().toString());

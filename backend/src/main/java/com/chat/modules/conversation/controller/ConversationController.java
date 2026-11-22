@@ -54,15 +54,21 @@ public class ConversationController {
     public BaseResponse<PageResponse<List<ConversationListItemResponse>>> getConversations(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @Valid @ModelAttribute PaginationRequest request) {
-        return BaseResponse.success(conversationService.getConversations(
-                session.userId(), request.page(), request.size()));
+        UUID currentUserId = session.userId();
+        PageResponse<List<ConversationListItemResponse>> conversations =
+                conversationService.getConversations(
+                        currentUserId, request.page(), request.size());
+        return BaseResponse.success(conversations);
     }
 
     @GetMapping("/{id}")
     public BaseResponse<ConversationDetailResponse> getConversation(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id) {
-        return BaseResponse.success(conversationService.getConversation(session.userId(), id));
+        UUID currentUserId = session.userId();
+        ConversationDetailResponse conversation =
+                conversationService.getConversation(currentUserId, id);
+        return BaseResponse.success(conversation);
     }
 
     @GetMapping("/{id}/members")
@@ -70,9 +76,11 @@ public class ConversationController {
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id,
             @Valid @ModelAttribute PaginationRequest request) {
-        return BaseResponse.success(
+        UUID currentUserId = session.userId();
+        PageResponse<List<ConversationMemberResponse>> members =
                 conversationMemberService.getMembers(
-                        session.userId(), id, request.page(), request.size()));
+                        currentUserId, id, request.page(), request.size());
+        return BaseResponse.success(members);
     }
 
     @GetMapping("/{id}/messages")
@@ -80,9 +88,10 @@ public class ConversationController {
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id,
             @Valid @ModelAttribute MessageHistoryRequest request) {
-        return BaseResponse.success(
-                conversationMessageService.getHistory(
-                        session.userId(), id, request.before(), request.limit()));
+        UUID currentUserId = session.userId();
+        MessageHistoryResponse history = conversationMessageService.getHistory(
+                currentUserId, id, request.before(), request.limit());
+        return BaseResponse.success(history);
     }
 
     @PutMapping("/{id}/read")
@@ -90,8 +99,10 @@ public class ConversationController {
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id,
             @Valid @RequestBody MarkConversationReadRequest request) {
-        return BaseResponse.success(conversationMessageService.markRead(
-                session.userId(), id, request.lastReadMessageId()));
+        UUID currentUserId = session.userId();
+        ConversationReadResponse readState = conversationMessageService.markRead(
+                currentUserId, id, request.lastReadMessageId());
+        return BaseResponse.success(readState);
     }
 
     @PostMapping("/{id}/members")
@@ -99,8 +110,10 @@ public class ConversationController {
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id,
             @Valid @RequestBody AddConversationMembersRequest request) {
-        return BaseResponse.success(
-                conversationMemberService.addMembers(session.userId(), id, request));
+        UUID currentUserId = session.userId();
+        AddConversationMembersResponse result =
+                conversationMemberService.addMembers(currentUserId, id, request);
+        return BaseResponse.success(result);
     }
 
     @DeleteMapping("/{id}/members/{userId}")
@@ -108,7 +121,8 @@ public class ConversationController {
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id,
             @PathVariable UUID userId) {
-        conversationMemberService.removeMember(session.userId(), id, userId);
+        UUID currentUserId = session.userId();
+        conversationMemberService.removeMember(currentUserId, id, userId);
         return ResponseEntity.noContent().build();
     }
 
@@ -117,9 +131,11 @@ public class ConversationController {
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id,
             @Valid @ModelAttribute AvailableMembersRequest request) {
-        return BaseResponse.success(
+        UUID currentUserId = session.userId();
+        PageResponse<List<UserResponse>> availableMembers =
                 conversationMemberService.getAvailableMembers(
-                        session.userId(), id, request.keyword(), request.page(), request.size()));
+                        currentUserId, id, request.keyword(), request.page(), request.size());
+        return BaseResponse.success(availableMembers);
     }
 
     @PutMapping("/{id}")
@@ -127,22 +143,31 @@ public class ConversationController {
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @PathVariable UUID id,
             @Valid @RequestBody UpdateConversationRequest request) {
-        return BaseResponse.success(conversationService.updateConversation(session.userId(), id, request));
+        UUID currentUserId = session.userId();
+        ConversationDetailResponse conversation =
+                conversationService.updateConversation(currentUserId, id, request);
+        return BaseResponse.success(conversation);
     }
 
     @GetMapping("/direct")
     public BaseResponse<DirectConversationLookupResponse> findDirectConversation(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @Valid @ModelAttribute DirectConversationRequest request) {
-        return BaseResponse.success(
-                conversationService.findDirectConversation(session.userId(), request.recipientId()));
+        UUID currentUserId = session.userId();
+        DirectConversationLookupResponse conversation =
+                conversationService.findDirectConversation(currentUserId, request.recipientId());
+        return BaseResponse.success(conversation);
     }
 
     @PostMapping("/group")
     public ResponseEntity<BaseResponse<GroupConversationResponse>> createGroup(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @Valid @RequestBody CreateGroupRequest request) {
+        UUID currentUserId = session.userId();
+        GroupConversationResponse conversation =
+                conversationService.createGroup(currentUserId, request);
+        BaseResponse<GroupConversationResponse> response = BaseResponse.created(conversation);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(BaseResponse.created(conversationService.createGroup(session.userId(), request)));
+                .body(response);
     }
 }

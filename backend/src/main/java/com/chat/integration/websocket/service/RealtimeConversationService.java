@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,70 +24,75 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class RealtimeConversationService {
-        private final ConversationRepository conversationRepository;
-        private final ConversationMemberRepository conversationMemberRepository;
-        private final UserRepository userRepository;
-        private final Clock clock;
+    private final ConversationRepository conversationRepository;
+    private final ConversationMemberRepository conversationMemberRepository;
+    private final UserRepository userRepository;
+    private final Clock clock;
 
-        // Xử lý event đang gõ: kiểm tra hội thoại và quyền thành viên rồi lấy những
-        // người còn lại làm audience.
-        @Transactional(readOnly = true)
-        public TypingChange typing(UUID userId, UUID conversationId, boolean isTyping) {
+    // Xử lý event đang gõ: kiểm tra hội thoại và quyền thành viên rồi lấy những
+    // người còn lại làm audience.
+    @Transactional(readOnly = true)
+    public TypingChange typing(UUID userId, UUID conversationId, boolean isTyping) {
         if (conversationId == null || !conversationRepository.existsById(conversationId)) {
-                        throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
-                }
+            throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
+        }
         if (!conversationMemberRepository.existsByConversationIdAndUserIdAndLeftAtIsNull(
                 conversationId, userId)) {
-                        throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
-                }
-                UserEntity user = findUser(userId);
+            throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
+        }
+        UserEntity user = findUser(userId);
 
-                // Không gửi TYPING lên FE của chính người đang gõ.
-        List<UUID> audience = conversationMemberRepository.findActiveUserIds(conversationId).stream()
-                                .filter(candidate -> !candidate.equals(userId))
-                                .toList();
-                return new TypingChange(
-                                new TypingData(
-                                                conversationId,
-                                                userId,
-                                                toRealtimeUser(user),
-                                                isTyping),
-                                audience);
+        // Không gửi TYPING lên FE của chính người đang gõ.
+        List<UUID> activeUserIds =
+                conversationMemberRepository.findActiveUserIds(conversationId);
+        List<UUID> audience = new ArrayList<>();
+        for (UUID activeUserId : activeUserIds) {
+            if (!activeUserId.equals(userId)) {
+                audience.add(activeUserId);
+            }
         }
 
-        // Tạo ONLINE và tìm những user mà BE cần gửi PRESENCE_CHANGED lên FE.
-        @Transactional(readOnly = true)
-        public PresenceChange connected(UUID userId) {
-                UserEntity user = findUser(userId);
-                return new PresenceChange(
-                                new PresenceChangedData(
-                                                userId, toRealtimeUser(user),
-                                                UserStatusEnum.ONLINE, user.getLastSeen()),
-                conversationMemberRepository.findActiveSharedConversationUserIds(userId));
-        }
+        RealtimeUserData realtimeUser = toRealtimeUser(user);
+        TypingData data = new TypingData(conversationId, userId, realtimeUser, isTyping);
+        return new TypingChange(data, audience);
+    }
 
-        // Khi user mất connection cuối, lưu lastSeen rồi tạo OFFLINE để BE gửi lên FE.
-        @Transactional
-        public PresenceChange disconnected(UUID userId) {
-                UserEntity user = findUser(userId);
-                Instant lastSeen = clock.instant();
-                user.markLastSeen(lastSeen);
-                return new PresenceChange(
-                                new PresenceChangedData(
-                                                userId, toRealtimeUser(user),
-                                                UserStatusEnum.OFFLINE, lastSeen),
-                conversationMemberRepository.findActiveSharedConversationUserIds(userId));
-        }
+    // Tạo ONLINE và tìm những user mà BE cần gửi PRESENCE_CHANGED lên FE.
+    @Transactional(readOnly = true)
+    public PresenceChange connected(UUID userId) {
+        UserEntity user = findUser(userId);
+        RealtimeUserData realtimeUser = toRealtimeUser(user);
+        PresenceChangedData data = new PresenceChangedData(
+                userId, realtimeUser, UserStatusEnum.ONLINE, user.getLastSeen());
+        List<UUID> audience =
+                conversationMemberRepository.findActiveSharedConversationUserIds(userId);
+        return new PresenceChange(data, audience);
+    }
 
-        // Rút gọn UserEntity thành thông tin công khai BE được phép gửi lên FE.
-        private RealtimeUserData toRealtimeUser(UserEntity user) {
-                return new RealtimeUserData(
-                                user.getId(), user.getFullName(), user.getAvatarFileId());
-        }
+    // Khi user mất connection cuối, lưu lastSeen rồi tạo OFFLINE để BE gửi lên FE.
+    @Transactional
+    public PresenceChange disconnected(UUID userId) {
+        UserEntity user = findUser(userId);
+        Instant lastSeen = clock.instant();
+        user.markLastSeen(lastSeen);
 
-        // Tìm user hoặc trả lỗi 404 nếu dữ liệu session/user không còn hợp lệ.
-        private UserEntity findUser(UUID userId) {
+        RealtimeUserData realtimeUser = toRealtimeUser(user);
+        PresenceChangedData data = new PresenceChangedData(
+                userId, realtimeUser, UserStatusEnum.OFFLINE, lastSeen);
+        List<UUID> audience =
+                conversationMemberRepository.findActiveSharedConversationUserIds(userId);
+        return new PresenceChange(data, audience);
+    }
+
+    // Rút gọn UserEntity thành thông tin công khai BE được phép gửi lên FE.
+    private RealtimeUserData toRealtimeUser(UserEntity user) {
+        return new RealtimeUserData(
+                user.getId(), user.getFullName(), user.getAvatarFileId());
+    }
+
+    // Tìm user hoặc trả lỗi 404 nếu dữ liệu session/user không còn hợp lệ.
+    private UserEntity findUser(UUID userId) {
         return userRepository.findById(userId)
-                                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
-        }
+                .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
+    }
 }

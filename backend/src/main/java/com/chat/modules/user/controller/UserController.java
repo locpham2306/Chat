@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/users")
@@ -30,19 +31,26 @@ public class UserController {
     public BaseResponse<PageResponse<List<UserResponse>>> searchUsers(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @Valid @ModelAttribute SearchRequest request) {
-        return BaseResponse.success(userService.searchUsers(session.userId(), request.keyword(), request.page(), request.size()));
+        UUID currentUserId = session.userId();
+        PageResponse<List<UserResponse>> users = userService.searchUsers(
+                currentUserId, request.keyword(), request.page(), request.size());
+        return BaseResponse.success(users);
     }
 
     @GetMapping("/me")
     public BaseResponse<UserResponse> getCurrentUser(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session) {
-        return BaseResponse.success(userService.getCurrentUser(session.userId()));
+        UUID currentUserId = session.userId();
+        UserResponse user = userService.getCurrentUser(currentUserId);
+        return BaseResponse.success(user);
     }
 
     @PutMapping("/me")
     public BaseResponse<UserResponse> updateCurrentUser(
             @RequestAttribute(SessionAuthenticationFilter.SESSION_ATTRIBUTE) SessionIdentity session,
             @Valid @RequestBody UpdateProfileRequest request) {
-        return BaseResponse.success(userService.updateCurrentUser(session.userId(), request));
+        UUID currentUserId = session.userId();
+        UserResponse user = userService.updateCurrentUser(currentUserId, request);
+        return BaseResponse.success(user);
     }
 }

@@ -68,8 +68,12 @@ public class MessageResponseLoader {
         for (MessageAttachmentEntity link : attachmentLinks) {
             FileEntity file = filesById.get(link.getFileId());
             if (file != null) {
-                filesByMessageId.computeIfAbsent(link.getMessageId(), ignored -> new ArrayList<>())
-                        .add(file);
+                List<FileEntity> messageFiles = filesByMessageId.get(link.getMessageId());
+                if (messageFiles == null) {
+                    messageFiles = new ArrayList<>();
+                    filesByMessageId.put(link.getMessageId(), messageFiles);
+                }
+                messageFiles.add(file);
             }
         }
 

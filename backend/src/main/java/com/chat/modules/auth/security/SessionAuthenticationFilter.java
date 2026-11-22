@@ -23,7 +23,8 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
 
     private final SessionCookieService sessionCookieService;
     private final SessionService sessionService;
-    private final HandlerExceptionResolver exceptionResolver; //Filter chạy trước Controller nên lỗi ném trong filter không tự động đi vào GlobalExceptionHandler như lỗi Controlle
+    // Filter chạy trước Controller nên cần chủ động chuyển lỗi cho GlobalExceptionHandler.
+    private final HandlerExceptionResolver exceptionResolver;
 
     public SessionAuthenticationFilter(
             SessionCookieService sessionCookieService,
@@ -45,14 +46,19 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
         try {
-            // lấy identity ra
-            SessionIdentity identity = sessionService.findActive(sessionCookieService.read(request))
+            // Kiểm tra token trong cookie và lấy thông tin phiên đăng nhập hiện tại.
+            String token = sessionCookieService.read(request);
+            SessionIdentity identity = sessionService.findActive(token)
                     .orElseThrow(this::unauthenticated);
-            // gắn vào request
+            // Controller lấy lại identity qua @RequestAttribute để biết user đang đăng nhập.
             request.setAttribute(SESSION_ATTRIBUTE, identity);
         } catch (BusinessException exception) {
-            exceptionResolver.resolveException(request, response, null,
-                    exception.getStatus().value() == 401 ? exception : unauthenticated());
+            BusinessException authenticationException = exception;
+            if (exception.getStatus().value() != HttpServletResponse.SC_UNAUTHORIZED) {
+                authenticationException = unauthenticated();
+            }
+            exceptionResolver.resolveException(
+                    request, response, null, authenticationException);
             return;
         }
         filterChain.doFilter(request, response);
