@@ -1,6 +1,5 @@
 package com.chat.integration.websocket.dto;
 
-// File này là lớp bọc chung cho dữ liệu BE gửi lên FE qua WebSocket.
-// event cho FE biết loại sự kiện, data là dữ liệu thật đi kèm.
+// Bọc tên event và dữ liệu đi kèm trong một frame WebSocket chung.
 public record WebSocketFrame<T>(String event, T data) {
 }

@@ -3,6 +3,7 @@ package com.chat.common.dto.request;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
+// Nhận page và size từ FE cho các API phân trang thông thường.
 public record PaginationRequest(
         @Min(value = 0, message = "{validation.min}") Integer page,
         @Min(value = 1, message = "{validation.min}")

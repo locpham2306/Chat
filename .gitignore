@@ -17,6 +17,9 @@ application-local.properties
 *.iml
 .DS_Store
 Thumbs.db
+__pycache__/
+*.pyc
+~$*.docx
 
 # Java builds (keep Maven/Gradle wrapper files trackable)
 target/

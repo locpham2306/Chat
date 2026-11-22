@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
 
+// Nhận tên và ảnh đại diện mới khi FE cập nhật thông tin nhóm.
 public record UpdateConversationRequest(
         @NotBlank(message = "{validation.notBlank}")
         @Size(max = 100, message = "{validation.maxLength}")

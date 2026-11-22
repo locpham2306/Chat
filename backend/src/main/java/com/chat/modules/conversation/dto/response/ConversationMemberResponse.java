@@ -5,6 +5,7 @@ import com.chat.modules.user.dto.response.UserResponse;
 
 import java.time.Instant;
 
+// Chứa thông tin user, vai trò và thời điểm tham gia của một thành viên trong nhóm.
 public record ConversationMemberResponse(
         UserResponse user,
         MemberRoleEnum role,

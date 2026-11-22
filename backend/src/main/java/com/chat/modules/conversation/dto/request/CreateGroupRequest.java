@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
 
+// Nhận tên, thành viên và ảnh đại diện FE gửi xuống khi tạo nhóm mới.
 public record CreateGroupRequest(
         @NotBlank(message = "{validation.notBlank}")
         @Size(max = 100, message = "{validation.maxLength}")

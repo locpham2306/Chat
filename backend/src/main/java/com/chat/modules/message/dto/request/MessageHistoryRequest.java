@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Min;
 
 import java.util.UUID;
 
+// Nhận cursor và giới hạn số lượng khi FE tải lịch sử tin nhắn.
 public record MessageHistoryRequest(
         UUID before,
         @Min(value = 1, message = "{validation.min}")

@@ -3,7 +3,7 @@ package com.chat.integration.websocket.dto;
 import java.time.Instant;
 import java.util.UUID;
 
-// File này định nghĩa dữ liệu BE gửi lên FE người gửi để xác nhận gửi tin thành công.
+// Xác nhận với FE người gửi rằng tin nhắn đã được BE lưu thành công.
 public record MessageAckData(
         String clientMessageId,
         UUID conversationId,

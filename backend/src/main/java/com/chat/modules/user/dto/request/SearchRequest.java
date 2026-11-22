@@ -3,6 +3,7 @@ package com.chat.modules.user.dto.request;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
+// Nhận từ khóa và phân trang khi FE tìm kiếm user.
 public record SearchRequest(
         String keyword,
         @Min(value = 0, message = "{validation.min}") Integer page,

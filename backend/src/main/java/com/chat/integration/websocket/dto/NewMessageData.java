@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-// File này định nghĩa dữ liệu tin nhắn mới BE gửi lên FE của các thành viên.
+// Chứa dữ liệu tin nhắn mới để BE gửi realtime lên FE của các thành viên.
 public record NewMessageData(
         UUID id,
         UUID conversationId,

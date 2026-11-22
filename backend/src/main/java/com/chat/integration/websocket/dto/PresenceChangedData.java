@@ -5,8 +5,7 @@ import com.chat.modules.user.enums.UserStatusEnum;
 import java.time.Instant;
 import java.util.UUID;
 
-// File này định nghĩa dữ liệu BE gửi lên FE để báo một user vừa ONLINE hoặc OFFLINE.
-// lastSeen là lần hoạt động cuối; khi ONLINE có thể vẫn là giá trị cũ trong DB.
+// Báo realtime cho FE rằng một user vừa ONLINE hoặc OFFLINE.
 public record PresenceChangedData(
         UUID userId,
         RealtimeUserData user,

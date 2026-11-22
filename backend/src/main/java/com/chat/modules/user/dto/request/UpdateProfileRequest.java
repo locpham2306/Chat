@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
 
+// Nhận họ tên và ảnh đại diện mới khi FE cập nhật hồ sơ user.
 public record UpdateProfileRequest(
         @NotBlank(message = "{validation.notBlank}")
         @Size(max = 100, message = "{validation.maxLength}")

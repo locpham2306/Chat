@@ -6,6 +6,7 @@ import com.chat.modules.message.dto.response.MessageResponse;
 import java.time.Instant;
 import java.util.UUID;
 
+// Chứa dữ liệu một dòng hội thoại trong danh sách chat của FE.
 public record ConversationListItemResponse(
         UUID id,
         ConversationTypeEnum type,

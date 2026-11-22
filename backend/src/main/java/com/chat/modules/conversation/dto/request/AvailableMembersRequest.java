@@ -3,6 +3,7 @@ package com.chat.modules.conversation.dto.request;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
+// Nhận điều kiện tìm kiếm và phân trang khi FE lấy các user có thể thêm vào nhóm.
 public record AvailableMembersRequest(
         String keyword,
         @Min(value = 0, message = "{validation.min}") Integer page,

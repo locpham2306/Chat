@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.UUID;
 
+// Nhận danh sách user FE muốn thêm vào một cuộc hội thoại nhóm.
 public record AddConversationMembersRequest(
         @NotEmpty(message = "{validation.notEmpty}")
         List<@NotNull(message = "{validation.notNull}") UUID> memberIds) {

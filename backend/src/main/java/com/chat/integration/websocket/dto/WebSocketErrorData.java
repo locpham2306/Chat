@@ -1,6 +1,5 @@
 package com.chat.integration.websocket.dto;
 
-// File này định nghĩa dữ liệu lỗi BE gửi lên FE qua WebSocket.
-// clientMessageId giúp FE xác định tin gửi nào bị lỗi.
+// Chứa mã và nội dung lỗi để BE gửi lên FE qua WebSocket.
 public record WebSocketErrorData(String clientMessageId, String code, String message) {
 }

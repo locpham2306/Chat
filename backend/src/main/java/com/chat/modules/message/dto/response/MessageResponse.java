@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+// Chứa toàn bộ dữ liệu một tin nhắn để BE trả lên FE.
 public record MessageResponse(
         UUID id,
         UUID conversationId,
