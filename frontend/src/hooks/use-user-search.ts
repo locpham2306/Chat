@@ -4,7 +4,6 @@ import type { ApiPage } from '~/types/api-response.type'
 import type { User } from '~/types/user.type'
 
 export const userSearchKeys = {
-  all: ['users', 'search'] as const,
   list: (keyword: string, page: number, size: number) => ['users', 'search', { keyword, page, size }] as const
 }
 

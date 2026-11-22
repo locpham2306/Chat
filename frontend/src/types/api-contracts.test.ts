@@ -3,8 +3,7 @@ import type { ApiError, ApiErrorCode, ApiErrorStatus } from './api-error.type'
 import type { ApiPage, ApiResponse } from './api-response.type'
 import type { Conversation, ConversationSummary } from './conversation.type'
 import type { File } from './file.type'
-import type { Message } from './message.type'
-import type { CursorPage } from './pagination.type'
+import type { Message, MessageHistoryPage } from './message.type'
 import type { User, UserStatus } from './user.type'
 
 describe('kiểu dữ liệu API dùng chung', () => {
@@ -39,7 +38,7 @@ describe('kiểu dữ liệu API dùng chung', () => {
     expectTypeOf<Message['attachments']>().toEqualTypeOf<File[]>()
     expectTypeOf<ApiResponse<User>['content']>().toEqualTypeOf<User>()
     expectTypeOf<ApiPage<User[]>['data']>().toEqualTypeOf<User[]>()
-    expectTypeOf<CursorPage<Message>['nextCursor']>().toEqualTypeOf<string | null>()
+    expectTypeOf<MessageHistoryPage['nextCursor']>().toEqualTypeOf<string | null>()
     expectTypeOf<ConversationSummary['lastMessage']>().toEqualTypeOf<Message | null>()
   })
 })

@@ -25,7 +25,7 @@ describe('message send and retry', () => {
       'client-1': { status: 'failed', error: 'Mất kết nối. Tin nhắn chưa được gửi.' }
     })
 
-    expect(queue.retry('client-1', retrySend)).toBe(true)
+    expect(queue.attempt('client-1', retrySend)).toBe(true)
     expect(firstSend.mock.calls[0][1]).toBe(message.payload)
     expect(retrySend.mock.calls[0][1]).toBe(message.payload)
     expect(retrySend.mock.calls[0][1]).toEqual({
@@ -38,7 +38,7 @@ describe('message send and retry', () => {
   it('does not automatically retry a server-rejected message on reconnect', () => {
     const queue = new MessageSendQueue()
     queue.enqueue(outgoing())
-    queue.markFailed('client-1', 'Bạn không có quyền gửi tin nhắn.', false)
+    queue.markFailed('client-1', 'Bạn không có quyền gửi tin nhắn.')
     const send = vi.fn()
 
     queue.retryUnresolved(send)

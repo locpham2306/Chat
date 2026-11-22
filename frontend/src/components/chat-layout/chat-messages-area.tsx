@@ -63,7 +63,6 @@ interface ChatMessagesAreaProps {
   messageDeliveryStates?: Record<string, MessageDeliveryState>
   onRetryMessage?: (clientMessageId: string) => void
   typingText?: string
-  isTyping?: boolean
 }
 
 interface ScrollSnapshot {
@@ -81,9 +80,9 @@ export const ChatMessagesArea = ({
   loadHistory = true,
   messageDeliveryStates = {},
   onRetryMessage,
-  typingText,
-  isTyping
+  typingText
 }: ChatMessagesAreaProps) => {
+  const isTyping = Boolean(typingText)
   const currentUserId = useAuthStore((state) => state.user?.id)
   const history = useMessageHistoryQuery(conversationId, loadHistory && !isLoading)
   const [earlyMessages, setEarlyMessages] = useState<Message[]>([])
@@ -396,7 +395,6 @@ export const ChatMessagesArea = ({
             const imageAttachments = attachments.filter(isImageAttachment)
             const otherAttachments = attachments.filter((f) => !isImageAttachment(f))
             const lightboxImages: LightboxImage[] = imageAttachments.map((img) => ({
-              id: img.id,
               name: img.name,
               url: img.downloadUrl
             }))
@@ -541,9 +539,9 @@ export const ChatMessagesArea = ({
           })}
 
           {/* Typing Indicator */}
-          {Boolean(isTyping && typingText) && (
+          {typingText && (
             <div className='mt-2'>
-              <TypingIndicator text={typingText || ''} visible={Boolean(isTyping && typingText)} />
+              <TypingIndicator text={typingText} />
             </div>
           )}
 

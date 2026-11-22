@@ -94,7 +94,7 @@ export const useMessageSend = ({ conversationId, recipientId }: UseMessageSendOp
       syncDeliveryStates()
       return
     }
-    if (!queue.current.markFailed(error.clientMessageId, error.message, false)) return
+    if (!queue.current.markFailed(error.clientMessageId, error.message)) return
     syncDeliveryStates()
   })
 

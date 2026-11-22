@@ -24,7 +24,7 @@ describe('useMessageSend', () => {
   beforeEach(() => {
     sendFrame.mockReset()
     Object.keys(listeners).forEach((event) => delete listeners[event as ServerEvent])
-    useWebSocketStore.getState().reset()
+    useWebSocketStore.getState().setStatus('CLOSED')
   })
 
   it('keeps a failed draft and manually retries the identical payload', () => {

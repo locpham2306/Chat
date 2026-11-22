@@ -4,7 +4,6 @@ import userApi from '~/apis/user.api'
 import { isUnauthorizedError } from '~/lib/api-error'
 import { wsClient } from '~/lib/websocket-client'
 import { useAuthStore } from '~/stores/use-auth-store'
-import { useWebSocketStore } from '~/stores/use-websocket-store'
 import type { LoginBody, LoginResponse, RegisterBody } from '~/types/auth.type'
 import type { UpdateProfileBody, User } from '~/types/user.type'
 
@@ -40,7 +39,6 @@ export const logoutSession = async (queryClient: QueryClient) => {
   }
 
   wsClient.disconnect()
-  useWebSocketStore.getState().reset()
   useAuthStore.getState().logout()
   await queryClient.cancelQueries()
   queryClient.clear()

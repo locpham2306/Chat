@@ -1,11 +1,8 @@
 interface TypingIndicatorProps {
   text: string
-  visible: boolean
 }
 
-export const TypingIndicator = ({ text, visible }: TypingIndicatorProps) => {
-  if (!visible || !text) return null
-
+export const TypingIndicator = ({ text }: TypingIndicatorProps) => {
   return (
     <div
       role='status'

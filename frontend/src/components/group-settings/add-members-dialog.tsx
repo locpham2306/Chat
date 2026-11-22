@@ -23,17 +23,14 @@ interface AddMembersDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   conversationId: string
-  onSuccess?: () => void
 }
 
 const PAGE_SIZE = 20
 
-export const AddMembersDialog = ({ open, onOpenChange, conversationId, onSuccess }: AddMembersDialogProps) => {
+export const AddMembersDialog = ({ open, onOpenChange, conversationId }: AddMembersDialogProps) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {open && (
-        <AddMembersDialogContent onOpenChange={onOpenChange} conversationId={conversationId} onSuccess={onSuccess} />
-      )}
+      {open && <AddMembersDialogContent onOpenChange={onOpenChange} conversationId={conversationId} />}
     </Dialog>
   )
 }
@@ -41,10 +38,9 @@ export const AddMembersDialog = ({ open, onOpenChange, conversationId, onSuccess
 interface AddMembersDialogContentProps {
   onOpenChange: (open: boolean) => void
   conversationId: string
-  onSuccess?: () => void
 }
 
-const AddMembersDialogContent = ({ onOpenChange, conversationId, onSuccess }: AddMembersDialogContentProps) => {
+const AddMembersDialogContent = ({ onOpenChange, conversationId }: AddMembersDialogContentProps) => {
   const addMembersMutation = useAddGroupMembersMutation(conversationId)
   const [selectedUsers, setSelectedUsers] = useState<User[]>([])
   const [keyword, setKeyword] = useState('')
@@ -98,7 +94,6 @@ const AddMembersDialogContent = ({ onOpenChange, conversationId, onSuccess }: Ad
     try {
       await addMembersMutation.mutateAsync(selectedUsers.map((u) => u.id))
       onOpenChange(false)
-      onSuccess?.()
     } catch {
       // Error handled by mutation
     }

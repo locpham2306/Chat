@@ -15,16 +15,9 @@ interface UseTypingIndicatorOptions {
   conversation?: ConversationDetail
 }
 
-export interface TypingUser {
-  userId: string
-  name: string
-  avatarFileId?: string | null
-}
-
 interface TypingEntry {
   timer: ReturnType<typeof setTimeout>
   name?: string
-  avatarFileId?: string | null
 }
 
 export const useTypingIndicator = ({ conversationId, conversation }: UseTypingIndicatorOptions) => {
@@ -142,7 +135,6 @@ export const useTypingIndicator = ({ conversationId, conversation }: UseTypingIn
       }
 
       const userName = payload.user?.fullName?.trim() || (payload.user as any)?.username?.trim()
-      const avatarFileId = payload.user?.avatarFileId
 
       setTypingMap((prev) => {
         const next = new Map(prev)
@@ -164,8 +156,7 @@ export const useTypingIndicator = ({ conversationId, conversation }: UseTypingIn
 
           next.set(payload.userId, {
             timer,
-            name: userName || existing?.name,
-            avatarFileId: avatarFileId !== undefined ? avatarFileId : existing?.avatarFileId
+            name: userName || existing?.name
           })
         } else {
           next.delete(payload.userId)
@@ -204,29 +195,18 @@ export const useTypingIndicator = ({ conversationId, conversation }: UseTypingIn
     }
   }, [conversationId, currentUserId])
 
-  // Xây dựng danh sách typingUsers và chuỗi typingText
-  const userIds = conversationId ? Array.from(typingMap.keys()) : []
-  const typingUsers: TypingUser[] = userIds.map((userId) => {
-    const entry = typingMap.get(userId)
-    return {
-      userId,
-      name: resolveUserName(userId),
-      avatarFileId: entry?.avatarFileId
-    }
-  })
+  const typingNames = conversationId ? Array.from(typingMap.keys(), resolveUserName) : []
 
   let typingText = ''
-  if (typingUsers.length === 1) {
-    typingText = `${typingUsers[0].name} đang nhập...`
-  } else if (typingUsers.length === 2) {
-    typingText = `${typingUsers[0].name} và ${typingUsers[1].name} đang nhập...`
-  } else if (typingUsers.length > 2) {
-    typingText = `${typingUsers[0].name} và ${typingUsers.length - 1} người khác đang nhập...`
+  if (typingNames.length === 1) {
+    typingText = `${typingNames[0]} đang nhập...`
+  } else if (typingNames.length === 2) {
+    typingText = `${typingNames[0]} và ${typingNames[1]} đang nhập...`
+  } else if (typingNames.length > 2) {
+    typingText = `${typingNames[0]} và ${typingNames.length - 1} người khác đang nhập...`
   }
 
   return {
-    typingUsers,
-    isTyping: typingUsers.length > 0,
     typingText,
     triggerTyping,
     stopTyping

@@ -20,8 +20,6 @@ export interface MessageSendDraft {
   attachments: File[]
 }
 
-type SendMessageResult = { sent: true; message: Message } | { sent: false }
-
 export interface OutgoingMessage {
   payload: SendMessagePayload
   message: Message
@@ -73,14 +71,10 @@ export class MessageSendQueue {
     return sent
   }
 
-  public retry(clientMessageId: string, sendFrame: SendFrame): boolean {
-    return this.attempt(clientMessageId, sendFrame)
-  }
-
-  public markFailed(clientMessageId: string, error = 'Không gửi được tin nhắn.', retryOnReconnect = false): boolean {
+  public markFailed(clientMessageId: string, error = 'Không gửi được tin nhắn.'): boolean {
     if (!this.pending.has(clientMessageId)) return false
     this.failed.add(clientMessageId)
-    this.delivery.set(clientMessageId, { status: 'failed', error, retryOnReconnect })
+    this.delivery.set(clientMessageId, { status: 'failed', error, retryOnReconnect: false })
     return true
   }
 
@@ -130,10 +124,6 @@ export class MessageSendQueue {
     return this.locallySent.has(clientMessageId) && this.draftRecipientByClientId.get(clientMessageId) === recipientId
   }
 
-  public failedClientMessageIds(): string[] {
-    return [...this.failed]
-  }
-
   public deliveryStates(): Record<string, MessageDeliveryState> {
     return Object.fromEntries(
       [...this.delivery].map(([clientMessageId, { status, error }]) => [
@@ -176,16 +166,6 @@ export const createOutgoingMessage = (input: SendMessageInput): OutgoingMessage 
       attachments,
       createdAt: input.createdAt
     }
-  }
-}
-
-export const sendMessage = (input: SendMessageInput, sendFrame: SendFrame): SendMessageResult => {
-  const outgoing = createOutgoingMessage(input)
-  if (!outgoing || !sendFrame('SEND_MESSAGE', outgoing.payload)) return { sent: false }
-
-  return {
-    sent: true,
-    message: outgoing.message
   }
 }
 

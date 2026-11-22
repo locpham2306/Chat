@@ -1,44 +1,7 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { wsClient } from '~/lib/websocket-client'
 import { useAuthStore } from '~/stores/use-auth-store'
-import { useWebSocketStore } from '~/stores/use-websocket-store'
-import type {
-  ClientEvent,
-  ClientEventMap,
-  ServerEvent,
-  ServerEventMap,
-  WebSocketListener
-} from '~/types/websocket.type'
-
-/**
- * Hook quản lý trạng thái kết nối WebSocket và các thao tác cơ bản
- */
-export const useWebSocket = () => {
-  const status = useWebSocketStore((state) => state.status)
-  const isConnected = useWebSocketStore((state) => state.isConnected)
-  const lastError = useWebSocketStore((state) => state.lastError)
-
-  const connect = useCallback((url?: string) => {
-    wsClient.connect(url)
-  }, [])
-
-  const disconnect = useCallback(() => {
-    wsClient.disconnect()
-  }, [])
-
-  const send = useCallback(<E extends ClientEvent>(event: E, data: ClientEventMap[E]): boolean => {
-    return wsClient.send(event, data)
-  }, [])
-
-  return {
-    status,
-    isConnected,
-    lastError,
-    connect,
-    disconnect,
-    send
-  }
-}
+import type { ServerEvent, ServerEventMap, WebSocketListener } from '~/types/websocket.type'
 
 /**
  * Hook đăng ký lắng nghe sự kiện cụ thể từ Server, tự động dọn dẹp khi unmount
@@ -75,10 +38,6 @@ export const useWebSocketLifecycle = (): void => {
       wsClient.connect()
     } else {
       wsClient.disconnect()
-    }
-
-    return () => {
-      // Khi component vòng đời unmount
     }
   }, [isAuthenticated])
 }

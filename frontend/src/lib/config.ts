@@ -10,9 +10,3 @@ export const getWebSocketUrl = (): string => {
 
   return 'ws://localhost:8086/ws'
 }
-
-export const envConfig = {
-  apiUrl: import.meta.env.VITE_API_URL || '',
-  timeout: Number(import.meta.env.VITE_TIMEOUT) || 10000,
-  wsUrl: getWebSocketUrl()
-}

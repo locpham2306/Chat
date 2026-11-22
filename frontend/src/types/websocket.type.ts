@@ -1,7 +1,7 @@
 import type { Message } from './message.type'
 import type { UserStatus } from './user.type'
 
-export type WebSocketStatus = 'CONNECTING' | 'OPEN' | 'CLOSING' | 'CLOSED'
+export type WebSocketStatus = 'CONNECTING' | 'OPEN' | 'CLOSED'
 
 // Client -> Server Payloads
 export interface SendMessagePayload {

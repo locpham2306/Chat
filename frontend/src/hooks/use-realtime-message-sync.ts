@@ -9,7 +9,6 @@ import type { Message } from '~/types/message.type'
 import type { MessageAckPayload, NewMessagePayload } from '~/types/websocket.type'
 
 export const messageKeys = {
-  all: ['messages'] as const,
   list: (conversationId?: string) => ['messages', 'list', conversationId] as const
 }
 

@@ -15,8 +15,6 @@ interface ChatLayoutProps {
   conversationId: string
   onBack?: () => void
   onSendMessage?: (draft: MessageSendDraft) => boolean | void
-  onAttachFile?: () => void
-  onOpenInfo?: () => void
   optimisticMessages?: Message[]
   messageDeliveryStates?: Record<string, MessageDeliveryState>
   onRetryMessage?: (clientMessageId: string) => void
@@ -26,8 +24,6 @@ export const ChatLayout = ({
   conversationId,
   onBack,
   onSendMessage,
-  onAttachFile,
-  onOpenInfo,
   optimisticMessages,
   messageDeliveryStates,
   onRetryMessage
@@ -35,7 +31,7 @@ export const ChatLayout = ({
   const { data: conversation, isLoading, isError, error } = useConversationDetailQuery(conversationId)
   const [isGroupSettingsOpen, setIsGroupSettingsOpen] = useState(false)
 
-  const { isTyping, typingText, triggerTyping, stopTyping } = useTypingIndicator({
+  const { typingText, triggerTyping, stopTyping } = useTypingIndicator({
     conversationId,
     conversation
   })
@@ -72,10 +68,10 @@ export const ChatLayout = ({
   if (conversation) {
     if (isGroup) {
       title = conversation.name || 'Nhóm chat'
-      subtitle = isTyping ? typingText : `${conversation.memberCount} thành viên`
+      subtitle = typingText || `${conversation.memberCount} thành viên`
     } else {
       title = conversation.peer?.fullName || conversation.name || 'Hội thoại trực tiếp'
-      subtitle = isTyping ? 'Đang nhập...' : conversation.peer?.status === 'ONLINE' ? 'Trực tuyến' : undefined
+      subtitle = typingText ? 'Đang nhập...' : conversation.peer?.status === 'ONLINE' ? 'Trực tuyến' : undefined
     }
   }
 
@@ -84,15 +80,7 @@ export const ChatLayout = ({
     : conversation?.peer?.avatarUrl ||
       (conversation?.peer?.avatarFileId ? `/api/files/${conversation.peer.avatarFileId}` : null) ||
       conversation?.avatarUrl ||
-      (!isGroup && conversation?.avatarFileId ? `/api/files/${conversation.avatarFileId}` : null)
-
-  const handleOpenInfo = () => {
-    if (onOpenInfo) {
-      onOpenInfo()
-    } else if (isGroup) {
-      setIsGroupSettingsOpen(true)
-    }
-  }
+      (conversation?.avatarFileId ? `/api/files/${conversation.avatarFileId}` : null)
 
   return (
     <div className='flex flex-col h-full w-full bg-background overflow-hidden'>
@@ -103,7 +91,7 @@ export const ChatLayout = ({
         subtitle={subtitle}
         avatarUrl={avatarUrl}
         onBack={onBack}
-        onOpenInfo={isGroup || onOpenInfo ? handleOpenInfo : undefined}
+        onOpenInfo={isGroup ? () => setIsGroupSettingsOpen(true) : undefined}
       />
 
       {/* 2. Messages Area */}
@@ -116,14 +104,12 @@ export const ChatLayout = ({
         optimisticMessages={optimisticMessages}
         messageDeliveryStates={messageDeliveryStates}
         onRetryMessage={onRetryMessage}
-        isTyping={isTyping}
         typingText={typingText}
       />
 
       {/* 3. Chat Composer */}
       <ChatComposer
         onSendMessage={onSendMessage}
-        onAttachFile={onAttachFile}
         onTyping={triggerTyping}
         onStopTyping={stopTyping}
         placeholder={`Nhắn tin tới ${title}...`}

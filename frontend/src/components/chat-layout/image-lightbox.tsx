@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button } from '~/components/ui/button'
 
 export interface LightboxImage {
-  id: string
   name: string
   url: string
 }

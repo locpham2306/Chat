@@ -7,10 +7,8 @@ import { useFileAttachments } from '~/hooks/use-file-attachments'
 import type { MessageSendDraft } from '~/lib/message-send'
 
 interface ChatComposerProps {
-  disabled?: boolean
   placeholder?: string
   onSendMessage?: (draft: MessageSendDraft) => boolean | void
-  onAttachFile?: () => void
   onTyping?: () => void
   onStopTyping?: () => void
 }
@@ -76,10 +74,8 @@ const AttachmentThumbnail = ({ file, onPreviewImage }: AttachmentThumbnailProps)
 }
 
 export const ChatComposer = ({
-  disabled = false,
   placeholder = 'Nhập tin nhắn...',
   onSendMessage,
-  onAttachFile,
   onTyping,
   onStopTyping
 }: ChatComposerProps) => {
@@ -91,11 +87,9 @@ export const ChatComposer = ({
   const [lightboxState, setLightboxState] = useState<{
     isOpen: boolean
     images: LightboxImage[]
-    initialIndex: number
   }>({
     isOpen: false,
-    images: [],
-    initialIndex: 0
+    images: []
   })
 
   useEffect(() => {
@@ -126,7 +120,7 @@ export const ChatComposer = ({
 
   const handleSend = () => {
     const trimmed = content.trim()
-    if ((!trimmed && uploadedFiles.length === 0) || disabled || hasUploading || hasFailed) return
+    if ((!trimmed && uploadedFiles.length === 0) || hasUploading || hasFailed) return
     const sent = onSendMessage?.({ content: trimmed, attachments: uploadedFiles })
     if (sent === false) return
     onStopTyping?.()
@@ -159,12 +153,11 @@ export const ChatComposer = ({
   const handlePreviewImage = (url: string, name: string) => {
     setLightboxState({
       isOpen: true,
-      images: [{ id: url, name, url }],
-      initialIndex: 0
+      images: [{ name, url }]
     })
   }
 
-  const isSendDisabled = disabled || hasUploading || hasFailed || (!content.trim() && uploadedFiles.length === 0)
+  const isSendDisabled = hasUploading || hasFailed || (!content.trim() && uploadedFiles.length === 0)
   const failedAttachmentNames = attachments
     .filter((attachment) => attachment.status === 'failed')
     .map((attachment) => attachment.source.name)
@@ -242,11 +235,7 @@ export const ChatComposer = ({
           type='button'
           variant='ghost'
           size='icon'
-          onClick={() => {
-            onAttachFile?.()
-            fileInputRef.current?.click()
-          }}
-          disabled={disabled}
+          onClick={() => fileInputRef.current?.click()}
           className='h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground mb-0.5'
           title='Đính kèm tệp'
           aria-label='Đính kèm tệp'
@@ -260,7 +249,6 @@ export const ChatComposer = ({
             value={content}
             onChange={(e) => handleContentChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={disabled}
             placeholder={placeholder}
             rows={1}
             aria-label='Nội dung tin nhắn'
@@ -292,7 +280,6 @@ export const ChatComposer = ({
       <ImageLightbox
         isOpen={lightboxState.isOpen}
         images={lightboxState.images}
-        initialIndex={lightboxState.initialIndex}
         onClose={() => setLightboxState((prev) => ({ ...prev, isOpen: false }))}
       />
     </form>

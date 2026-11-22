@@ -10,64 +10,28 @@ import type {
   WebSocketStatus
 } from '~/types/websocket.type'
 
-export interface WebSocketClientOptions {
-  url?: string
-  minReconnectDelay?: number
-  maxReconnectDelay?: number
-  reconnectFactor?: number
-  jitter?: number
-  heartbeatInterval?: number
-}
-
 type GenericListener = (data: unknown) => void
 type StatusListener = (status: WebSocketStatus) => void
-type RawMessageListener = (frame: WebSocketFrame) => void
 
-export class WebSocketClient {
-  private static instance: WebSocketClient | null = null
-
+class WebSocketClient {
   private socket: WebSocket | null = null
   private status: WebSocketStatus = 'CLOSED'
   private explicitClose = false
   private reconnectAttempts = 0
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
-  private heartbeatTimer: ReturnType<typeof setInterval> | null = null
 
-  private readonly minReconnectDelay: number
-  private readonly maxReconnectDelay: number
-  private readonly reconnectFactor: number
-  private readonly jitter: number
-  private readonly heartbeatInterval: number
-  private customUrl?: string
+  private readonly minReconnectDelay = 1000
+  private readonly maxReconnectDelay = 30000
+  private readonly reconnectFactor = 2
+  private readonly jitter = 0.2
 
   private readonly listeners = new Map<string, Set<GenericListener>>()
   private readonly statusListeners = new Set<StatusListener>()
-  private readonly rawMessageListeners = new Set<RawMessageListener>()
-
-  constructor(options: WebSocketClientOptions = {}) {
-    this.minReconnectDelay = options.minReconnectDelay ?? 1000
-    this.maxReconnectDelay = options.maxReconnectDelay ?? 30000
-    this.reconnectFactor = options.reconnectFactor ?? 2
-    this.jitter = options.jitter ?? 0.2
-    this.heartbeatInterval = options.heartbeatInterval ?? 30000
-    this.customUrl = options.url
-  }
-
-  public static getInstance(options?: WebSocketClientOptions): WebSocketClient {
-    if (!WebSocketClient.instance) {
-      WebSocketClient.instance = new WebSocketClient(options)
-    }
-    return WebSocketClient.instance
-  }
 
   /**
    * Khởi tạo kết nối WebSocket với cookie phiên tự động (không truyền token trên URL)
    */
-  public connect(url?: string): void {
-    if (url) {
-      this.customUrl = url
-    }
-
+  public connect(): void {
     if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
       return
     }
@@ -76,10 +40,8 @@ export class WebSocketClient {
     this.clearReconnectTimer()
     this.updateStatus('CONNECTING')
 
-    const targetUrl = this.customUrl || getWebSocketUrl()
-
     try {
-      this.socket = new WebSocket(targetUrl)
+      this.socket = new WebSocket(getWebSocketUrl())
       this.setupSocketHandlers()
     } catch (error) {
       console.error('[WebSocket] Lỗi khi tạo WebSocket:', error)
@@ -93,7 +55,6 @@ export class WebSocketClient {
   public disconnect(): void {
     this.explicitClose = true
     this.clearReconnectTimer()
-    this.stopHeartbeat()
 
     if (this.socket) {
       // Hủy bỏ handlers để tránh trigger reconnect ngoài ý muốn
@@ -171,31 +132,12 @@ export class WebSocketClient {
     }
   }
 
-  /**
-   * Đăng ký lắng nghe tất cả các frame nhận được
-   */
-  public onAnyMessage(listener: RawMessageListener): () => void {
-    this.rawMessageListeners.add(listener)
-    return () => {
-      this.rawMessageListeners.delete(listener)
-    }
-  }
-
-  public getStatus(): WebSocketStatus {
-    return this.status
-  }
-
-  public isConnected(): boolean {
-    return this.status === 'OPEN'
-  }
-
   private setupSocketHandlers(): void {
     if (!this.socket) return
 
     this.socket.onopen = () => {
       this.reconnectAttempts = 0
       this.updateStatus('OPEN')
-      this.startHeartbeat()
     }
 
     this.socket.onmessage = (event: MessageEvent) => {
@@ -222,15 +164,6 @@ export class WebSocketClient {
         return
       }
 
-      // Thông báo cho raw listeners
-      this.rawMessageListeners.forEach((listener) => {
-        try {
-          listener(parsed)
-        } catch (err) {
-          console.error('[WebSocket] Lỗi trong raw listener:', err)
-        }
-      })
-
       // Điều hướng tới event listener tương ứng
       const handlers = this.listeners.get(parsed.event)
       if (handlers && handlers.size > 0) {
@@ -248,7 +181,6 @@ export class WebSocketClient {
   }
 
   private handleSocketClose(): void {
-    this.stopHeartbeat()
     this.socket = null
     this.updateStatus('CLOSED')
 
@@ -284,24 +216,6 @@ export class WebSocketClient {
     }
   }
 
-  private startHeartbeat(): void {
-    this.stopHeartbeat()
-    if (this.heartbeatInterval <= 0) return
-
-    this.heartbeatTimer = setInterval(() => {
-      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-        // Kiểm tra kết nối liveness
-      }
-    }, this.heartbeatInterval)
-  }
-
-  private stopHeartbeat(): void {
-    if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer)
-      this.heartbeatTimer = null
-    }
-  }
-
   private updateStatus(nextStatus: WebSocketStatus): void {
     if (this.status === nextStatus) return
     this.status = nextStatus
@@ -315,14 +229,11 @@ export class WebSocketClient {
   }
 }
 
-export const wsClient = WebSocketClient.getInstance()
+export const wsClient = new WebSocketClient()
 
-// Tự động đồng bộ trạng thái kết nối và lỗi frame vào Zustand store
+// Đồng bộ trạng thái kết nối vào Zustand store
 if (typeof window !== 'undefined') {
   wsClient.onStatusChange((status) => {
     useWebSocketStore.getState().setStatus(status)
-  })
-  wsClient.on('ERROR', (error) => {
-    useWebSocketStore.getState().setLastError(error)
   })
 }
