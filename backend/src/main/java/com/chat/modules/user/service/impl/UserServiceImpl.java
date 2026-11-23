@@ -64,8 +64,8 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public UserResponse updateCurrentUser(UUID userId, UpdateProfileRequest request) {
         UserEntity user = this.currentUser(userId);
-        if (request.avatarFileId() != null) {
-            FileEntity avatar = fileRepository.findById(request.avatarFileId())
+        if (request.getAvatarFileId() != null) {
+            FileEntity avatar = fileRepository.findById(request.getAvatarFileId())
                     .orElseThrow(() -> BusinessException.notFound(ErrorConstants.NOT_FOUND));
             boolean allowed = userId.equals(avatar.getUploaderId()) // File do chính user upload
                     && avatar.getConversationId() == null // File không thuộc hội thoại
@@ -74,7 +74,7 @@ public class UserServiceImpl implements UserService {
                 throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
             }
         }
-        user.updateProfile(StringUtils.trim(request.fullName()), request.avatarFileId());
+        user.updateProfile(StringUtils.trim(request.getFullName()), request.getAvatarFileId());
         userRepository.save(user);
         UserStatusEnum status = userPresence.status(user.getId());
         return userMapper.toResponse(user, status);

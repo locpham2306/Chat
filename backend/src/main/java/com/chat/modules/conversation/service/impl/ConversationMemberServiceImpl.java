@@ -133,7 +133,7 @@ public class ConversationMemberServiceImpl implements ConversationMemberService 
         requireGroup(conversation, "conversation.membersGroupOnly");
         requireOwner(conversation, conversationId, currentUserId);
 
-        LinkedHashSet<UUID> requestedUserIds = new LinkedHashSet<>(request.memberIds());
+        LinkedHashSet<UUID> requestedUserIds = new LinkedHashSet<>(request.getMemberIds());
         if (userRepository.countByIdIn(requestedUserIds) != requestedUserIds.size()) {
             throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
@@ -181,6 +181,7 @@ public class ConversationMemberServiceImpl implements ConversationMemberService 
         requireGroup(conversation, "conversation.membersGroupOnly");
 
         ConversationMemberEntity currentMembership = requireActiveMember(conversationId, currentUserId);
+
         boolean hasOwnerRole = currentMembership.getRole() == MemberRoleEnum.OWNER;
         boolean isConversationOwner = currentUserId.equals(conversation.getOwnerId());
         boolean isOwner = hasOwnerRole && isConversationOwner;
@@ -199,8 +200,7 @@ public class ConversationMemberServiceImpl implements ConversationMemberService 
             throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
 
-        Optional<ConversationMemberEntity> targetMembership =
-                conversationMemberRepository.findByConversationIdAndUserId(conversationId, userId);
+        Optional<ConversationMemberEntity> targetMembership = conversationMemberRepository.findByConversationIdAndUserId(conversationId, userId);
         if (targetMembership.isEmpty()) {
             return;
         }

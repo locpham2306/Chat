@@ -57,7 +57,7 @@ public class ConversationController {
         UUID currentUserId = session.userId();
         PageResponse<List<ConversationListItemResponse>> conversations =
                 conversationService.getConversations(
-                        currentUserId, request.page(), request.size());
+                        currentUserId, request.getPage(), request.getSize());
         return BaseResponse.success(conversations);
     }
 
@@ -79,7 +79,7 @@ public class ConversationController {
         UUID currentUserId = session.userId();
         PageResponse<List<ConversationMemberResponse>> members =
                 conversationMemberService.getMembers(
-                        currentUserId, id, request.page(), request.size());
+                        currentUserId, id, request.getPage(), request.getSize());
         return BaseResponse.success(members);
     }
 
@@ -90,7 +90,7 @@ public class ConversationController {
             @Valid @ModelAttribute MessageHistoryRequest request) {
         UUID currentUserId = session.userId();
         MessageHistoryResponse history = conversationMessageService.getHistory(
-                currentUserId, id, request.before(), request.limit());
+                currentUserId, id, request.getBefore(), request.getLimit());
         return BaseResponse.success(history);
     }
 
@@ -101,7 +101,7 @@ public class ConversationController {
             @Valid @RequestBody MarkConversationReadRequest request) {
         UUID currentUserId = session.userId();
         ConversationReadResponse readState = conversationMessageService.markRead(
-                currentUserId, id, request.lastReadMessageId());
+                currentUserId, id, request.getLastReadMessageId());
         return BaseResponse.success(readState);
     }
 
@@ -134,7 +134,7 @@ public class ConversationController {
         UUID currentUserId = session.userId();
         PageResponse<List<UserResponse>> availableMembers =
                 conversationMemberService.getAvailableMembers(
-                        currentUserId, id, request.keyword(), request.page(), request.size());
+                        currentUserId, id, request.getKeyword(), request.getPage(), request.getSize());
         return BaseResponse.success(availableMembers);
     }
 
@@ -155,7 +155,7 @@ public class ConversationController {
             @Valid @ModelAttribute DirectConversationRequest request) {
         UUID currentUserId = session.userId();
         DirectConversationLookupResponse conversation =
-                conversationService.findDirectConversation(currentUserId, request.recipientId());
+                conversationService.findDirectConversation(currentUserId, request.getRecipientId());
         return BaseResponse.success(conversation);
     }
 

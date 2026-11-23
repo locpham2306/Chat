@@ -34,14 +34,14 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     @Transactional
     public UserResponse register(RegisterRequest request) {
-        validatePasswordLength(request.password());
-        String username = StringUtils.trim(request.username());
-        String fullName = StringUtils.trim(request.fullName());
+        validatePasswordLength(request.getPassword());
+        String username = StringUtils.trim(request.getUsername());
+        String fullName = StringUtils.trim(request.getFullName());
         if (userRepository.existsByUsername(username)) {
             throw usernameExists();
         }
         try {
-            String passwordHash = passwordEncoder.encode(request.password());
+            String passwordHash = passwordEncoder.encode(request.getPassword());
             UserEntity newUser = new UserEntity(username, passwordHash, fullName);
             UserEntity user = userRepository.saveAndFlush(newUser);
             return userMapper.toResponse(user, UserStatusEnum.OFFLINE);
@@ -53,11 +53,11 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     @Transactional
     public IssuedSession login(LoginRequest request) {
-        validatePasswordLength(request.password());
-        String username = StringUtils.trim(request.username());
+        validatePasswordLength(request.getPassword());
+        String username = StringUtils.trim(request.getUsername());
         UserEntity user = userRepository.findByUsername(username)
                 .orElseThrow(this::invalidCredentials);
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw invalidCredentials();
         }
         UUID userId = user.getId();

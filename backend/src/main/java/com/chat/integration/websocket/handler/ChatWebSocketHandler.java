@@ -172,11 +172,11 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
         MessageSendCommand command = new MessageSendCommand(
                 identity.userId(),
-                request.recipientId(),
-                request.conversationId(),
-                request.clientMessageId(),
-                request.content(),
-                request.attachmentIds());
+                request.getRecipientId(),
+                request.getConversationId(),
+                request.getClientMessageId(),
+                request.getContent(),
+                request.getAttachmentIds());
         MessageDelivery delivery = messageService.send(command);
 
         // Gửi ACK lên FE người gửi
@@ -211,11 +211,11 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     // Kiểm tra TYPING FE gửi xuống BE và tìm các thành viên cần được gửi event lên FE.
     private void handleTyping(SessionIdentity identity, JsonNode data) throws JsonProcessingException {
         TypingFrameData request = objectMapper.treeToValue(data, TypingFrameData.class);
-        if (request.conversationId() == null || request.isTyping() == null) {
+        if (request.getConversationId() == null || request.getTyping() == null) {
             throw invalid();
         }
         TypingChange change = realtimeConversationService.typing(
-                identity.userId(), request.conversationId(), request.isTyping());
+                identity.userId(), request.getConversationId(), request.getTyping());
         webSocketSessionRegistry.broadcast(change.audienceUserIds(), TYPING, change.data());
     }
 

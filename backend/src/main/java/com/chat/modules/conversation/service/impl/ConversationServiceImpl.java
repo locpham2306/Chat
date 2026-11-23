@@ -127,7 +127,7 @@ public class ConversationServiceImpl implements ConversationService {
     @Override
     @Transactional
     public GroupConversationResponse createGroup(UUID currentUserId, CreateGroupRequest request) {
-        LinkedHashSet<UUID> memberIds = new LinkedHashSet<>(request.memberIds());
+        LinkedHashSet<UUID> memberIds = new LinkedHashSet<>(request.getMemberIds());
         memberIds.remove(currentUserId);
         if (memberIds.isEmpty()) {
             throw BusinessException.badRequest("conversation.groupRequiresMember");
@@ -135,12 +135,12 @@ public class ConversationServiceImpl implements ConversationService {
         if (userRepository.countByIdIn(memberIds) != memberIds.size()) {
             throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
         }
-        validateGroupAvatar(currentUserId, request.avatarFileId());
+        validateGroupAvatar(currentUserId, request.getAvatarFileId());
 
         if (currentUserId == null) {
             throw new IllegalArgumentException("Current user is required");
         }
-        String groupName = StringUtils.trim(request.name());
+        String groupName = StringUtils.trim(request.getName());
         if (groupName == null) {
             throw new IllegalArgumentException("Group name is required");
         }
@@ -149,7 +149,7 @@ public class ConversationServiceImpl implements ConversationService {
         conversation.setType(ConversationTypeEnum.GROUP);
         conversation.setOwnerId(currentUserId);
         conversation.setName(groupName);
-        conversation.setAvatarFileId(request.avatarFileId());
+        conversation.setAvatarFileId(request.getAvatarFileId());
         conversation = conversationRepository.saveAndFlush(conversation);
         Instant joinedAt = clock.instant();
         ArrayList<ConversationMemberEntity> memberships =
@@ -251,14 +251,14 @@ public class ConversationServiceImpl implements ConversationService {
                 || !currentUserId.equals(conversation.getOwnerId())) {
             throw BusinessException.forbidden(ErrorConstants.FORBIDDEN);
         }
-        validateGroupAvatar(currentUserId, request.avatarFileId());
+        validateGroupAvatar(currentUserId, request.getAvatarFileId());
 
-        String name = StringUtils.trim(request.name());
+        String name = StringUtils.trim(request.getName());
         if (name == null || name.isBlank() || name.length() > 100) {
             throw new IllegalArgumentException("Invalid group name");
         }
         conversation.setName(name);
-        conversation.setAvatarFileId(request.avatarFileId());
+        conversation.setAvatarFileId(request.getAvatarFileId());
         long memberCount = conversationMemberRepository.countByConversationIdAndLeftAtIsNull(conversationId);
         return conversationMapper.toDetailResponse(conversation, memberCount, null);
     }

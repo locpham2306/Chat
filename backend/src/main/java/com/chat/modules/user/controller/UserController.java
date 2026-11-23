@@ -33,7 +33,7 @@ public class UserController {
             @Valid @ModelAttribute SearchRequest request) {
         UUID currentUserId = session.userId();
         PageResponse<List<UserResponse>> users = userService.searchUsers(
-                currentUserId, request.keyword(), request.page(), request.size());
+                currentUserId, request.getKeyword(), request.getPage(), request.getSize());
         return BaseResponse.success(users);
     }
 

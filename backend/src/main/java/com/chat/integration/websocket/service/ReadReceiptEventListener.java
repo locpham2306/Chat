@@ -19,9 +19,9 @@ public class ReadReceiptEventListener {
     public void publish(MessageReadEvent event) {
         ConversationReadResponse response = event.response();
         ReadReceiptData data = new ReadReceiptData(
-                response.conversationId(),
-                response.userId(),
-                response.lastReadMessageId());
+                response.getConversationId(),
+                response.getUserId(),
+                response.getLastReadMessageId());
         webSocketSessionRegistry.broadcast(
                 event.activeMemberIds(), // gui cho nhung ai
                 ChatWebSocketHandler.READ_RECEIPT, // ten event

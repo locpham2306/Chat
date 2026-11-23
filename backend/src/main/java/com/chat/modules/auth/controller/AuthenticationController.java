@@ -57,7 +57,7 @@ public class AuthenticationController {
             HttpServletResponse response) {
         String bodyToken = null;
         if (body != null) {
-            bodyToken = body.token();
+            bodyToken = body.getToken();
         }
 
         String token = sessionCookieService.resolveLogoutToken(request, bodyToken);
