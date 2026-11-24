@@ -71,9 +71,6 @@ public class ConversationServiceImpl implements ConversationService {
     private final Clock clock;
     private ConversationMemberService compatibilityMemberService;
 
-    /**
-     * Keeps source compatibility for callers that still construct the old combined service.
-     */
     public ConversationServiceImpl(
             ConversationRepository conversationRepository,
             ConversationMemberRepository conversationMemberRepository,
@@ -169,10 +166,10 @@ public class ConversationServiceImpl implements ConversationService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<List<ConversationListItemResponse>> getConversations(
-            UUID currentUserId, Integer page, Integer size) {
+    public PageResponse<List<ConversationListItemResponse>> getConversations(UUID currentUserId, Integer page, Integer size) {
         Page<ConversationEntity> conversationsPage = conversationRepository.findActiveForUser(
                 currentUserId, PageableUtils.of(page, size));
+
         if (conversationsPage.isEmpty()) {
             return PageResponse.of(List.of(), conversationsPage.getTotalPages(), conversationsPage.getTotalElements());
         }
@@ -181,20 +178,21 @@ public class ConversationServiceImpl implements ConversationService {
         for (ConversationEntity conversation : conversationsPage.getContent()) {
             conversationIds.add(conversation.getId());
         }
-        Map<UUID, UserEntity> peersById = loadDirectPeers(
-                conversationsPage.getContent(), currentUserId);
-        Map<UUID, Long> memberCounts = toCountMap(
-                conversationMemberRepository.countActiveMembersByConversationIds(conversationIds));
-        Map<UUID, Long> unreadCounts = toCountMap(
-                messageRepository.countUnreadByConversationIds(currentUserId, conversationIds));
+        Map<UUID, UserEntity> peersById = loadDirectPeers(conversationsPage.getContent(), currentUserId);
+
+        Map<UUID, Long> memberCounts = toCountMap(conversationMemberRepository.countActiveMembersByConversationIds(conversationIds));
+
+        Map<UUID, Long> unreadCounts = toCountMap(messageRepository.countUnreadByConversationIds(currentUserId, conversationIds));
 
         Map<UUID, MessageEntity> latestMessages = new HashMap<>();
+
         for (MessageEntity message : messageRepository.findLatestByConversationIds(conversationIds)) {
             latestMessages.putIfAbsent(message.getConversationId(), message);
         }
         Map<UUID, MessageResponse> lastMessageResponses = messageResponseLoader.load(latestMessages.values());
 
         List<ConversationListItemResponse> data = new ArrayList<>();
+
         for (ConversationEntity conversation : conversationsPage.getContent()) {
             UUID conversationId = conversation.getId();
             MessageEntity lastMessage = latestMessages.get(conversationId);

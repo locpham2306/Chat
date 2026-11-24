@@ -16,11 +16,9 @@ public interface ConversationService {
 
     GroupConversationResponse createGroup(UUID currentUserId, CreateGroupRequest request);
 
-    PageResponse<List<ConversationListItemResponse>> getConversations(
-            UUID currentUserId, Integer page, Integer size);
+    PageResponse<List<ConversationListItemResponse>> getConversations(UUID currentUserId, Integer page, Integer size);
 
     ConversationDetailResponse getConversation(UUID currentUserId, UUID conversationId);
 
-    ConversationDetailResponse updateConversation(
-            UUID currentUserId, UUID conversationId, UpdateConversationRequest request);
+    ConversationDetailResponse updateConversation(UUID currentUserId, UUID conversationId, UpdateConversationRequest request);
 }

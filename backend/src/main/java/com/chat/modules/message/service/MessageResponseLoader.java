@@ -22,9 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Loads the related sender and attachment data needed to build message responses.
- */
 @Component
 @RequiredArgsConstructor
 public class MessageResponseLoader {
@@ -52,6 +49,7 @@ public class MessageResponseLoader {
 
         List<MessageAttachmentEntity> attachmentLinks =
                 messageAttachmentRepository.findByMessageIdInOrderByMessageIdAscPositionAsc(messageIds);
+
         LinkedHashSet<UUID> fileIds = new LinkedHashSet<>();
         for (MessageAttachmentEntity link : attachmentLinks) {
             fileIds.add(link.getFileId());
