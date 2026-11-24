@@ -40,7 +40,6 @@ Server chịu trách nhiệm:
 
 - JDK 21.
 - MySQL 8.4.
-- Docker Desktop nếu chạy test tích hợp.
 
 ### Cài đặt
 
@@ -52,7 +51,7 @@ CREATE DATABASE chat
     COLLATE utf8mb4_0900_as_ci;
 ```
 
-Từ thư mục `backend/`, sao chép cấu hình mẫu:
+Từ thư mục `source/server/`, sao chép cấu hình mẫu:
 
 ```bash
 cp .env.example .env
@@ -157,7 +156,7 @@ Client kết nối `/ws` bằng cookie session hợp lệ. Frame chung:
 ## 📦 CẤU TRÚC
 
 ```text
-backend/
+server/
 ├── README.md
 ├── pom.xml
 ├── mvnw
@@ -180,7 +179,6 @@ backend/
 │   │       ├── application.properties
 │   │       ├── db/migration/
 │   │       └── messages*.properties
-│   └── test/
 └── uploads/                    # File local khi chạy development
 ```
 
@@ -206,7 +204,7 @@ curl http://localhost:8086/actuator/health
 
 - Port mặc định: **8086**.
 - Có thể thay đổi bằng `SERVER_PORT` trong file `.env`.
-- Frontend local mặc định: `http://localhost:3001`.
+- Client local mặc định: `http://localhost:3001`.
 - Cookie local cần `SESSION_COOKIE_SECURE=false`; production HTTPS nên dùng `true`.
 - File thật được lưu tại `FILE_STORAGE_ROOT`; bảng `files` chỉ lưu metadata và `storageKey`.
 - Giới hạn mặc định: **20 MiB/file**.

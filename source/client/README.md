@@ -90,7 +90,7 @@ Không đặt token, mật khẩu, khóa API hoặc secret khác vào `.env` fro
 ## 📦 CẤU TRÚC
 
 ```text
-frontend/
+client/
 ├── README.md                     # Tài liệu module client
 ├── .env.example                  # Mẫu cấu hình môi trường
 ├── package.json                  # Scripts và dependencies
@@ -114,7 +114,7 @@ frontend/
 ## 💡 SỬ DỤNG
 
 1. Khởi động backend Chat tại `http://localhost:8086`.
-2. Chạy `pnpm dev` trong thư mục `frontend`.
+2. Chạy `pnpm dev` trong thư mục `source/client`.
 3. Mở `http://localhost:3001`, đăng ký hoặc đăng nhập.
 4. Dùng giao diện để tìm người dùng, tạo hội thoại, gửi tin nhắn hoặc tệp đính kèm.
 
