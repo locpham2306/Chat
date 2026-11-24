@@ -1,183 +1,223 @@
-# Backend
+# MODULE SERVER
 
-Thư mục dành cho toàn bộ source, build, cấu hình và test của backend Spring Boot.
-Đã dựng entity/schema, API register/login/logout, filter session, xem/cập nhật `/api/users/me`,
-tìm kiếm user và upload/download file có phân quyền. Raw WebSocket `/ws` dùng cookie session
-đã hỗ trợ gửi tin, retry idempotent, typing, read receipt, presence và lỗi frame.
-`ConversationService` xử lý bản thân hội thoại; `ConversationMemberService` tách riêng nghiệp vụ
-danh sách, tìm ứng viên, thêm và xóa thành viên để mỗi service có một trách nhiệm rõ ràng.
-HTTP lịch sử tin nhắn dùng cursor; HTTP mốc đọc chỉ tiến và phát receipt sau commit.
-Lookup hội thoại DIRECT đã có và không tạo dữ liệu khi hai user chưa từng nhắn tin;
-API tạo nhóm tạo OWNER/MEMBER trong cùng transaction. Danh sách hội thoại chỉ trả
-membership đang hoạt động, sắp xếp theo hoạt động mới nhất và kèm tin cuối/số chưa đọc.
-API chi tiết hội thoại chỉ cho thành viên đang hoạt động truy cập; OWNER có thể cập nhật
-tên và avatar của GROUP. Danh sách thành viên có phân trang và không trả người đã rời.
-MEMBER có thể rời nhóm, còn OWNER có thể xóa MEMBER nhưng không thể tự rời nhóm.
-Tin đầu DIRECT tạo conversation + hai membership + message trong cùng transaction; ACK và
-NEW_MESSAGE chỉ phát sau commit. Logout/phiên hết hạn đóng đúng kết nối của phiên đó.
-Xem [session và cookie](docs/07-session-base.md).
-Xem [schema và quan hệ DB](docs/06-database-schema.md).
-Java 21, Spring Boot 3.5.16, Maven Wrapper 3.9.5; root package `com.chat`.
+> 📘 Module server của ứng dụng Chat realtime, xử lý tài khoản, phiên đăng nhập, hội thoại, tin nhắn, trạng thái đọc, file đính kèm và WebSocket.
 
-Phát triển trên nhánh `backend`, giữ toàn bộ code trong thư mục `backend/`.
-Khi hoàn thiện và kiểm tra xong mới gộp vào `main`.
+---
 
-## Chạy local
+## 🎯 MỤC TIÊU
 
-Cần JDK 21, MySQL 8.4 và kết nối mạng để tải dependency lần đầu.
-Tạo database `chat` rỗng với charset `utf8mb4`; chuẩn bị tài khoản riêng có quyền trên database này.
-Xem [hướng dẫn database](docs/05-database-va-migration.md).
-Từ `backend/`, đặt biến môi trường bằng giá trị local của bạn:
+Server chịu trách nhiệm:
+
+- Tiếp nhận yêu cầu HTTP và kết nối WebSocket từ client.
+- Đăng ký, đăng nhập, đăng xuất và xác thực bằng session cookie.
+- Quản lý người dùng, hội thoại DIRECT/GROUP và thành viên nhóm.
+- Lưu tin nhắn, lịch sử chat, file đính kèm và mốc đọc.
+- Phát realtime tin nhắn mới, trạng thái đang nhập, đã đọc và ONLINE/OFFLINE.
+- Kiểm tra quyền truy cập trước khi trả dữ liệu hoặc file.
+
+---
+
+## ⚙️ CÔNG NGHỆ SỬ DỤNG
+
+| Thành phần | Công nghệ |
+|------------|-----------|
+| Ngôn ngữ | Java 21 |
+| Framework | Spring Boot 3.5.16 |
+| REST API | Spring Web MVC |
+| Realtime | Spring WebSocket, raw JSON, không dùng STOMP |
+| Database | MySQL 8.4 |
+| ORM | Spring Data JPA / Hibernate |
+| Migration | Flyway |
+| Authentication | Session cookie HttpOnly, BCrypt |
+| File storage | Local filesystem, metadata lưu trong MySQL |
+| Build | Maven Wrapper |
+| Test | JUnit 5, Spring Boot Test, Testcontainers MySQL |
+
+---
+
+## 🚀 HƯỚNG DẪN CHẠY
+
+### Yêu cầu
+
+- JDK 21.
+- MySQL 8.4.
+- Docker Desktop nếu chạy test tích hợp.
+
+### Cài đặt
+
+Tạo database MySQL rỗng:
+
+```sql
+CREATE DATABASE chat
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_0900_as_ci;
+```
+
+Từ thư mục `backend/`, sao chép cấu hình mẫu:
+
+```bash
+cp .env.example .env
+```
+
+Điền thông tin kết nối trong `.env`:
+
+```properties
+DB_URL=jdbc:mysql://localhost:3306/chat?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=UTF-8
+DB_USERNAME=chat_app
+DB_PASSWORD=your_password
+SERVER_PORT=8086
+SESSION_COOKIE_SECURE=false
+CORS_ALLOWED_ORIGINS=http://localhost:3001
+FILE_STORAGE_ROOT=./uploads
+```
+
+Flyway tự tạo và cập nhật schema khi server khởi động.
+
+### Khởi động server
+
+Windows:
 
 ```powershell
-$env:DB_URL='jdbc:mysql://localhost:3306/chat?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=UTF-8'
-$env:DB_USERNAME='chat_app'
-$env:DB_PASSWORD='<mat-khau-local>'
 .\mvnw.cmd spring-boot:run
 ```
 
-Linux/macOS: `sh mvnw spring-boot:run`.
-Có thể copy `.env.example` thành `backend/.env` và điền thông tin local.
-App import `.env` khi chạy từ `Chat/` hoặc `Chat/backend/`; dùng `KEY=value`,
-không bọc giá trị trong dấu nháy hoặc thêm `export`. Biến môi trường có độ ưu tiên cao hơn file.
-Trong VS Code chọn cấu hình `Chat Backend (8086)` rồi F5/Ctrl+F5.
-App yêu cầu database hoạt động; không tự tạo database hay âm thầm chuyển sang database in-memory.
+Linux/macOS:
 
-### Nạp dữ liệu mẫu local
-
-Khởi động backend một lần để Flyway tạo schema V1–V4, sau đó chạy script từ thư mục
-`backend/`. Dữ liệu mẫu chỉ dành cho database local, không chạy trên môi trường dùng chung
-hoặc production.
-
-PowerShell/MySQL CLI:
-
-```powershell
-mysql --default-character-set=utf8mb4 -u root -p chat -e "source scripts/seed-dev.sql"
+```bash
+./mvnw spring-boot:run
 ```
 
-MySQL Workbench: mở `scripts/seed-dev.sql`, chọn schema `chat` rồi chạy toàn bộ script.
-Script có thể chạy lại, không nằm trong Flyway và không tự chạy khi start ứng dụng.
+Server chạy tại: `http://localhost:8086`
 
-Các tài khoản mẫu dùng chung mật khẩu `123456`:
+WebSocket chạy tại: `ws://localhost:8086/ws`
 
-- `seed_an`
-- `seed_binh`
-- `seed_chi`
-- `seed_dung`
+Kiểm tra health:
 
-Seed tạo một hội thoại DIRECT, một GROUP có tin nhắn và một GROUP chưa có tin để kiểm
-tra danh sách hội thoại, tin cuối và số chưa đọc. Không seed session; đăng nhập qua
-`POST /api/auth/login` để backend tự tạo cookie session hợp lệ.
+```bash
+curl http://localhost:8086/actuator/health
+```
 
-Kiểm tra: `GET http://localhost:8086/actuator/health` trả `{"status":"UP"}`.
-Chỉ expose health, không expose env hoặc chi tiết health.
-Đổi port bằng biến môi trường `SERVER_PORT` (mặc định 8086).
-Session token nằm trong cookie HttpOnly và chỉ được lưu hash trong DB.
-Cookie mặc định Secure=true; khi chạy HTTP local dùng `SESSION_COOKIE_SECURE=false`.
-CORS mặc định chỉ cho `http://localhost:3001` và bật credentials để trình duyệt gửi
-cookie session. Cấu hình nhiều origin bằng `CORS_ALLOWED_ORIGINS` phân tách bởi dấu phẩy;
-không dùng wildcard `*`.
-WebSocket dùng `ws://localhost:8086/ws` khi chạy local HTTP, raw JSON và không dùng STOMP.
-Handshake bắt buộc cookie `token` hợp lệ và Origin nằm trong `CORS_ALLOWED_ORIGINS`; không
-truyền token trong URL/frame. Server ping mỗi 30 giây, đổi bằng `WEBSOCKET_HEARTBEAT_INTERVAL`.
-File được lưu ngoài database tại `FILE_STORAGE_ROOT` (mặc định `./uploads`), còn bảng
-`files` chỉ lưu metadata. Upload chấp nhận mọi loại file; Content-Type thiếu hoặc sai
-được lưu là `application/octet-stream`. Giới hạn mặc định là 20 MiB/file và có thể
-cấu hình bằng `FILE_MAX_SIZE`, `FILE_MAX_REQUEST_SIZE`.
-Chưa dùng để triển khai production.
+Kết quả:
 
-## Build và kiểm tra
+```json
+{"status":"UP"}
+```
 
-Cần Docker Engine/Docker Desktop đang chạy. Testcontainers tạo MySQL riêng trên port ngẫu nhiên,
-không dùng `DB_URL`/tài khoản database local; container được dọn sau test.
-Lần đầu cần tải image `mysql:8.4`.
+---
+
+## 🔗 API
+
+Các API yêu cầu đăng nhập sử dụng cookie session do endpoint login tạo.
+
+| Endpoint | Method | Input chính | Output chính |
+|----------|--------|------------|--------------|
+| `/actuator/health` | GET | — | `{"status":"UP"}` |
+| `/api/auth/register` | POST | `username, password, fullName` | Tạo tài khoản |
+| `/api/auth/login` | POST | `username, password` | Cookie session và thông báo đăng nhập |
+| `/api/auth/logout` | POST | Cookie session | Thu hồi phiên đăng nhập |
+| `/api/users` | GET | `keyword, page, size` | Danh sách user công khai |
+| `/api/users/me` | GET | Cookie session | User đang đăng nhập |
+| `/api/users/me` | PUT | `fullName, avatarFileId` | User sau khi cập nhật |
+| `/api/files` | POST | Multipart field `file` | Metadata và `fileId` |
+| `/api/files/{id}` | GET | File ID | Nội dung file |
+| `/api/conversations` | GET | `page, size` | Danh sách hội thoại, tin cuối và số chưa đọc |
+| `/api/conversations/direct` | GET | `recipientId` | DIRECT đã có và thông tin người nhận |
+| `/api/conversations/group` | POST | `name, avatarFileId, memberIds` | Nhóm vừa tạo |
+| `/api/conversations/{id}` | GET | Conversation ID | Chi tiết hội thoại |
+| `/api/conversations/{id}` | PUT | `name, avatarFileId` | Nhóm sau khi cập nhật |
+| `/api/conversations/{id}/messages` | GET | `before, limit` | Lịch sử tin nhắn theo cursor |
+| `/api/conversations/{id}/read` | PUT | `lastReadMessageId` | Mốc đọc và số chưa đọc |
+| `/api/conversations/{id}/members` | GET | `page, size` | Thành viên đang hoạt động |
+| `/api/conversations/{id}/members` | POST | `memberIds` | Kết quả thêm thành viên |
+| `/api/conversations/{id}/members/{userId}` | DELETE | User ID | Rời nhóm hoặc xóa thành viên |
+| `/api/conversations/{id}/available-members` | GET | `keyword, page, size` | User có thể thêm vào nhóm |
+
+### WebSocket
+
+Client kết nối `/ws` bằng cookie session hợp lệ. Frame chung:
+
+```json
+{
+  "event": "EVENT_NAME",
+  "data": {}
+}
+```
+
+| Chiều | Event | Mục đích |
+|-------|-------|----------|
+| FE → BE | `SEND_MESSAGE` | Gửi tin bằng `conversationId` hoặc `recipientId` |
+| FE → BE | `TYPING` | Báo đang nhập hoặc đã dừng nhập |
+| BE → FE | `MESSAGE_ACK` | Xác nhận tin đã được lưu |
+| BE → FE | `NEW_MESSAGE` | Phát tin mới tới thành viên |
+| BE → FE | `READ_RECEIPT` | Báo user đã đọc tới tin nào |
+| BE → FE | `PRESENCE_CHANGED` | Báo ONLINE/OFFLINE |
+| BE → FE | `ERROR` | Trả lỗi của frame WebSocket |
+
+---
+
+## 📦 CẤU TRÚC
+
+```text
+backend/
+├── README.md
+├── pom.xml
+├── mvnw
+├── mvnw.cmd
+├── .env.example
+├── config/
+│   └── application-local.yml
+├── scripts/
+│   └── seed-dev.sql
+├── src/
+│   ├── main/
+│   │   ├── java/com/chat/
+│   │   │   ├── common/        # Response chung, constant và base entity
+│   │   │   ├── config/        # CORS, cookie, WebSocket và validation
+│   │   │   ├── exception/     # Chuẩn hóa lỗi toàn hệ thống
+│   │   │   ├── integration/   # Storage và WebSocket
+│   │   │   ├── modules/       # auth, user, conversation, message, file
+│   │   │   └── utils/         # Helper dùng chung
+│   │   └── resources/
+│   │       ├── application.properties
+│   │       ├── db/migration/
+│   │       └── messages*.properties
+│   └── test/
+└── uploads/                    # File local khi chạy development
+```
+
+---
+
+## 🧪 TEST
+
+Chạy toàn bộ test:
 
 ```powershell
 .\mvnw.cmd clean verify
-java -jar target/chat-backend-0.0.1-SNAPSHOT.jar
 ```
 
-Lệnh chạy jar vẫn cần các biến DB và MySQL như phần chạy local.
-Test khởi động HTTP server ở port ngẫu nhiên, kiểm tra health và endpoint env không được expose.
-Test persistence chạy migration fixture trên MySQL, kiểm tra không chạy lặp migration,
-lưu/đọc tiếng Việt và emoji, rollback transaction.
-Các migration production V1–V4 cũng chạy trong test; Hibernate validate entity khớp schema.
-Schema 3NF có 8 bảng nghiệp vụ; test nâng cấp V3 có dữ liệu xác nhận giữ liên kết và mốc đọc.
-Test bổ sung kiểm tra unique username, UUID/audit, foreign key, unique token hash,
-phiên hết hạn đúng tại expiresAt và thu hồi idempotent.
-Test MVC kiểm tra validation Việt/Anh, JSON sai, lỗi nghiệp vụ, lỗi giao thức HTTP,
-ẩn thông tin lỗi nội bộ và response wrapper chung.
-Test auth kiểm tra BCrypt, session hạn 365 ngày, cookie, xác thực `/api/users/me`
-và không serialize token thô. Test hồ sơ kiểm tra request đầy đủ, trim tên,
-xóa avatar và quyền sử dụng file ảnh. Test tìm kiếm user kiểm tra username/fullName,
-loại người đang đăng nhập, phân trang và validation query.
-Test file kiểm tra mọi loại MIME, giới hạn dung lượng, metadata an toàn và quyền tải của uploader,
-avatar công khai cho user đã đăng nhập, thành viên hội thoại và người không có quyền.
-Test HTTP-08 kiểm tra lookup hai chiều luôn trả 200 với peer, conversation có thể null,
-recipient sai và bảo đảm không tạo hội thoại rỗng.
-Test HTTP-09 kiểm tra role, member trùng, user/avatar không hợp lệ, rollback và quyền
-xem avatar nhóm.
-Test HTTP-10 kiểm tra phân trang, chỉ lấy membership đang hoạt động, thứ tự hoạt động,
-peer của DIRECT, memberCount, lastMessage kèm thông tin người gửi/attachment và unreadCount.
-Test HTTP-11 kiểm tra response chi tiết, peer của DIRECT, memberCount hiện tại, hội thoại
-không tồn tại, người ngoài, thành viên đã rời, ID sai và session thiếu.
-Test HTTP-12 kiểm tra quyền OWNER, trim tên, đặt/xóa avatar, file sai quyền/không tồn tại,
-body thiếu/sai và từ chối cập nhật DIRECT.
-Test HTTP-13 kiểm tra phân trang thành viên, public profile, role, thứ tự ổn định,
-loại người đã rời và chặn người ngoài hội thoại.
-Test HTTP-14 kiểm tra OWNER thêm thành viên, deduplicate ID, bỏ qua thành viên hiện tại,
-kích hoạt lại người đã rời, rollback khi có user sai và từ chối MEMBER/DIRECT.
-Test HTTP-15 kiểm tra MEMBER tự rời, OWNER xóa MEMBER, xóa idempotent, giữ membership
-để có thể thêm lại và từ chối OWNER rời nhóm, MEMBER xóa người khác hoặc thao tác trên DIRECT.
-Test HTTP-20 kiểm tra tìm ứng viên thêm vào nhóm, loại OWNER/thành viên hiện tại,
-cho phép thêm lại người đã rời, phân trang và chỉ OWNER được gọi.
-Test HTTP-16 kiểm tra cursor loại trừ, thứ tự mới đến cũ, attachment và phân quyền.
-Test HTTP-17 kiểm tra mốc đọc chỉ tiến, unreadCount và READ_RECEIPT dùng mốc thực tế.
-Test WebSocket kiểm tra cookie/Origin handshake, SEND_MESSAGE tạo dữ liệu trước ACK/broadcast,
-retry không tạo trùng, attachment, TYPING, lỗi frame và presence theo số kết nối.
+Test tích hợp sử dụng Testcontainers nên cần Docker đang chạy.
 
-## Xử lý lỗi và validation
+Chỉ compile source:
 
-- `common.wrapper.BaseResponse`: envelope chung `code/strCode/message/content` theo QLCC.
-- `common.dto.response.PageResponse`: dữ liệu và metadata phân trang.
-- `exception.BusinessException`: lỗi nghiệp vụ với HTTP status và message key; dùng các factory
-  `badRequest`, `unauthenticated`, `forbidden`, `notFound`, `conflict`, `payloadTooLarge`.
-- `exception.GlobalExceptionHandler`: chuẩn hóa lỗi Spring MVC vào `BaseResponse`.
-- `common.dto.response.ErrorDetailResponse`: timestamp UTC, status, path, fieldErrors.
-- `utils.MessageUtils`, `StringUtils`, `PageableUtils`: helper dùng chung đã có nhu cầu.
-- `common.constant.ErrorConstants`: các code ổn định theo hợp đồng.
-- `config.ValidationConfig`: Bean Validation dùng chung message bundle.
-- `messages.properties` / `messages_en.properties`: tiếng Việt mặc định; dùng
-  `Accept-Language: en` để nhận tiếng Anh.
-
-Ví dụ trong service khi đã có nghiệp vụ:
-
-```java
-throw BusinessException.notFound(ErrorConstants.NOT_FOUND);
+```powershell
+.\mvnw.cmd -DskipTests compile
 ```
 
-Message riêng module khai báo trong bundle, `strCode` trả FE vẫn theo loại lỗi HTTP.
-Key không tồn tại sẽ dùng thông báo chung, không trả nguyên key.
-Request DTO dùng `@NotBlank(message = "{validation.notBlank}")` cùng `@Valid`.
-Không đưa password, token hoặc chi tiết SQL vào message/arguments.
-`fieldErrors` trong `content` luôn là array; lỗi DTO có tên field và message,
-không chứa rejectedValue.
+Test nhanh health API:
 
-Các lỗi giao thức vẫn giữ HTTP status/header gốc, ví dụ 405 với header Allow;
-405/406 dùng code `VALIDATION_ERROR`, không chuyển thành 500.
-Filter session chuyển lỗi xác thực qua cùng Error model; lỗi WS sẽ được tích hợp ở bước tương ứng.
-Các endpoint `/test/...` chỉ nằm trong test, không được thêm vào ứng dụng.
+```bash
+curl http://localhost:8086/actuator/health
+```
 
-## Các bước review tiếp theo
+---
 
-1. Review HTTP-16/HTTP-17 và READ_RECEIPT.
-2. Tiếp tục các API/event còn lại theo hợp đồng.
+## 📝 GHI CHÚ
 
-Mỗi bước dừng để review; chỉ commit/push khi được yêu cầu.
-
-Quy tắc BE được lưu trong `docs/` của thư mục backend.
-
-Đọc [convention](docs/01-kien-truc-va-convention.md),
-[quy tắc code](docs/02-quy-tac-trien-khai-code.md),
-[quy trình Git](docs/03-git-workflow.md) và
-[hợp đồng API](docs/04-hop-dong-api.md) trước khi code.
+- Port mặc định: **8086**.
+- Có thể thay đổi bằng `SERVER_PORT` trong file `.env`.
+- Frontend local mặc định: `http://localhost:3001`.
+- Cookie local cần `SESSION_COOKIE_SECURE=false`; production HTTPS nên dùng `true`.
+- File thật được lưu tại `FILE_STORAGE_ROOT`; bảng `files` chỉ lưu metadata và `storageKey`.
+- Giới hạn mặc định: **20 MiB/file**.
+- Gửi tin nhắn dùng WebSocket; tải lịch sử và file dùng HTTP.
+- Flyway quản lý schema; không dùng Hibernate để tự tạo hoặc sửa bảng.

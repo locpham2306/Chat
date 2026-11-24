@@ -20,6 +20,7 @@ Thumbs.db
 __pycache__/
 *.pyc
 ~$*.docx
+/*.docx
 
 # Java builds (keep Maven/Gradle wrapper files trackable)
 target/
