@@ -123,8 +123,6 @@ Với cấu hình mẫu, client kết nối trực tiếp đến các URL backen
 Các lệnh kiểm tra:
 
 ```bash
-pnpm test:run
-pnpm test:typecheck
 pnpm lint
 pnpm prettier
 pnpm build

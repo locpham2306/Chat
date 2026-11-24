@@ -31,7 +31,6 @@ Server chịu trách nhiệm:
 | Authentication | Session cookie HttpOnly, BCrypt |
 | File storage | Local filesystem, metadata lưu trong MySQL |
 | Build | Maven Wrapper |
-| Test | JUnit 5, Spring Boot Test, Testcontainers MySQL |
 
 ---
 
@@ -187,17 +186,9 @@ backend/
 
 ---
 
-## 🧪 TEST
+## 🧪 KIỂM TRA BUILD
 
-Chạy toàn bộ test:
-
-```powershell
-.\mvnw.cmd clean verify
-```
-
-Test tích hợp sử dụng Testcontainers nên cần Docker đang chạy.
-
-Chỉ compile source:
+Compile source:
 
 ```powershell
 .\mvnw.cmd -DskipTests compile

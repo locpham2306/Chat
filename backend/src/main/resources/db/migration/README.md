@@ -12,4 +12,3 @@ Entity/repository nằm ở modules.user và modules.auth.
 - Không thêm `schema.sql` hoặc dùng Hibernate `update/create`.
 - Database đích phải được tạo trước; cấu hình URL/user/password bằng biến môi trường.
 - Không baseline tự động một database cũ; kiểm tra schema trước khi lập kế hoạch chuyển đổi.
-- Fixture kiểm thử nằm trong `src/test/resources/db/test-migration`, không đưa vào production.
